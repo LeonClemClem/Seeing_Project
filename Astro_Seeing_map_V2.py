@@ -85,8 +85,8 @@ def calculate_seeing(lat, lon):
 #    print("Wind Speed Levels:", wind_levels)
 #    print("dimension:",len(wind_levels))
     
-    z         =     [100, 1500, 3000, 5500, 9000, 12000]  # Altitudes in km
-    p         =     [1000, 850, 700, 500, 300, 200]
+    z         =     [100, 1500, 3000, 5500, 9000, 12000]  # Altitudes in m
+    p         =     [1000, 850, 700, 500, 300, 200]  # en hPa / mb
 
     # Calculate Cn^2
     gamma     =     0.0098 # mettre vraie valeure plus tard
@@ -101,7 +101,7 @@ def calculate_seeing(lat, lon):
             pression = p[k+1]  
             print(f"Iteration {k}: pression = {pression}")  # Debugging output
             print("p =", pression)
-            T           =   temp_levels[k+1] + 273.15
+            T           =   temp_levels[k+1] + 273.15  # en K
             print ("Temperatures", T)
 
  ######################
