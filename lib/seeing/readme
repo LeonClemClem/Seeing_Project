@@ -1,0 +1,19 @@
+# Developer instructions
+
+## Environment
+
+Create a virtual environment:
+
+`python3 -m venv <env>`
+
+Activate the virtual environment
+
+`source <env>/bin/activate`
+
+Install the library in developer mode
+
+`pip install -e .[dev]`
+
+Install the pre-commit hooks
+
+`pre-commit install`

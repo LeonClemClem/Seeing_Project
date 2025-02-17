@@ -1,0 +1,29 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=64.0", "wheel>=0.37.1"]
+
+[project]
+name = "seeing"
+version = "0.0.1"
+description = "seeing"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
+authors = [
+    {name = "Clement Brustel", email = "example@example.com"},
+    {name = "Navid Hedjazian", email = "navid.hedjazian@gmail.com"},
+]
+dependencies = [
+    "numpy >= 2.1",
+    "matplotlib"
+]
+
+[project.optional-dependencies]
+dev = ['pytest', 'black', 'isort', 'flake8', 'pre-commit']
+
+[tool.isort]
+profile = "black"
+
+[tool.setuptools]
+# https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
+platforms = ["Linux", "Windows"]
