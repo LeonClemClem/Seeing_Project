@@ -17,3 +17,8 @@ Install the library in developer mode
 Install the pre-commit hooks
 
 `pre-commit install`
+
+Install the environment as a jupyter kernel
+
+`pip install jupyter ipykernel`
+`ipython kernel install --user --name=env`
