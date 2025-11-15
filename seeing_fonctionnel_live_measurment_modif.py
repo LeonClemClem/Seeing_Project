@@ -48,81 +48,35 @@ def compute_seeing(diff_positions):
     if len(diff_positions) < 2:
         return None
 
-    # Convert pixel differences to radians on sky:
-    # theta = pixel displacement * pixel_size / focal_length
-    # diff_positions = abs(diff_positions)
-    print (diff_positions, 'diff_positions')
-
+    #print (diff_positions, 'diff_positions')
     diff_radians = diff_positions * pixel_size / focal_length
-    print (diff_radians, 'diff_radians')
-
-    # print(diff_radians,'diff_radians')
-    # var_x = np.var(diff_radians[:,0])
-    # var_y = np.var(diff_radians[:,1])
-    # print (var_x, var_y, 'var X Y')
-    # print(f"{var_x:.3f}", f"{var_y:.3f}", ' var X Y') 
-    
-    # Vesion taille trous
-    # print(diff_positions,'diff_positions')
-    # var_x_b = x_pix_chang * pixel_size / focal_length
-    # var_y_b = y_pix_chang * pixel_size / focal_length
+    #print (diff_radians, 'diff_radians')
     var_x_b = np.var(diff_radians[:,0])
     var_y_b = np.var(diff_radians[:,1])
-    print(diff_radians[:,1],'diff_radians [:, 1')
-    print (var_x_b, var_y_b, 'var X Y')
-
-
-  
-    #tentatives debug ####################################
-    # var_x2 = diff_radians[1][0] - diff_radians[0][0]
-    # var_y2 = diff_radians[1][1] - diff_radians[0][1]
-    # var_x = abs(var_x2)
-    # var_y = abs(var_y2)
-    # print (var_x2, var_y2, 'var X2 Y2')
-    
-    # Calculate Fried parameter r0 (Fried 1966 DIMM formula)
-    # Variance of differential motion related to r0 by:
-    # var = 0.358 * wavelength^2 * baseline^(-1/3) * r0^(-5/3)
-    # => r0 = (0.358 * wavelength^2 * baseline^(-1/3) / var)^(3/5)
+    #print(diff_radians[:,1],'diff_radians [:, 1')
+    #print (var_x_b, var_y_b, 'var X Y')
 
     try:
-        #  Version simple
-        # r0_x = (0.358 * wavelength**2 * baseline**(-1/3) / var_x)**(3/5)
-        # r0_y = (0.358 * wavelength**2 * baseline**(-1/3) / var_y)**(3/5)
-        
         #  Version avec taille trous
         factor_x_b = 2 * wavelength**2 * (0.179 * D_hole**(-1/3) - 0.0968 * baseline**(-1/3))
         factor_y_b = 2 * wavelength**2 * (0.179 * D_hole**(-1/3) - 0.145 * baseline**(-1/3))
-        print(factor_y_b, factor_x_b, 'factor_xy_b')
+        #print(factor_y_b, factor_x_b, 'factor_xy_b')
         
         r0_xb = (factor_x_b / var_x_b**2)**(3/5)
         r0_yb = (factor_y_b / var_y_b**2)**(3/5)
-        print(r0_xb, r0_yb, 'r0_xy_b')
-        
+        #print(r0_xb, r0_yb, 'r0_xy_b')
         
     except ZeroDivisionError:
         return None
-    
-    # # Version Simple
-    # r0 = (r0_x + r0_y) / 2
-    # print(r0, 'r0')
-    # # Seeing in radians: seeing = 0.98 * wavelength / r0
-    # seeing_rad = 0.98 * wavelength / r0
-    # # Convert radians to arcseconds
-    # seeing_arcsec = np.degrees(seeing_rad) * 3600
-    # # print(seeing_arcsec, 'seeing')
-    # print(f"Seeing Methode a: {seeing_arcsec:.2f} arcsec")
-    
-    # Version avec taille trous mais marche pas =  Zero. Verifier 
+    # Version avec taille trous
     r0_b = (r0_xb + r0_yb) / 2                                      
     seeing_rad_b = 0.98 * wavelength / r0_b                        
     seeing_arcsec_b = np.degrees(seeing_rad_b) * 3600   
-    print(r0_b, 'r0_b)')   
+    #print(r0_b, 'r0_b)')   
     # print(seeing_arcsec_b, 'seeing_b')         
     print(f"Seeing Methode b: {seeing_arcsec_b:.2f} arcsec")
 
     return seeing_arcsec_b#, seeing_arcsec_b
-
 
 def main():
     asi.init()
@@ -178,24 +132,11 @@ def main():
                     diff_y = sep_y - prev_sep_y
                     diff_positions.append([diff_x, diff_y])
                     # diff_positions.append([delta_x, delta_y])
-
-                    
-                    # x1,  y1 = centroids[0]
-                    # x2, y2 = centroids[1]
-                    # dx = x1 - x2
-                    # dy = y1 - y2
-                    # diff_positions.append([dx, dy])
-                    
-                    # dx = centroids[0][0] - prev_centroids[0][0]                       #Verifier ça
-                    # dy = centroids[0][1] - prev_centroids[0][1]
-                    # diff_positions.append([dx, dy])
-                    
-                    # print (dx, dy)
-                    # # Keep only recent 50 differences for smoothing    MAIS si désactivé... ça fait gros smooth, why ??
+                    # variance sur 10 images successives arbitraire
                     if len(diff_positions) > 10:
                         diff_positions.pop(0)
-                    print (centroids, 'çentroids')
-                    print (diff_positions, 'diff poz')
+                    #print (centroids, 'çentroids')
+                    #print (diff_positions, 'diff poz')
 
                     diff_arr = np.array(diff_positions)
                     seeing = compute_seeing(diff_arr)
@@ -204,7 +145,6 @@ def main():
                         cv2.putText(frame, f"Seeing: {seeing:.2f} arcsec", (10,30),
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
                         print(f"Seeing: {seeing:.2f} arcsec")
-                        
                         
                         #######  Update live plot ##################
                         x_data.append(time.time() - start_time)
@@ -220,8 +160,6 @@ def main():
                         ###########UPDATE live plot #################
                         
                 prev_centroids = centroids
-                
-
                 # Draw star circles
                 for (cx, cy) in centroids:
                     cv2.circle(frame, (cx, cy), 5, (0,255,0), 2)
@@ -247,3 +185,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
