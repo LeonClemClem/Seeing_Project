@@ -26,6 +26,7 @@ Physique :
     lambda = 500 nm
 """
 
+import argparse
 from pathlib import Path
 import re
 
@@ -45,7 +46,9 @@ from eccodes import (
 # CONFIGURATION
 # ============================================================================
 
-DATA_DIR = Path("/Users/melissavirassamy/AROME_download")
+# Valeur par defaut ; ecrasee par l'argument --data-dir passe en ligne de
+# commande (voir parse_args / main).
+DATA_DIR = Path(".")
 
 # LAT_SITE = 43.9500;  LON_SITE  =  4.81667   #   Avignon 
 # LAT_SITE = 48.8566;  LON_SITE  =  2.3522   #   Paris 
@@ -1091,7 +1094,23 @@ def make_one_figure(results_by_hour, df):
 # MAIN
 # ============================================================================
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Calcul du seeing optique AROME a partir des GRIB2 deja telecharges."
+    )
+    parser.add_argument(
+        "data_dir",
+        nargs="?",
+        type=Path,
+        default=Path("."),
+        help="Folder containing the downloaded AROME GRIB2 files (default: current directory).",
+    )
+    return parser.parse_args()
+
+
 def main():
+    global DATA_DIR
+    DATA_DIR = parse_args().data_dir
 
     print()
     print("=" * 80)

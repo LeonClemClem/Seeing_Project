@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "seeing-project"
+version = "0.1.0"
+description = "Compute astronomical seeing (Cn2 / seeing in arcsec) from Meteo-France AROME weather model data."
+authors = ["defqoon <thomas.hossler@gmail.com>"]
+readme = "README.md"
+packages = [{include = "seeing_project"}]
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.13"
+numpy = "^2.5.3"
+pandas = "^3.0.5"
+matplotlib = "^3.11.2"
+eccodes = "^2.48.0"
+meteofetch = "^0.5.8"
+eccodeslib = "^2.48.2.27"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
