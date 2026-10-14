@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "seeing-core"
+version = "0.1.0"
+description = "Astronomical seeing (Cn2, r0, seeing) from Meteo-France AROME GRIB2 forecasts."
+authors = ["defqoon <thomas.hossler@gmail.com>"]
+packages = [{include = "seeing_core"}]
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.13"
+numpy = "^2.5.3"
+eccodes = "^2.48.0"
+# Bundles the ecCodes C library (no system libeccodes needed).
+eccodeslib = "^2.48.2.27"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

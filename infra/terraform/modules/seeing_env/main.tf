@@ -1,0 +1,115 @@
+# Everything one environment (dev or prod) owns: service accounts, the web service, the batch and
+# migrate jobs and the batch schedule. Shared pieces (VPC, DB VM, secrets, registry, scheduler SA)
+# come in as inputs from the `shared` root.
+
+locals {
+  db_name = "seeing_${var.env}"
+
+  db_env = {
+    DB_HOST = var.db_host
+    DB_PORT = tostring(var.db_port)
+    DB_NAME = local.db_name
+    DB_USER = local.db_name
+    ENV     = var.env
+  }
+  db_secret_env = { DB_PASSWORD = var.db_password_secret_id }
+}
+
+# --- Service accounts: each one can read only this environment's DB password -------------------
+
+resource "google_service_account" "web" {
+  account_id   = "seeing-web-${var.env}"
+  display_name = "Seeing web (${var.env})"
+}
+
+resource "google_service_account" "batch" {
+  account_id   = "seeing-batch-${var.env}"
+  display_name = "Seeing batch (${var.env})"
+}
+
+resource "google_secret_manager_secret_iam_member" "db_password" {
+  for_each = {
+    web   = google_service_account.web.member
+    batch = google_service_account.batch.member
+  }
+
+  secret_id = var.db_password_secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = each.value
+}
+
+# --- Web service + migrations job (same image) --------------------------------------------------
+
+module "web" {
+  source = "../cloud_run_service"
+
+  name                  = "seeing-web-${var.env}"
+  region                = var.region
+  image                 = var.web_image
+  service_account_email = google_service_account.web.email
+  network               = var.network_id
+  subnetwork            = var.subnet_id
+  cpu                   = "1"
+  memory                = "512Mi"
+  min_instances         = 0
+  max_instances         = var.web_max_instances
+  env                   = local.db_env
+  secret_env            = local.db_secret_env
+  iap_members           = var.iap_members
+  deletion_protection   = var.deletion_protection
+
+  depends_on = [google_secret_manager_secret_iam_member.db_password]
+}
+
+module "migrate" {
+  source = "../cloud_run_job"
+
+  name                  = "seeing-migrate-${var.env}"
+  region                = var.region
+  image                 = var.job_image
+  command               = ["seeing-migrate"]
+  service_account_email = google_service_account.web.email
+  network               = var.network_id
+  subnetwork            = var.subnet_id
+  cpu                   = "1"
+  memory                = "512Mi"
+  timeout_seconds       = 600
+  max_retries           = 0
+  env                   = local.db_env
+  secret_env            = local.db_secret_env
+  deletion_protection   = var.deletion_protection
+
+  depends_on = [google_secret_manager_secret_iam_member.db_password]
+}
+
+# --- Batch job + schedule -------------------------------------------------------------------------
+
+module "batch" {
+  source = "../cloud_run_job"
+
+  name                  = "seeing-batch-${var.env}"
+  region                = var.region
+  image                 = var.job_image
+  service_account_email = google_service_account.batch.email
+  network               = var.network_id
+  subnetwork            = var.subnet_id
+  cpu                   = var.batch_cpu
+  memory                = var.batch_memory
+  timeout_seconds       = var.batch_timeout_seconds
+  max_retries           = var.batch_max_retries
+  env                   = merge(var.batch_env, local.db_env)
+  secret_env            = local.db_secret_env
+  deletion_protection   = var.deletion_protection
+
+  depends_on = [google_secret_manager_secret_iam_member.db_password]
+}
+
+module "batch_schedule" {
+  source = "../scheduled_job"
+
+  name                            = "seeing-batch-${var.env}"
+  region                          = var.region
+  job_name                        = module.batch.name
+  schedule                        = var.batch_schedule
+  scheduler_service_account_email = var.scheduler_service_account_email
+}

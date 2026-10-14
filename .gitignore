@@ -19,3 +19,23 @@ seeing_AROME_complet_HAG_isobares.csv
 .vscode/
 .idea/
 .DS_Store
+
+# Web
+node_modules/
+apps/web/dist/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
+# Tests / tooling
+.pytest_cache/
+.ruff_cache/
+.coverage
+*.tsbuildinfo
+
+# Claude Code worktrees / local state
+.claude/
