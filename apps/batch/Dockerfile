@@ -23,7 +23,7 @@ COPY apps/batch/seeing_batch apps/batch/seeing_batch
 # Path dependencies are installed in develop mode (.pth -> /app/...), so the runtime stage
 # keeps the same layout.
 RUN cd apps/batch && poetry install --only main \
-    && .venv/bin/python -c "import eccodes, seeing_core, seeing_db, seeing_batch.cli; print('ecCodes', eccodes.codes_get_api_version())"
+    && .venv/bin/python -c "import seeing_batch.cli, seeing_core, seeing_db, eccodes; print('ecCodes', eccodes.codes_get_api_version())"
 
 FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \
