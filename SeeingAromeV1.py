@@ -22,6 +22,8 @@ IMPORTANT :
 - Le script ne telecharge rien.
 - Il utilise les GRIB2 deja presents dans DATA_DIR.
 """
+
+import argparse
 from pathlib import Path
 import re
 from datetime import datetime, timedelta
@@ -32,7 +34,9 @@ from eccodes import (codes_grib_new_from_file,codes_get,codes_get_array,codes_re
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-DATA_DIR = Path("AROME_download_2109_12h30")
+# Valeur par defaut ; ecrasee par l'argument data_dir passe en ligne de
+# commande (voir parse_args / main).
+DATA_DIR = Path(".")
 FORECAST_HOURS = 51
 # ======    Sites d'observations    =========
 # LAT_SITE = 43.9500;  LON_SITE  =  4.81667   #   Avignon 
@@ -1027,7 +1031,24 @@ def make_one_figure(results_by_hour, df, forecast_reference):
 # MAIN
 # ============================================================================
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Calcul du seeing optique AROME a partir des GRIB2 deja telecharges."
+    )
+    parser.add_argument(
+        "data_dir",
+        nargs="?",
+        type=Path,
+        default=Path("."),
+        help="Folder containing the downloaded AROME GRIB2 files (default: current directory).",
+    )
+    return parser.parse_args()
+
+
 def main():
+    global DATA_DIR
+    DATA_DIR = parse_args().data_dir
+
     print("\n" + "=" * 80)
     print("CALCUL SEEING AROME — PROFIL COMPLET HAG + ISOBARIQUE")
     print("=" * 80)

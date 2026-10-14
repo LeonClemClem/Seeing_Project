@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Poetry / virtual environments
+.venv/
+venv/
+
+# Downloaded AROME GRIB2 data and generated outputs (large, machine-specific)
+AROME_download/
+*.grib2
+*.idx
+seeing_AROME_local.csv
+seeing_AROME_complet_HAG_isobares.csv
+*.csv
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

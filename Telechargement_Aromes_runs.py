@@ -1,10 +1,8 @@
-from pathlib import Path
+import argparse
 import logging
+from pathlib import Path
 
 from meteofetch import Arome0025
-
-
-OUTPUT_DIR = Path("C:/Users/clement/Documents/Seeing_project/modele/Arome_runs/AROME_download_2109_21h")
 
 
 # Paquets nécessaires au calcul complet sur toute la colonne :
@@ -30,9 +28,9 @@ OUTPUT_DIR = Path("C:/Users/clement/Documents/Seeing_project/modele/Arome_runs/A
 PACKAGES = ("SP3","HP1", "HP2", "IP1", "IP4", "SP2")
 
 
-def download_arome():
+def download_arome(output_dir):
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     logging.basicConfig(
         level=logging.INFO,
@@ -42,9 +40,9 @@ def download_arome():
     print()
     print("=" * 70)
     print("Téléchargement AROME 0.025° avec MeteoFetch")
-    print("Variables : HP1 + HP2(TKE HAG) + IP1 + IP4(TKE isobare) + SP2(H_COULIM)")
+    print("Variables : SP3(flux) + HP1 + HP2(TKE HAG) + IP1 + IP4(TKE isobare) + SP2(H_COULIM)")
     print("=" * 70)
-    print(f"Dossier : {OUTPUT_DIR.resolve()}")
+    print(f"Dossier : {output_dir.resolve()}")
     print(f"Paquets : {', '.join(PACKAGES)}")
     print()
 
@@ -56,7 +54,7 @@ def download_arome():
 
         paths = Arome0025.get_latest_forecast(
             paquet=package,
-            path=str(OUTPUT_DIR),
+            path=str(output_dir),
             return_data=False,
             num_workers=1,
             num_retries=5,
@@ -81,5 +79,19 @@ def download_arome():
     print("=" * 70)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Download AROME 0.025° GRIB2 forecast files via MeteoFetch."
+    )
+    parser.add_argument(
+        "output_dir",
+        nargs="?",
+        type=Path,
+        default=Path("."),
+        help="Folder to save downloaded GRIB2 files into (default: current directory).",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    download_arome()
+    download_arome(parse_args().output_dir)
