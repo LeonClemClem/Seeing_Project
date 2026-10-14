@@ -1,0 +1,36 @@
+# Generic image build used by infra/scripts/deploy.sh (build context = repo root).
+#   gcloud builds submit . --config cloudbuild.yaml \
+#     --substitutions=_IMAGE=us-central1-docker.pkg.dev/project-astrarome/seeing/web,_TAG=<sha>,_DOCKERFILE=apps/api/Dockerfile
+# Runs on the default pool (e2-standard-2; 2,500 free build-minutes/month per billing account).
+steps:
+  - id: pull-cache
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args: ["-c", "docker pull ${_IMAGE}:latest || true"]
+
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    env: ["DOCKER_BUILDKIT=1"]
+    args:
+      - build
+      - --file=${_DOCKERFILE}
+      - --tag=${_IMAGE}:${_TAG}
+      - --tag=${_IMAGE}:latest
+      - --cache-from=${_IMAGE}:latest
+      - --build-arg=BUILDKIT_INLINE_CACHE=1
+      - .
+
+images:
+  - ${_IMAGE}:${_TAG}
+  - ${_IMAGE}:latest
+
+substitutions:
+  _IMAGE: ""
+  _TAG: ""
+  _DOCKERFILE: ""
+
+options:
+  # Required when building as a user-specified service account (seeing-build).
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1800s

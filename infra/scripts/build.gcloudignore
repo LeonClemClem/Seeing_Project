@@ -1,0 +1,16 @@
+# Files NOT uploaded to Cloud Build by deploy.sh (build context = repo root).
+.git
+.gitignore
+.claude/
+**/.terraform/
+**/node_modules/
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+apps/web/dist/
+research/
+infra/
+docs/
+**/*.grib2
+**/*.idx
