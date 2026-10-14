@@ -155,14 +155,25 @@ programmatically for projects without an organization. Do this once per project 
    **Cloud Run** → `seeing-web-dev` → **Security** → *Identity-Aware Proxy (IAP)* → **Edit policy**
    → **Configure in IAP** → **Configure consent screen** if still prompted (audience External) →
    **Auto generate credentials** → **Save**. Back on the service, check IAP is enabled.
-4. Re-run `terraform -chdir=envs/dev apply`: it should report no changes (or finish the IAP IAM
+   Until this is done, IAP answers every request with `502 Empty Google Account OAuth client
+   ID(s)/secret(s)` (it fails closed).
+4. If sign-in then fails with **`Error 400: redirect_uri_mismatch`**, the generated client lacks
+   IAP's callback. Find the client ID IAP uses (`gcloud iap settings get --project=project-astrarome
+   --resource-type=iap_web` doesn't show Cloud Run services; query
+   `https://iap.googleapis.com/v1/projects/<number>/iap_web/cloud_run-us-central1/services/seeing-web-dev:iapSettings`),
+   then Console → **Google Auth Platform → Clients** → that client (type *Web application*) →
+   **Authorized redirect URIs** → add
+   `https://iap.googleapis.com/v1/oauth/clientIds/<CLIENT_ID>:handleRedirect` → Save, wait a few
+   minutes. For prod, pick the same client in the IAP settings of `seeing-web-prod` so it works
+   without further edits.
+5. Re-run `terraform -chdir=envs/dev apply`: it should report no changes (or finish the IAP IAM
    bindings that failed before the OAuth client existed).
 
 ### 4. Dev environment
 
 ```bash
 terraform -chdir=envs/dev init
-terraform -chdir=envs/dev apply          # then do step 3.3/3.4 if not done yet
+terraform -chdir=envs/dev apply          # then do steps 3.3–3.5 if not done yet
 ```
 
 This creates the service and jobs with Google's placeholder images (`cloudrun/container/hello`
