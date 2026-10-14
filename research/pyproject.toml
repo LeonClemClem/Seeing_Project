@@ -1,10 +1,10 @@
 [tool.poetry]
-name = "seeing-project"
+name = "seeing-research"
 version = "0.1.0"
 description = "Compute astronomical seeing (Cn2 / seeing in arcsec) from Meteo-France AROME weather model data."
 authors = ["defqoon <thomas.hossler@gmail.com>"]
 readme = "README.md"
-packages = [{include = "seeing_project"}]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = ">=3.12,<3.13"
