@@ -130,6 +130,7 @@ resource "google_secret_manager_secret_version" "db" {
 module "db_vm" {
   source = "../modules/db_vm"
 
+  project_id          = var.project_id
   name                = "seeing-db"
   region              = var.region
   zone                = var.zone

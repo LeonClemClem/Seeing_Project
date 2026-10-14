@@ -2,8 +2,6 @@
 # started by a systemd unit written by cloud-init, data on a separate persistent disk that is
 # snapshotted daily.
 
-data "google_project" "this" {}
-
 data "google_compute_image" "cos" {
   family  = "cos-stable"
   project = "cos-cloud"
@@ -13,7 +11,7 @@ locals {
   registry_host = "${var.region}-docker.pkg.dev"
 
   user_data = templatefile("${path.module}/cloud-init.yaml.tftpl", {
-    project              = data.google_project.this.project_id
+    project              = var.project_id
     image                = var.postgres_image
     registry_host        = local.registry_host
     data_device_name     = var.data_disk_name
@@ -38,7 +36,7 @@ resource "google_service_account" "vm" {
 resource "google_project_iam_member" "vm" {
   for_each = toset(["roles/logging.logWriter", "roles/monitoring.metricWriter"])
 
-  project = data.google_project.this.project_id
+  project = var.project_id
   role    = each.value
   member  = google_service_account.vm.member
 }
