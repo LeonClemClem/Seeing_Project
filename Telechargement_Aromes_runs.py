@@ -25,7 +25,7 @@ from meteofetch import Arome0025
 #
 # L'altitude du relief n'est pas supposée provenir de SP2 : le code de calcul
 # peut la déduire du géopotentiel Z des niveaux heightAboveGround si nécessaire.
-PACKAGES = ("HP1", "HP2", "IP1", "IP4", "SP2")
+PACKAGES = ("SP3","HP1", "HP2", "IP1", "IP4", "SP2")
 
 
 def download_arome(output_dir):
@@ -40,7 +40,7 @@ def download_arome(output_dir):
     print()
     print("=" * 70)
     print("Téléchargement AROME 0.025° avec MeteoFetch")
-    print("Variables : HP1 + HP2(TKE HAG) + IP1 + IP4(TKE isobare) + SP2(H_COULIM)")
+    print("Variables : SP3(flux) + HP1 + HP2(TKE HAG) + IP1 + IP4(TKE isobare) + SP2(H_COULIM)")
     print("=" * 70)
     print(f"Dossier : {output_dir.resolve()}")
     print(f"Paquets : {', '.join(PACKAGES)}")

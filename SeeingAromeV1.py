@@ -26,53 +26,79 @@ IMPORTANT :
 import argparse
 from pathlib import Path
 import re
-
+from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
-from eccodes import (
-    codes_grib_new_from_file,
-    codes_get,
-    codes_get_array,
-    codes_release,
-)
-
-
+from eccodes import (codes_grib_new_from_file,codes_get,codes_get_array,codes_release,)
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-# Valeur par defaut ; ecrasee par l'argument --data-dir passe en ligne de
+# Valeur par defaut ; ecrasee par l'argument data_dir passe en ligne de
 # commande (voir parse_args / main).
 DATA_DIR = Path(".")
-
-
+FORECAST_HOURS = 51
+# ======    Sites d'observations    =========
 # LAT_SITE = 43.9500;  LON_SITE  =  4.81667   #   Avignon 
-LAT_SITE = 48.8566;  LON_SITE  =  2.3522   #   Paris 
+# LAT_SITE = 48.8566;  LON_SITE  =  2.3522   #   Paris 
 # LAT_SITE = 42.93642; LON_SITE  =  0.14122  #   Pic Du Midi Observatoire 
 # LAT_SITE = 45.8326 ;  LON_SITE  =  6.8652    #   Mont Blanc
 # -------------   Seeing monitor disponibles :   ------------------------------
 # LAT_SITE = 44.5828;  LON_SITE  =  5.9868   #   Asso Copernicus
 # LAT_SITE = 44.3814;  LON_SITE  =  5.4286   #   VERCLAUSE
-LAT_SITE = 49.8566;  LON_SITE  =  1.3522   
+# LAT_SITE = 38;  LON_SITE  =  -2.55   #espagne
+
+# LAT_SITE = 44.1952; LON_SITE = 5.4716  #cosmodrome
+
+LAT_SITE = 44.6988; LON_SITE =  6.9083   #Observatoire Saint Veran
+K_TKE = 1.8 ; K_CIS = 1
+
+# ============================================================================
+#                         VERCLAUSE
+# ============================================================================
+# LAT_SITE = 44.3814;  LON_SITE  =  5.4286   #   VERCLAUSE
+# K_TKE = 4 ; K_CIS = 40
+# ============================================================================
 
 
-FORECAST_HOURS = 51
+# SBIG : les dates du CSV d'extraction sont ignorées volontairement.
+# Les points correspondent à la nuit du 13 au 14 septembre 2026,
+# de 20:50 à 05:45 heure locale France.
+# Pour l'affichage AROME/SBIG commun en TU, on retire 2 h.
+
+# OBS_SEEING_CSV = Path(__file__).resolve().parent / "seeing_16-17_septembre_2026_UTC_SaintVeran2.csv"
+# SBIG_START_TU = datetime(2026, 9, 16, 18, 10)
+# heure_depart_TU = 18.0 + 50.0 / 60.0
+# SBIG_SAMPLE_MINUTES = 5
+
+# csv_path = "seeing_16-17_septembre_2026_UTCplus2_SaintVeran3.csv"
+# df2 = pd.read_csv(csv_path)
+# df2["UTC+2"] = pd.to_datetime(df2["UTC+2"], format="%d/%m/%Y %H:%M")
+
+# csv_path = "Saint_veran_18_09_2026_jour_2.csv"
+# df3 = pd.read_csv(csv_path)
+# df3["UTC"] = pd.to_datetime(df3["UTC"])
+# df3["seeing_median"]=(df3["seeing_arcsec"].rolling(window=5, center=True).median())
+
+
+
+#=============================
+affichage_altitude = 4000
+#======= Coeef ===============
+# K_TKE = 4
+# K_CIS = 40
+#=============================
+G           = 9.81
+R_OVER_CP   = 0.286
+P0_HPA      = 1000.0
+LAMBDA      = 500e-9
+ARCSEC      = 206265.0
 
 HEIGHTS = np.array([
     10, 20, 35, 50, 75, 100, 150, 200, 250,
     375, 500, 625, 750, 875, 1000, 1125, 1250,
     1375, 1500, 1750, 2000, 2250, 2500, 2750, 3000
 ], dtype=float)
-
-K_CN2 = 6
-K_CIS = 6
-
-G = 9.81
-R_OVER_CP = 0.286
-P0_HPA = 1000.0
-LAMBDA = 500e-9
-ARCSEC = 206265.0
 
 
 # ============================================================================
@@ -490,7 +516,7 @@ def calculate_cn2_tke(profile):
     )
 
     cn2[valid] = (
-        K_CN2
+        K_TKE
         * (80e-6 * P[valid] / (T[valid] * theta[valid])) ** 2
         * L[valid] ** (4.0 / 3.0)
         * dtheta_dz[valid] ** 2
@@ -762,11 +788,90 @@ def interp_variable(z_target, z_source, values):
 
 
 # ============================================================================
+# DATE/HEURE DU CYCLE AROME
+# ============================================================================
+
+def get_grib_cycle_datetime(path):
+    """Lit la date/heure de reference du cycle directement dans le GRIB."""
+    with open(path, "rb") as f:
+        while True:
+            gid = codes_grib_new_from_file(f)
+            if gid is None:
+                break
+            try:
+                data_date = _get(gid, "dataDate", None)
+                data_time = _get(gid, "dataTime", None)
+                if data_date is not None and data_time is not None:
+                    date_str = str(int(data_date))
+                    time_int = int(round(float(data_time)))
+                    hour = time_int // 100
+                    minute = time_int % 100
+                    return datetime.strptime(
+                        f"{date_str} {hour:02d}{minute:02d}",
+                        "%Y%m%d %H%M",
+                    )
+            finally:
+                codes_release(gid)
+    raise RuntimeError(
+        f"Impossible de lire dataDate/dataTime dans le GRIB {path.name}."
+    )
+
+
+# ============================================================================
 # FIGURE
 # ============================================================================
 
-def make_one_figure(results_by_hour, df):
+def load_observed_seeing(csv_path):
+    """Charge la courbe SBIG et reconstruit son axe temporel directement en TU.
+
+    Les colonnes date/heure du CSV d'extraction ne sont pas utilisées pour
+    l'axe temporel, car elles contiennent les anciennes dates d'affichage.
+    Les valeurs de seeing sont conservées telles quelles.
+
+    La séquence correspond à la nuit :
+        12/09/2026 20:45 -> 13/09/2026 05:55 heure locale France
+        13/09/2026 18:50 -> 14/09/2026 03:45 TU
+    """
+    if not csv_path.exists():
+        return None, None
+
+    obs = pd.read_csv(csv_path, sep=";")
+
+    required = {"seeing_arcsec"}
+    if not required.issubset(obs.columns):
+        raise ValueError(
+            f"Le CSV {csv_path.name} doit contenir la colonne "
+            f"'seeing_arcsec'."
+        )
+
+    obs_seeing = pd.to_numeric(obs["seeing_arcsec"], errors="coerce")
+
+    valid = obs_seeing.notna() & np.isfinite(obs_seeing)
+    if not np.any(valid):
+        return None, None
+
+
+
+
+# ======================    FICHIERS   CSV   ===================================
+    # Reconstruction temporelle explicite en TU :
+    # 1er point = 13/09/2026 18:50 TU, puis un point toutes les 5 minutes.
+    # n = int(np.count_nonzero(valid))
+    # obs_dates = np.array(
+    #     [
+    #         SBIG_START_TU + timedelta(minutes=SBIG_SAMPLE_MINUTES * i)
+    #         for i in range(n)
+    #     ],
+    #     dtype=object,
+    # )
+    # obs_values = obs_seeing[valid].to_numpy(dtype=float)
+    # return obs_dates, obs_values
+# ======================    FICHIERS   CSV   ===================================
+
+
+def make_one_figure(results_by_hour, df, forecast_reference):
     hours = sorted(results_by_hour)
+    valid_dates = [forecast_reference + timedelta(hours=int(h)) for h in hours]
 
     zmax = max(
         np.nanmax(results_by_hour[h]["z_combined"])
@@ -829,7 +934,7 @@ def make_one_figure(results_by_hour, df):
             norm = None
             if finite.size:
                 vmin = max(np.nanpercentile(finite, 40), np.finfo(float).tiny)
-                vmax = np.nanpercentile(finite, 98)
+                vmax = np.nanpercentile(finite, 100)
                 if vmax <= vmin:
                     vmax = vmin * 10.0
                 norm = LogNorm(vmin=vmin, vmax=vmax)
@@ -837,12 +942,12 @@ def make_one_figure(results_by_hour, df):
             norm = None
 
         mesh = ax.pcolormesh(
-            hours, display_z, data.T, shading="auto", cmap="turbo", norm=norm
+            valid_dates, display_z, data.T, shading="auto", cmap="turbo", norm=norm
         )
         ax.set_title(title, fontsize=12, fontweight="bold")
         ax.set_xlabel("Heure")
         ax.set_ylabel("Altitude AGL [m]")
-        ax.set_ylim(display_z.min(), display_z.max())
+        ax.set_ylim(display_z.min(), affichage_altitude)# display_z.max())
         ax.grid(True, alpha=0.18, linestyle=":")
         cb = fig.colorbar(mesh, ax=ax, pad=0.02, fraction=0.046)
         cb.set_label(label)
@@ -859,28 +964,63 @@ def make_one_figure(results_by_hour, df):
     ax = axes[2, 1]
     valid_h = np.isfinite(H)
     if np.any(valid_h):
-        ax.plot(np.asarray(hours)[valid_h], H[valid_h], color="white", linewidth=2,
+        ax.plot(np.asarray(valid_dates, dtype=object)[valid_h], H[valid_h], color="white", linewidth=2,
                 label=r"$H_{COULIM}$", zorder=20)
         ax.legend(loc="best")
 
     ax9 = axes[2, 2]
     ax9.set_title("Seeing", fontsize=12, fontweight="bold")
-    ax9.set_xlabel("Heure")
+    ax9.set_xlabel("Heure TU")
     ax9.set_ylabel("Seeing [arcsec]")
-    ax9.plot(df["forecast_hour"], df["seeing_arcsec"], marker="o", markersize=3,
-             linewidth=1.5, color="tab:red", label="Seeing")
+    # plt.ylim(0, 4)
+
+    # Prediction AROME.
+    ax9.plot(
+        valid_dates,
+        df["seeing_arcsec"].to_numpy(),
+        marker="o",
+        markersize=3,
+        linewidth=1.5,
+        color="tab:blue",
+        label="AROME",
+        zorder=5,
+    )
+
+
+# ======================    FICHIERS   CSV   ===================================
+    # Observation SBIG : courbe rouge, axe temporel reconstruit directement en TU.
+    # obs_dates, obs_values = load_observed_seeing(OBS_SEEING_CSV)
+    # if obs_dates is not None:
+    #     ax9.plot(
+    #         obs_dates,
+    #         obs_values,
+    #         color="red",
+    #         linewidth=1.8,
+    #         label="SBIG (observation)",
+    #         zorder=10,
+    #     )
+    # ax9.plot(df2["UTC+2"], df2["seeing_arcsec"], marker="o", markersize=3, linestyle="-", linewidth=2, color="gold", label="Seeing Nuit")
+    # ax9.scatter(df3["UTC"], df3["seeing_arcsec"], marker="o",color="green", alpha = 0.1, label="Seeing jour")
+    # ax9.plot(df3["UTC"],df3["seeing_median"], linewidth=1, color="green")
+
+# ======================    FICHIERS   CSV   ===================================
+
+
     ax9.legend(loc="best")
     ax9.grid(True, alpha=0.18, linestyle=":")
 
-    xticks = [h for h in hours if h % 6 == 0]
+    # Graduations toutes les 6 h, mais affichees en date/heure reelles.
+    tick_dates = [d for d in valid_dates if (d - forecast_reference).total_seconds() % (6 * 3600) == 0]
+    tick_labels = [d.strftime("%d/%m %Hh") for d in tick_dates]
+
     for ax in axes.flat:
-        ax.set_xticks(xticks)
-        ax.set_xticklabels([f"{int(h):02d} h" for h in xticks])
-        ax.set_xlim(min(hours), max(hours))
-        for h in range(6, int(max(hours)) + 1, 24):
-            ax.axvline(h, color="black", linestyle="--", linewidth=1.0, alpha=0.6, zorder=15)
-        for h in range(18, int(max(hours)) + 1, 24):
-            ax.axvline(h, color="black", linestyle="--", linewidth=1.0, alpha=0.6, zorder=15)
+        ax.set_xticks(tick_dates)
+        ax.set_xticklabels(tick_labels, rotation=45, ha="right")
+        ax.set_xlim(valid_dates[0], valid_dates[-1])
+        # Lignes verticales quotidiennes conservees a 06 h et 18 h.
+        for d in valid_dates:
+            if d.hour in (6, 18):
+                ax.axvline(d, color="black", linestyle="--", linewidth=1.0, alpha=0.6, zorder=15)
 
     fig.subplots_adjust(left=0.055, right=0.965, bottom=0.07, top=0.91,
                         wspace=0.28, hspace=0.30)
@@ -923,6 +1063,16 @@ def main():
     ip1_files = find_grib_files("IP1")
     ip4_files = find_grib_files("IP4")
     sp2_files = find_grib_files("SP2")
+
+    # Date/heure reelle du cycle lue directement dans les metadonnees GRIB.
+    # Elle sert uniquement a l'axe temporel des figures et n'affecte pas le calcul physique.
+    forecast_reference = get_grib_cycle_datetime(hp1_files[0])
+
+    print(f"Cycle AROME : {forecast_reference:%d/%m/%Y %H:%M}")
+    
+    # ======================    FICHIERS   CSV   ===================================
+    # print(f"Seeing SBIG : {OBS_SEEING_CSV}" if OBS_SEEING_CSV.exists() else f"Seeing SBIG : fichier absent ({OBS_SEEING_CSV})")
+   # ======================    FICHIERS   CSV   ===================================
 
     print(f"HP1 : {len(hp1_files)} fichiers")
     print(f"HP2 : {len(hp2_files)} fichiers")
@@ -1128,7 +1278,7 @@ def main():
     print(f"Seeing min/max         : {df['seeing_arcsec'].min():.5f} / {df['seeing_arcsec'].max():.5f} arcsec")
     print(f"CSV                   : {output}")
 
-    make_one_figure(results_by_hour, df)
+    make_one_figure(results_by_hour, df, forecast_reference)
 
 
 if __name__ == "__main__":

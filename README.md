@@ -13,9 +13,9 @@ top to bottom.
 
 | File | What it does |
 |---|---|
-| `telecharger_arome_meteofetch_TKE_cisaillement_HCOULIM_v3.py` | Downloads the AROME GRIB2 files needed by the calculations. **Run this first.** |
-| `calcul_seeing_arome_2_modeles_V11_optimise.py` | Main seeing calculation (newer version). Reads the downloaded GRIB2 files, produces a CSV and a figure. |
-| `calcul_seeing_arome_2_modeles_HCOULIM.py` | Earlier version of the same calculation, kept for reference/comparison. |
+| `Telechargement_Aromes_runs.py` | Downloads the AROME GRIB2 files needed by the calculations. **Run this first.** |
+| `SeeingAromeV2_correction_conv_tke.py` | Main seeing calculation (latest version, with a convective closure where the TKE model fails). Reads the downloaded GRIB2 files, produces a CSV and a figure. |
+| `SeeingAromeV1.py` | Earlier version of the same calculation, kept for reference/comparison. |
 | `Model Masciardi et al 2001.py` | A small, self-contained example of the Cn² formula. It needs no downloaded data, so it's the easiest way to check your setup works. |
 | `Quatresooz.pdf`, `seeing_cn2_of_mm5_OCuevas_Valpo2010.pdf` | Reference papers, not code. |
 
@@ -120,11 +120,11 @@ both so the calculation script finds the files the downloader just saved. For ex
 everything in a folder called `AROME_download` next to the scripts:
 
 ```bash
-poetry run python "telecharger_arome_meteofetch_TKE_cisaillement_HCOULIM_v3.py" AROME_download
-poetry run python "calcul_seeing_arome_2_modeles_V11_optimise.py" AROME_download
+poetry run python Telechargement_Aromes_runs.py AROME_download
+poetry run python SeeingAromeV2_correction_conv_tke.py AROME_download
 ```
 
-(Quoting the filenames is needed because some of them contain spaces.)
+(Quotes are only needed for filenames containing spaces, such as `"Model Masciardi et al 2001.py"`.)
 
 If you omit the folder argument, both scripts use the current directory — fine for a quick test,
 but the downloaded GRIB2 files will land right next to the source code, so a dedicated folder
