@@ -40,7 +40,7 @@ def create_app(static_dir: str | Path | None = None) -> FastAPI:
 def _mount_spa(app: FastAPI, root: Path) -> None:
     index = root / "index.html"
 
-    @app.get("/{path:path}", include_in_schema=False)
+    @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
     def spa(path: str):
         if path == "api" or path.startswith("api/"):
             raise HTTPException(404, "Not Found")

@@ -24,6 +24,7 @@ def test_client_routes_fall_back_to_index(spa):
     r = spa.get("/sites/saint-veran")
     assert r.status_code == 200 and "Seeing the Sky" in r.text
     assert r.headers["content-type"].startswith("text/html")
+    assert spa.head("/sites/saint-veran").status_code == 200
 
 
 def test_hashed_assets_long_cache(spa):
