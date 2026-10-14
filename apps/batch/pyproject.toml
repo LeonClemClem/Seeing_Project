@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "seeing-batch"
+version = "0.1.0"
+description = "Cloud Run job: download the latest AROME run, compute seeing forecasts, store them in Postgres."
+authors = ["defqoon <thomas.hossler@gmail.com>"]
+packages = [{include = "seeing_batch"}]
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.13"
+seeing-core = {path = "../../packages/seeing_core", develop = true}
+seeing-db = {path = "../../packages/seeing_db", develop = true}
+# Pinned: we use its URL builder / single-file downloader (Arome0025._get_urls, _url_to_file).
+meteofetch = "0.5.8"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+
+[tool.poetry.scripts]
+seeing-batch = "seeing_batch.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
