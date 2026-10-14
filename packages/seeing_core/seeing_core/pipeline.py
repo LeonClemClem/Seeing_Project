@@ -60,7 +60,10 @@ class MissingDataError(LookupError):
     """Input data needed for one lead hour is missing."""
 
 
-REQUIRED_HOURLY = ("HP1", "HP2", "IP1", "IP4", "SP2")
+HOURLY = ("HP1", "HP2", "IP1", "IP4", "SP2")
+# HP2/IP4 (TKE) are optional per hour, as in V2: AROME does not publish TKE at H+0 (analysis),
+# where the boundary layer then relies on the convective closure only.
+REQUIRED_HOURLY = ("HP1", "IP1", "SP2")
 
 
 def compute_hour(
@@ -131,7 +134,7 @@ def compute_from_extracted(
         raise RuntimeError("AROME cycle date not found in the GRIB files")
     out: dict[str, SiteForecast] = {}
     for site in sites:
-        hourly = {pkg: run.data.get(pkg, {}).get(site.slug, {}) for pkg in REQUIRED_HOURLY}
+        hourly = {pkg: run.data.get(pkg, {}).get(site.slug, {}) for pkg in HOURLY}
         sp3 = run.data.get("SP3", {}).get(site.slug, {})
         if not sp3:
             logger.warning("%s: no SP3 data, convective closure disabled", site.slug)
