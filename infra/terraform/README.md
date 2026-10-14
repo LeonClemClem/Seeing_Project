@@ -78,7 +78,7 @@ Prices: us-central1, October 2026. Free tiers are per billing account.
 | pd-standard 10 + 10 GB | 20 GB-month | 30 GB-month | $0 |
 | Data disk snapshots, 7 daily, incremental | < 2 GB-month (DB is small) | 5 GB-month in US regions | $0 – 0.10 |
 | Cloud Run web (2 envs) | a few hundred requests/day, request-based | 180k vCPU-s, 360k GiB-s, 2M requests | $0 |
-| Cloud Run batch jobs (2 vCPU / 8 GiB) | prod 120 + dev 30 runs/month | 240k vCPU-s, 450k GiB-s (instance-based) | 10 min/run: ≈ $0.55; 20 min/run: ≈ $4; 30 min/run: ≈ $8 |
+| Cloud Run batch jobs (2 vCPU / 4 GiB) | prod 120 + dev 30 runs/month (each downloads ~15 GB; ingress is free) | 240k vCPU-s, 450k GiB-s (instance-based) | 10 min/run: ≈ $0; 20 min/run: ≈ $3; 30 min/run: ≈ $7 |
 | Cloud Run migrate jobs | seconds per deploy | (same) | $0 |
 | Artifact Registry | ≤ 5 versions × 2 images + postgres cache | 0.5 GB | $0 – 0.20 ($0.10/GB above) |
 | Cloud Build | ~5–10 min per image build | 2,500 build-min/month (e2-standard-2) | $0 |

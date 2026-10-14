@@ -36,3 +36,6 @@ crash.log
 .ruff_cache/
 .coverage
 *.tsbuildinfo
+
+# Claude Code worktrees / local state
+.claude/

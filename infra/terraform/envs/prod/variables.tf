@@ -41,7 +41,7 @@ variable "batch_cpu" {
 
 variable "batch_memory" {
   type    = string
-  default = "8Gi"
+  default = "4Gi"
 }
 
 variable "batch_timeout_seconds" {
