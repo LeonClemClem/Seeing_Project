@@ -1,0 +1,164 @@
+#cloud-config
+# Container-Optimized OS runs write_files and runcmd on EVERY boot (/etc is stateless), so every
+# step below is idempotent: it re-creates the unit, re-reads the passwords from Secret Manager
+# and re-syncs roles/databases on each boot. Data lives on the separate persistent data disk.
+
+write_files:
+  - path: /etc/seeing/pg_hba.conf
+    permissions: "0644"
+    owner: root
+    content: |
+      # TYPE  DATABASE  USER      ADDRESS  METHOD
+      local   all       postgres           peer
+      local   all       all                scram-sha-256
+      host    all       all       127.0.0.1/32  scram-sha-256
+%{ for db, secret in databases ~}
+%{ for cidr in client_cidrs ~}
+      host    ${db}  ${db}  ${cidr}  scram-sha-256
+%{ endfor ~}
+%{ endfor ~}
+
+  - path: /etc/seeing/setup-disk.sh
+    permissions: "0755"
+    owner: root
+    content: |
+      #!/bin/bash
+      # Format the data disk on first use only, then mount it.
+      set -euo pipefail
+      DEV=/dev/disk/by-id/google-${data_device_name}
+      MNT=${mount_dir}
+      for _ in $(seq 1 30); do [ -b "$DEV" ] && break; sleep 2; done
+      if ! blkid "$DEV" >/dev/null 2>&1; then
+        echo "seeing: formatting $DEV"
+        mkfs.ext4 -m 0 -E lazy_itable_init=0,lazy_journal_init=0,discard "$DEV"
+      fi
+      mkdir -p "$MNT"
+      if ! mountpoint -q "$MNT"; then
+        fsck.ext4 -p "$DEV" || true
+        mount -t ext4 -o discard,defaults,nosuid,nodev "$DEV" "$MNT"
+      fi
+
+  - path: /etc/seeing/fetch-secrets.sh
+    permissions: "0755"
+    owner: root
+    content: |
+      #!/bin/bash
+      # Read DB passwords from Secret Manager with the VM service account (metadata server token
+      # + REST API; there is no gcloud on COS). Files live on tmpfs (/run) only.
+      set -euo pipefail
+      umask 077
+      DIR=/run/seeing/secrets
+      mkdir -p "$DIR"
+      TOKEN=$(curl -sSf --retry 10 --retry-connrefused -H 'Metadata-Flavor: Google' \
+        http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token \
+        | sed -E 's/.*"access_token" *: *"([^"]+)".*/\1/')
+      fetch() {
+        curl -sSf --retry 10 --retry-connrefused -H "Authorization: Bearer $TOKEN" \
+          "https://secretmanager.googleapis.com/v1/projects/${project}/secrets/$1/versions/latest:access" \
+          | tr -d ' \n' | sed -E 's/.*"data":"([^"]+)".*/\1/' | base64 -d > "$DIR/$2.tmp"
+        mv "$DIR/$2.tmp" "$DIR/$2"
+      }
+      fetch ${superuser_secret} postgres
+%{ for db, secret in databases ~}
+      fetch ${secret} ${db}
+%{ endfor ~}
+      # The postgres image reads POSTGRES_PASSWORD_FILE as uid 999 (only used by initdb).
+      chown 999:999 "$DIR/postgres"
+      chmod 0400 "$DIR"/*
+
+  - path: /etc/seeing/init-db.sh
+    permissions: "0755"
+    owner: root
+    content: |
+      #!/bin/bash
+      # Idempotently create one login role + one database per environment (role owns its
+      # database, no CONNECT for PUBLIC) and sync passwords from Secret Manager.
+      set -euo pipefail
+      DIR=/run/seeing/secrets
+      # Probe over TCP: during first-boot initdb the image runs a temporary socket-only server.
+      for _ in $(seq 1 150); do
+        docker exec seeing-postgres pg_isready -q -h 127.0.0.1 -U postgres && break
+        sleep 2
+      done
+      sql() { docker exec -i -u postgres seeing-postgres psql -X -q -v ON_ERROR_STOP=1 -d postgres; }
+      # Passwords are alphanumeric (random_password special=false), safe inside '...'.
+      {
+        printf "\\set pw '%s'\n" "$(cat "$DIR/postgres")"
+        cat <<'SQL'
+      ALTER ROLE postgres WITH PASSWORD :'pw';
+      REVOKE CONNECT ON DATABASE postgres FROM PUBLIC;
+      SQL
+      } | sql
+      setup_db() {
+        {
+          printf "\\set db '%s'\n\\set pw '%s'\n" "$1" "$(cat "$DIR/$1")"
+          cat <<'SQL'
+      SELECT format('CREATE ROLE %I LOGIN', :'db') WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'db') \gexec
+      ALTER ROLE :"db" WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD :'pw';
+      SELECT format('CREATE DATABASE %I OWNER %I', :'db', :'db') WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = :'db') \gexec
+      ALTER DATABASE :"db" OWNER TO :"db";
+      REVOKE ALL ON DATABASE :"db" FROM PUBLIC;
+      GRANT CONNECT, TEMPORARY ON DATABASE :"db" TO :"db";
+      SQL
+        } | sql
+      }
+%{ for db, secret in databases ~}
+      setup_db ${db}
+%{ endfor ~}
+      echo "seeing: databases ready"
+
+  - path: /etc/systemd/system/seeing-postgres.service
+    permissions: "0644"
+    owner: root
+    content: |
+      [Unit]
+      Description=PostgreSQL (seeing) in Docker
+      Requires=docker.service
+      After=docker.service network-online.target
+      Wants=network-online.target
+      RequiresMountsFor=${mount_dir}
+
+      [Service]
+      Environment=HOME=/var/lib/seeing
+      TimeoutStartSec=600
+      ExecStartPre=/bin/mkdir -p /var/lib/seeing
+      ExecStartPre=/bin/bash /etc/seeing/fetch-secrets.sh
+      ExecStartPre=/usr/bin/docker-credential-gcr configure-docker --registries=${registry_host}
+      ExecStartPre=-/usr/bin/docker pull ${image}
+      ExecStartPre=-/usr/bin/docker rm -f seeing-postgres
+      ExecStart=/usr/bin/docker run --rm --name seeing-postgres \
+        --network host --log-driver journald --shm-size 128m \
+        -e PGDATA=/var/lib/postgresql/data/pgdata \
+        -e POSTGRES_PASSWORD_FILE=/run/secrets/postgres-password \
+        -v ${mount_dir}:/var/lib/postgresql/data \
+        -v /run/seeing/secrets/postgres:/run/secrets/postgres-password:ro \
+        -v /etc/seeing/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro \
+        ${image} \
+        -c listen_addresses=* \
+        -c port=5432 \
+        -c hba_file=/etc/postgresql/pg_hba.conf \
+        -c password_encryption=scram-sha-256 \
+        -c max_connections=${max_connections} \
+        -c shared_buffers=${shared_buffers} \
+        -c effective_cache_size=${effective_cache_size} \
+        -c work_mem=${work_mem} \
+        -c maintenance_work_mem=64MB \
+        -c wal_buffers=4MB \
+        -c max_wal_size=512MB \
+        -c random_page_cost=2.0
+      ExecStop=/usr/bin/docker stop -t 60 seeing-postgres
+      Restart=always
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - bash /etc/seeing/setup-disk.sh
+  # COS's host firewall drops inbound traffic by default; open 5432 for the allowed clients.
+%{ for cidr in client_cidrs ~}
+  - iptables -C INPUT -p tcp -s ${cidr} --dport 5432 -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp -s ${cidr} --dport 5432 -j ACCEPT
+%{ endfor ~}
+  - systemctl daemon-reload
+  - systemctl start seeing-postgres.service
+  - bash /etc/seeing/init-db.sh
