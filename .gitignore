@@ -35,3 +35,4 @@ crash.log
 .pytest_cache/
 .ruff_cache/
 .coverage
+*.tsbuildinfo

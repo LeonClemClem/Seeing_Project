@@ -124,7 +124,11 @@ All responses are JSON; times are ISO 8601 UTC (`Z`).
 - `GET /api/sites/{slug}/cn2?run=latest|<ISO run_time>` →
   `{site: {...}, run_time, valid_times: [...], heights_m: [...], cn2: [[...per height...] per valid_time]}`
   (`null` for missing values; heights are the union grid, padded with null).
-- Unknown slug or run → 404.
+- `GET /api/me` → `{email, env}`: IAP user (from `X-Goog-Authenticated-User-Email`, prefix stripped,
+  `null` without IAP) and `ENV`, for the UI header.
+- Unknown slug or run → 404; a `run` that is neither `latest` nor ISO 8601 → 422.
+- `/api/*` responses carry `Cache-Control: private, max-age=300`; hashed SPA assets are cached for a
+  year (`immutable`), `index.html` is `no-cache`.
 - Everything else not under `/api` serves the SPA (`index.html` fallback for client routes).
 
 Auth: none in the app. IAP sits in front of the Cloud Run service; the app can read
