@@ -14,6 +14,8 @@ Prevision de seeing AROME pour les sites, sur tout un run.
 Sorties : previsions/prevision_<run>.png et .csv
 """
 from pathlib import Path
+import sys as _sys; _sys.path.insert(0, str(Path(__file__).resolve().parent))  # chemins.py est a cote
+from chemins import AROME_RUNS, PREVISIONS
 import importlib.util
 import re
 
@@ -23,8 +25,8 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 V2 = Path(__file__).resolve().parent
-ARUNS_DIR = Path("C:/Users/clement/Documents/Seeing_project/modele/Arome_runs")
-OUT_DIR = Path("C:/Users/clement/Documents/Seeing_project/modele/previsions")
+ARUNS_DIR = AROME_RUNS
+OUT_DIR = PREVISIONS
 RUN_DIR = None                  # None : dernier run complet ; sinon Path(".../AROME_download_...")
 FORECAST_HOURS = 51
 PAQUETS = ("HP1", "HP2", "IP1", "IP4", "SP2", "SP3")

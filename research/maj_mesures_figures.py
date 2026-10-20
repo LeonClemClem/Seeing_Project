@@ -14,6 +14,8 @@ inclure les mesures dans les graphiques et relancer la correlation).
 Usage : python maj_mesures_figures.py [--sans-releve]
 """
 from pathlib import Path
+import sys as _sys; _sys.path.insert(0, str(Path(__file__).resolve().parent))  # chemins.py est a cote
+from chemins import CACHE
 import importlib.util
 import subprocess
 import sys
@@ -42,7 +44,7 @@ def figures():
     print("=== Figures (coefficients inchanges)")
     h = _load("historique_sites")
     h.calibrate = lambda *a, **k: None                      # pas de recalage automatique
-    h.COEFF_FILE = V2 / "cache_validation" / "coeff_non_ecrit.json"
+    h.COEFF_FILE = CACHE / "coeff_non_ecrit.json"
     h.main()
     _load("prevision_sites").main()
 

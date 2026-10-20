@@ -18,6 +18,8 @@ Usage :  python calcul_run.py <dossier du run> [site ...]      (un processus par
 Ensuite : python figures_run.py <run_court> [<run_court> ...]   (figure Cn2, prevision collee, historique)
 """
 from pathlib import Path
+import sys as _sys; _sys.path.insert(0, str(Path(__file__).resolve().parent))  # chemins.py est a cote
+from chemins import CACHE, PREVISIONS
 import contextlib, importlib.util, io, pickle, sys
 import numpy as np
 import pandas as pd
@@ -27,8 +29,8 @@ import matplotlib.pyplot as plt
 
 V2 = Path(__file__).resolve().parent
 SCRIPT_V2 = V2 / "SeeingAromeV2_correction_conv_tke.py"
-OUT = V2.parent.parent / "previsions"
-PAN = V2 / "cache_validation" / "panneaux"
+OUT = PREVISIONS
+PAN = CACHE / "panneaux"
 FORECAST_HOURS = 51
 # Copernic : deux mailles (09/10) ; la position COORDS de historique_sites sert aux caches V1/V2
 MAILLES_COPERNIC = {"ancienne": (44.5828, 5.9868), "nouvelle": (44.56179, 5.99762)}

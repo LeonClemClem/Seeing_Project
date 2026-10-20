@@ -25,6 +25,8 @@ Sorties (dans OUTPUT_DIR) : figure PNG (un panneau par site) et CSV des
 statistiques.
 """
 from pathlib import Path
+import sys as _sys; _sys.path.insert(0, str(Path(__file__).resolve().parent))  # chemins.py est a cote
+from chemins import AROME_RUNS, CACHE, TESTS, MESURES
 import contextlib
 import importlib.util
 import io
@@ -39,9 +41,9 @@ import matplotlib.dates as mdates
 # CONFIGURATION
 # ============================================================================
 SEEING_SCRIPT = Path(__file__).resolve().parent / "SeeingAromeV2_correction_conv_tke.py"
-RUN_DIR = Path("C:/Users/clement/Documents/Seeing_project/modele/Arome_runs/AROME_download_2509_16h")
-CACHE_DIR = Path(__file__).resolve().parent / "cache_validation"
-OUTPUT_DIR = Path("C:/Users/clement/Documents/Seeing_project/modele/tests")
+RUN_DIR = AROME_RUNS / "AROME_download_2509_16h"
+CACHE_DIR = CACHE
+OUTPUT_DIR = TESTS
 
 # utc_offset_h : heures a retirer pour passer en TU (0 si deja en TU,
 # 2 pour l'heure locale d'ete, 1 pour l'heure locale d'hiver).
@@ -52,7 +54,7 @@ SITES = [
         "lat": 44.3814, "lon": 5.4286,
         "K": (8, 40, 0.1),
         "forecast_hours": 19,
-        "obs_csv": Path("C:/Users/clement/Documents/claude/seeing-rosa/seeing_rosa_2026-09-26_UTC.csv"),
+        "obs_csv": MESURES / "seeing-rosa/seeing_rosa_2026-09-26_UTC.csv",
         "col_temps": "datetime_utc", "col_seeing": "seeing_brut_arcsec", "utc_offset_h": 0,
     },
     {
@@ -60,7 +62,7 @@ SITES = [
         "lat": 44.5828, "lon": 5.9868,
         "K": (84, 126, 0.3),
         "forecast_hours": 19,
-        "obs_csv": Path("C:/Users/clement/Documents/claude/seeing-copernic/seeing_copernic_2026-09-25_UTC.csv"),
+        "obs_csv": MESURES / "seeing-copernic/seeing_copernic_2026-09-25_UTC.csv",
         "col_temps": "datetime_utc", "col_seeing": "seeing_arcsec", "utc_offset_h": 0,
     },
     {
@@ -68,7 +70,7 @@ SITES = [
         "lat": 44.6988, "lon": 6.9083,
         "K": (6, 12, 0.1),
         "forecast_hours": 51,
-        "obs_csv": Path("C:/Users/clement/Documents/Seeing_project/modele/tests/Saint_veran_2026-09-25_27_UTC_capture.csv"),
+        "obs_csv": TESTS / "Saint_veran_2026-09-25_27_UTC_capture.csv",
         "col_temps": "datetime_utc", "col_seeing": "seeing_arcsec", "utc_offset_h": 0,
     },
 ]

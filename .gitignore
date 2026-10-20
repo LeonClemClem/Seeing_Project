@@ -39,3 +39,8 @@ crash.log
 
 # Claude Code worktrees / local state
 .claude/
+
+# Chemins et donnees propres a chaque machine (voir research/chemins.py)
+research/chemins_locaux.json
+donnees/
+*.log

@@ -10,6 +10,8 @@ Usage : python figures_run.py <run_court> [<run_court> ...]   ex. 2026-10-08_12Z
 Si les K changent, relancer ce script suffit (Cn2 remis a l'echelle par zone, seeing des caches a K = 1).
 """
 from pathlib import Path
+import sys as _sys; _sys.path.insert(0, str(Path(__file__).resolve().parent))  # chemins.py est a cote
+from chemins import CACHE
 import importlib.util, subprocess, sys
 
 V2 = Path(__file__).resolve().parent
@@ -21,5 +23,5 @@ subprocess.run([PY, str(V2 / "prevision_collee.py"), *[f"AROME_download_{r}" for
 s = importlib.util.spec_from_file_location("historique_sites", V2 / "historique_sites.py")
 h = importlib.util.module_from_spec(s); s.loader.exec_module(h)
 h.calibrate = lambda *a, **k: None                       # pas de recalage automatique
-h.COEFF_FILE = V2 / "cache_validation" / "coeff_non_ecrit.json"
+h.COEFF_FILE = CACHE / "coeff_non_ecrit.json"
 h.main()

@@ -46,7 +46,7 @@ import numpy as np
 import pandas as pd
 import carte_seeing as cs
 
-CACHE_CIEL = cs.V2 / "cache_validation" / "ciel"
+CACHE_CIEL = cs.CACHE_RACINE / "ciel"
 HEIGHTS_V2 = np.array([10, 20, 35, 50, 75, 100, 150, 200, 250, 375, 500, 625, 750, 875, 1000, 1125, 1250,
                        1375, 1500, 1750, 2000, 2250, 2500, 2750, 3000], float)   # = HEIGHTS du script principal
 Z_AGL = np.concatenate([HEIGHTS_V2, np.arange(3250.0, 20001.0, 250.0)])          # grille verticale du cube (m sol)

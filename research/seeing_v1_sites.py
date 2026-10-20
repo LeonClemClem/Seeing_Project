@@ -17,6 +17,8 @@ Les integrales sont gardees en cache (cache_validation/v1/), ce qui permet de
 retracer la V1 apres suppression des GRIB.
 """
 from pathlib import Path
+import sys as _sys; _sys.path.insert(0, str(Path(__file__).resolve().parent))  # chemins.py est a cote
+from chemins import CACHE
 import importlib.util
 
 import numpy as np
@@ -24,7 +26,7 @@ import pandas as pd
 
 V2 = Path(__file__).resolve().parent
 V1_SCRIPT = V2 / "SeeingAromeV1.py"   # dossier a plat : V1 a cote des scripts V2
-CACHE_V1 = V2 / "cache_validation" / "v1"
+CACHE_V1 = CACHE / "v1"
 FORECAST_HOURS = 51
 
 

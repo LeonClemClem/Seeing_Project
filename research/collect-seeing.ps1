@@ -5,9 +5,14 @@
 param([string]$ExportUtc)   # optionnel : CSV en TU de la nuit en cours (contenu du fichier source)
 
 $Url     = "https://www.asso-copernic.org/seeing/data.txt"
-$Dir     = Split-Path -Parent $MyInvocation.MyCommand.Path
+$Here    = Split-Path -Parent $MyInvocation.MyCommand.Path
+$CfgFile = Join-Path $Here "chemins_locaux.json"
+$Mes     = if ($env:SEEING_MESURES) { $env:SEEING_MESURES } elseif (Test-Path $CfgFile) { (Get-Content $CfgFile -Raw | ConvertFrom-Json).mesures } else { $null }
+if (-not $Mes) { $Mes = Join-Path (Split-Path -Parent $Here) "donnees\mesures" }   # voir chemins.py
+$Dir     = Join-Path $Mes "seeing-copernic"
+New-Item -ItemType Directory -Force $Dir | Out-Null
 $Csv     = Join-Path $Dir "seeing_copernic.csv"
-$Log     = Join-Path $Dir "collect-copernic.log"
+$Log     = Join-Path $Dir "collect.log"
 $Header  = "datetime,date,heure,scintillation,seeing_arcsec"
 
 function Write-Log($msg) {

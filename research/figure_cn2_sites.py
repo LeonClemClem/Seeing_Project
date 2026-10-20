@@ -1,8 +1,10 @@
-﻿"""Figure Cn2 par site (run donne) : Cn2 (altitude x temps, log), H_COULIM, couches convectives (hachures),
+"""Figure Cn2 par site (run donne) : Cn2 (altitude x temps, log), H_COULIM, couches convectives (hachures),
 seeing prevu V2 et seeing observe (brut + mediane horaire) superposes. Copernic : ancienne maille, nouvelle, mediane.
 Signale aussi les NaN (seeing et Cn2). Usage : python figure_cn2_sites.py <run_court>  (ex. 2026-10-08_12Z)"""
 import importlib.util, pickle, sys
 from pathlib import Path
+import sys as _sys; _sys.path.insert(0, str(Path(__file__).resolve().parent))  # chemins.py est a cote
+from chemins import RESEARCH, PREVISIONS, CACHE
 import numpy as np, pandas as pd
 import matplotlib
 matplotlib.use("Agg")
@@ -11,10 +13,10 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.patches import Patch
 
-SCR = Path(__file__).resolve().parent / "cache_validation" / "panneaux"   # profils enregistres par calcul_run.py
-OUT = Path(r"C:\Users\clement\Documents\Seeing_project\modele\previsions")
+SCR = CACHE / "panneaux"   # profils enregistres par calcul_run.py
+OUT = PREVISIONS
 run = sys.argv[1]
-spec = importlib.util.spec_from_file_location("h", r"C:\Users\clement\Documents\Seeing_project\modele\code\V2\historique_sites.py")
+spec = importlib.util.spec_from_file_location("h", RESEARCH / "historique_sites.py")
 h = importlib.util.module_from_spec(spec); spec.loader.exec_module(h)
 h.SITES = {n: c for n, c in h.SITES.items() if n not in getattr(h, "SITES_HORS_PREVISION", set())}   # 13/10 : Pic du Midi retire (pas de mesures recentes)
 ZMAX, DZ = 4000.0, 25.0
@@ -22,12 +24,12 @@ ZG = np.arange(10.0, ZMAX + DZ, DZ)
 # K utilises lors du calcul des pickles du 09/10 (les nouveaux pickles contiennent "K")
 K_CALCUL_09_10 = {"Drôme": (15.8, 11.2, 0.1), "Copernic": (1, 30, 0.1), "Saint-Veran": (6, 12, 0.1),
                   "OHP": (0.53, 32.6, 0.515), "Seeing monitor 5": (2.32, 65.5, 0.002)}
-sm = importlib.util.spec_from_file_location("m", r"C:\Users\clement\Documents\Seeing_project\modele\code\V2\SeeingAromeV2_correction_conv_tke.py")
+sm = importlib.util.spec_from_file_location("m", RESEARCH / "SeeingAromeV2_correction_conv_tke.py")
 M = importlib.util.module_from_spec(sm); sm.loader.exec_module(M)
 V1M = h.v1()     # modele V1 (caches), superpose a la V2
 
 
-smb = importlib.util.spec_from_file_location("mb", r"C:\Users\clement\Documents\Seeing_project\modele\code\V2\SeeingAromeV2b_cisaillement_V1.py")
+smb = importlib.util.spec_from_file_location("mb", RESEARCH / "SeeingAromeV2b_cisaillement_V1.py")
 MB = importlib.util.module_from_spec(smb); smb.loader.exec_module(MB); MB.K_CIS = 1.0
 DELTA_V2BD = 100.0
 

@@ -6,6 +6,8 @@ Usage : python plot_saint_veran_jour.py [AAAA-MM-JJ]   (defaut : aujourd'hui TU)
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+import sys as _sys; _sys.path.insert(0, str(Path(__file__).resolve().parent))  # chemins.py est a cote
+from chemins import MESURES
 
 import matplotlib
 matplotlib.use("Agg")
@@ -13,7 +15,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 
-ROOT = Path(__file__).parent
+ROOT = MESURES   # donnees des seeing monitors (chemins.py)
 CSV = ROOT / "seeing-saint-veran" / "seeing_saint_veran.csv"
 GAP = pd.Timedelta(minutes=10)   # au-dela, la courbe est interrompue
 

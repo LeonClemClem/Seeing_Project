@@ -1,10 +1,12 @@
 from pathlib import Path
+import sys as _sys; _sys.path.insert(0, str(Path(__file__).resolve().parent))  # chemins.py est a cote
+from chemins import AROME_RUNS
 import logging
 
 from meteofetch import Arome0025
 
 
-OUTPUT_DIR = Path("C:/Users/clement/Documents/Seeing_project/modele/Arome_runs/AROME_download_2509_16h")
+OUTPUT_DIR = AROME_RUNS / "AROME_download_2509_16h"
 
 
 # Paquets nécessaires au calcul complet sur toute la colonne :

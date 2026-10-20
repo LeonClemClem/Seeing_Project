@@ -7,6 +7,8 @@ Usage : python releve_miratlas_ohp_sm5.py [jours]   (defaut : 30)
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import sys as _sys; _sys.path.insert(0, str(Path(__file__).resolve().parent))  # chemins.py est a cote
+from chemins import MESURES
 
 import matplotlib
 matplotlib.use("Agg")
@@ -15,7 +17,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import requests
 
-ROOT = Path(__file__).parent
+ROOT = MESURES   # donnees des seeing monitors (chemins.py)
 OUT = ROOT / "seeing-miratlas"
 OUT.mkdir(exist_ok=True)
 API = "https://dashboard.miratlas.net/api/ds/query?orgId=29"

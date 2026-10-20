@@ -1,18 +1,20 @@
-﻿"""Prevision de seeing collee sur plusieurs runs (le plus recent l'emporte), V2 et V1, avec les mesures.
+"""Prevision de seeing collee sur plusieurs runs (le plus recent l'emporte), V2 et V1, avec les mesures.
 Utilise les calculs en cache (aucune lecture de GRIB). Usage : python prevision_collee.py <run_dir1> <run_dir2> ..."""
 import importlib.util, sys
 from pathlib import Path
+import sys as _sys; _sys.path.insert(0, str(Path(__file__).resolve().parent))  # chemins.py est a cote
+from chemins import RESEARCH, PREVISIONS
 import numpy as np, pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-spec = importlib.util.spec_from_file_location("h", r"C:\Users\clement\Documents\Seeing_project\modele\code\V2\historique_sites.py")
+spec = importlib.util.spec_from_file_location("h", RESEARCH / "historique_sites.py")
 h = importlib.util.module_from_spec(spec); spec.loader.exec_module(h)
 h.SITES = {n: c for n, c in h.SITES.items() if n not in getattr(h, "SITES_HORS_PREVISION", set())}   # 13/10 : Pic du Midi retire (pas de mesures recentes)
 v1m = h.v1()
 RUNS = sys.argv[1:]
-OUT = Path(r"C:\Users\clement\Documents\Seeing_project\modele\previsions")
+OUT = PREVISIONS
 bg = "#fcfcfb"
 fig, axes = plt.subplots(len(h.SITES), 1, figsize=(14, 3.8 * len(h.SITES)), dpi=110, sharex=True)
 fig.patch.set_facecolor(bg)

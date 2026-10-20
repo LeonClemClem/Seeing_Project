@@ -32,6 +32,8 @@ IMPORTANT :
 - Il utilise les GRIB2 deja presents dans DATA_DIR.
 """
 from pathlib import Path
+import sys as _sys; _sys.path.insert(0, str(Path(__file__).resolve().parent))  # chemins.py est a cote
+from chemins import AROME_RUNS
 import re
 from datetime import datetime, timedelta
 import numpy as np
@@ -41,7 +43,7 @@ from eccodes import (codes_grib_new_from_file,codes_get,codes_get_array,codes_re
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-DATA_DIR = Path("C:/Users/clement/Documents/Seeing_project/modele/Arome_runs/AROME_download_2509_16h")
+DATA_DIR = AROME_RUNS / "AROME_download_2509_16h"
 FORECAST_HOURS = 12
 # ======    Sites d'observations    =========
 # LAT_SITE = 43.9500;  LON_SITE  =  4.81667   #   Avignon

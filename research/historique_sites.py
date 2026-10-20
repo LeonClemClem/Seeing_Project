@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Historique : toutes les previsions AROME et toutes les mesures, par site.
@@ -16,6 +16,8 @@ Historique : toutes les previsions AROME et toutes les mesures, par site.
   est refaite avec la courbe la mieux correlee.
 """
 from pathlib import Path
+import sys as _sys; _sys.path.insert(0, str(Path(__file__).resolve().parent))  # chemins.py est a cote
+from chemins import CACHE, MESURES, TESTS as TESTS_DIR, PREVISIONS, MESURES_V1
 import json
 import re
 
@@ -25,12 +27,12 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 V2 = Path(__file__).resolve().parent
-CACHE_DIR = V2 / "cache_validation"
-CLAUDE = Path("C:/Users/clement/Documents/claude")
-TESTS = Path("C:/Users/clement/Documents/Seeing_project/modele/tests")
-OUTPUT = Path("C:/Users/clement/Documents/Seeing_project/modele/previsions/historique_sites.png")
+CACHE_DIR = CACHE
+CLAUDE = MESURES
+TESTS = TESTS_DIR
+OUTPUT = PREVISIONS / "historique_sites.png"
 # Historique des coefficients recalibres (une entree par lancement)
-COEFF_FILE = Path("C:/Users/clement/Documents/Seeing_project/modele/previsions/coefficients_calibres.json")
+COEFF_FILE = PREVISIONS / "coefficients_calibres.json"
 
 # K = (K_TKE, K_CIS, K_TKE_CONV)
 # 08/10 soir, demande utilisateur "meilleure correlation possible pour chaque site" : rapports entre K qui donnent
@@ -322,7 +324,7 @@ def observations(site):
     elif site == "Saint-Veran":
         parts += [read(TESTS / "seeing_16-17_septembre_2026_UTC_SaintVeran2.csv", "UTC", "seeing_arcsec", dayfirst=True),
                   read(TESTS / "Saint_veran_UTC_Diurne_vert.csv", "UTC", "seeing_arcsec"),
-                  read(V2.parent / "V1/Saint_veran_18_09_2026_jour_2.csv", "UTC", "seeing_arcsec", dayfirst=True),
+                  read(MESURES_V1 / "Saint_veran_18_09_2026_jour_2.csv", "UTC", "seeing_arcsec", dayfirst=True),
                   read(TESTS / "Saint_veran_2026-09-25_27_UTC_capture.csv", "datetime_utc", "seeing_arcsec")]
         parts += [read(d / "saint_veran_UTC.csv", "datetime_utc", "day_ssm_arcsec", fallback="night_cdimm_arcsec")
                   for d in releves]

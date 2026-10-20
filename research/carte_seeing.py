@@ -32,6 +32,8 @@ Usage : python carte_seeing.py <dossier du run> [--heures 51] [--rayon-km 50] [-
         python carte_seeing.py <dossier du run> --zone france --echeances 32-40 --tuiles 8 --K 1 6 0.1
 """
 from pathlib import Path
+import sys as _sys; _sys.path.insert(0, str(Path(__file__).resolve().parent))  # chemins.py est a cote
+from chemins import CACHE as CACHE_RACINE, PREVISIONS
 from concurrent.futures import ProcessPoolExecutor
 import argparse, contextlib, gc, importlib.util, io, pickle, shutil, sys, time
 import numpy as np
@@ -39,8 +41,8 @@ import pandas as pd
 
 V2 = Path(__file__).resolve().parent
 SCRIPT_V2 = V2 / "SeeingAromeV2_correction_conv_tke.py"
-CACHE = V2 / "cache_validation" / "carte"
-OUT = V2.parent.parent / "previsions"
+CACHE = CACHE_RACINE / "carte"
+OUT = PREVISIONS
 CENTRE = (44.3814, 5.4286)          # Verclause (historique_sites.COORDS["Drôme"])
 FRANCE = (41.2, 51.3, -5.3, 9.8)    # lat min, lat max, lon min, lon max (France metropolitaine + Corse)
 # sites des cartes zoomees (--zooms) : Cosmodrome = scripts V1, autres = historique_sites.COORDS

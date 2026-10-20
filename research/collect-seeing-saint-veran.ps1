@@ -11,9 +11,14 @@ param(
 
 $Api    = "https://dashboard.miratlas.net/api/ds/query?orgId=29"
 $DsUid  = "ddzuval7sgglcb"
-$Dir    = Split-Path -Parent $MyInvocation.MyCommand.Path
+$Here    = Split-Path -Parent $MyInvocation.MyCommand.Path
+$CfgFile = Join-Path $Here "chemins_locaux.json"
+$Mes     = if ($env:SEEING_MESURES) { $env:SEEING_MESURES } elseif (Test-Path $CfgFile) { (Get-Content $CfgFile -Raw | ConvertFrom-Json).mesures } else { $null }
+if (-not $Mes) { $Mes = Join-Path (Split-Path -Parent $Here) "donnees\mesures" }   # voir chemins.py
+$Dir     = Join-Path $Mes "seeing-saint-veran"
+New-Item -ItemType Directory -Force $Dir | Out-Null
 $Csv    = Join-Path $Dir "seeing_saint_veran.csv"
-$Log    = Join-Path $Dir "collect-saint-veran.log"
+$Log    = Join-Path $Dir "collect.log"
 # colonne CSV -> (measurement, field)
 $Series = [ordered]@{
     day_ssm_arcsec        = @("ism_stations", "day_see")

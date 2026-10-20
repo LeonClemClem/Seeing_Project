@@ -15,9 +15,14 @@ param(
 Add-Type -AssemblyName System.Drawing
 
 $Url       = "https://rosa-remote.com/rosa-live/images/sm.png"
-$Dir       = Split-Path -Parent $MyInvocation.MyCommand.Path
+$Here    = Split-Path -Parent $MyInvocation.MyCommand.Path
+$CfgFile = Join-Path $Here "chemins_locaux.json"
+$Mes     = if ($env:SEEING_MESURES) { $env:SEEING_MESURES } elseif (Test-Path $CfgFile) { (Get-Content $CfgFile -Raw | ConvertFrom-Json).mesures } else { $null }
+if (-not $Mes) { $Mes = Join-Path (Split-Path -Parent $Here) "donnees\mesures" }   # voir chemins.py
+$Dir     = Join-Path $Mes "seeing-rosa"
+New-Item -ItemType Directory -Force $Dir | Out-Null
 $Csv       = Join-Path $Dir "seeing_rosa.csv"
-$Log       = Join-Path $Dir "collect-rosa.log"
+$Log       = Join-Path $Dir "collect.log"
 $Png       = Join-Path $Dir "last_sm.png"
 $Header    = "datetime,seeing_moyen_arcsec,seeing_brut_arcsec"
 $GreenRef  = 2.5      # valeur du seuil vert (arcsec)

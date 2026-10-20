@@ -3,16 +3,18 @@ Chaque variable est interpolee sur les niveaux de la premiere maille, puis media
 (avec 2 mailles : mediane = moyenne). Seeing et H_COULIM : mediane heure par heure."""
 import importlib.util, pickle, sys
 from pathlib import Path
+import sys as _sys; _sys.path.insert(0, str(Path(__file__).resolve().parent))  # chemins.py est a cote
+from chemins import RESEARCH, PREVISIONS, CACHE
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-SCR = Path(__file__).resolve().parent / "cache_validation" / "panneaux"   # profils enregistres par calcul_run.py
-SCRIPT = r"C:\Users\clement\Documents\Seeing_project\modele\code\V2\SeeingAromeV2_correction_conv_tke.py"
-OUT = Path(r"C:\Users\clement\Documents\Seeing_project\modele\previsions")
+SCR = CACHE / "panneaux"   # profils enregistres par calcul_run.py
+SCRIPT = str(RESEARCH / "SeeingAromeV2_correction_conv_tke.py")
+OUT = PREVISIONS
 nom, run_nom = "Copernic", sys.argv[1]
-spec = importlib.util.spec_from_file_location("h", r"C:\Users\clement\Documents\Seeing_project\modele\code\V2\historique_sites.py")
+spec = importlib.util.spec_from_file_location("h", RESEARCH / "historique_sites.py")
 h = importlib.util.module_from_spec(spec); spec.loader.exec_module(h)
 K = h.SITES[nom]["K_new"]
 if h.est_jour_nuit(K):          # jeux jour / nuit : la figure des panneaux est tracee avec le jeu de NUIT
