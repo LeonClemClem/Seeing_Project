@@ -28,7 +28,6 @@ IMPORTANT :
 - Le script ne telecharge rien.
 - Il utilise les GRIB2 deja presents dans DATA_DIR.
 """
-import argparse
 from pathlib import Path
 import re
 from datetime import datetime, timedelta
@@ -39,39 +38,36 @@ from eccodes import (codes_grib_new_from_file,codes_get,codes_get_array,codes_re
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-# Valeur par defaut ; ecrasee par l'argument data_dir passe en ligne de
-# commande (voir parse_args / main).
-DATA_DIR = Path(".")
-FORECAST_HOURS = 51
+DATA_DIR = Path("C:/Users/clement/Documents/Seeing_project/modele/Arome_runs/AROME_download_2509_16h")
+FORECAST_HOURS = 12
 # ======    Sites d'observations    =========
 # LAT_SITE = 43.9500;  LON_SITE  =  4.81667   #   Avignon
 # LAT_SITE = 48.8566;  LON_SITE  =  2.3522   #   Paris
 # LAT_SITE = 42.93642; LON_SITE  =  0.14122  #   Pic Du Midi Observatoire
 # LAT_SITE = 45.8326 ;  LON_SITE  =  6.8652    #   Mont Blanc
 # -------------   Seeing monitor disponibles :   ------------------------------
-LAT_SITE = 44.5828;  LON_SITE  =  5.9868   #   Asso Copernicus
-K_TKE_CONV = 0.3 ; K_TKE = 3 ; K_CIS = 30
+# LAT_SITE = 44.5828;  LON_SITE  =  5.9868   #   Asso Copernicus
+# K_TKE_CONV = 0.3 ; K_TKE = 3 ; K_CIS = 30
 # LAT_SITE = 44.3814;  LON_SITE  =  5.4286   #   VERCLAUSE
 # LAT_SITE = 38;  LON_SITE  =  -2.55   #espagne
 
-# LAT_SITE = 44.1952; LON_SITE = 5.4716  #cosmodrome
+LAT_SITE = 44.1952; LON_SITE = 5.4716  #cosmodrome
 
 # LAT_SITE = 44.6988; LON_SITE =  6.9083   #Observatoire Saint Veran
-# K_TKE_CONV = 0.3 ; K_TKE = 3 ; K_CIS = 30
+# K_TKE_CONV = 0.1 ; K_TKE = 6 ; K_CIS = 12
 
 # ---- Fermeture convective (convection libre, cf. w'theta'_0 issu de SP3:sshf) ----
 KAPPA      = 0.4
 CP_AIR     = 1005.0
 R_D        = 287.05
 C_FC       = 2.1      # constante convection libre (Wyngaard-Izumi-Collins, a~4.9 b~9) -- a calibrer
-     
 SSHF_SIGN  = -1.0      # -1 si sshf est positif vers le bas (convention ECMWF-like) ; a verifier
 
 # ============================================================================
 #                         VERCLAUSE
 # ============================================================================
-# LAT_SITE = 44.3814;  LON_SITE  =  5.4286   #   VERCLAUSE
-# K_TKE = 4 ; K_CIS = 40
+# LAT_SITE = 44.3814;  LON_SITE  =  5.4286  
+K_TKE_CONV = 0.1 ; K_TKE = 8 ; K_CIS = 40
 # ============================================================================
 
 
@@ -103,7 +99,7 @@ affichage_seeing_max   = 3   #arc_secondes
 # ============================================================
 # True  = choix manuel de l'echelle
 # False = echelle automatique calculee a partir des donnees
-HEATMAP_LOG_MANUAL = False
+HEATMAP_LOG_MANUAL = True
 CN2_LOG_VMIN = 1e-18
 CN2_LOG_VMAX = 1e-13
 
@@ -226,15 +222,53 @@ def read_grib_package(path, variables, allowed_types=None):
                 codes_release(gid)
 
     if not data:
-        raise RuntimeError(f"Aucune donnée utile trouvée dans {path.name}.")
+        # Fichier vide ou corrompu : ses echeances seront marquees incompletes
+        # (colonne vide de Cn2, trou dans le seeing) au lieu d'arreter le script.
+        print(f"  ⚠️ Aucune donnée utile dans {path.name} : échéances concernées non calculées.")
+        return {}, None, None
 
     print(f"  {path.name} : steps = {sorted(found_steps)}")
-    if not found_steps:
-        raise RuntimeError(
-            f"Aucun message exploitable trouvé dans {path.name}. "
-            "Le fichier est probablement vide ou corrompu."
-        )
     return data, grid_lat, grid_lon
+
+# ============================================================================
+# ECHEANCES INCOMPLETES
+# ============================================================================
+def count_fields(cache, hour_file, hour):
+    """Nombre de champs (variable x niveau) lus pour une echeance ; None si fichier absent."""
+    path = hour_file.get(hour)
+    if path is None or path not in cache:
+        return None
+    data = cache[path]["data"].get(hour)
+    return sum(len(levels) for levels in data.values()) if data else 0
+
+def find_incomplete_hours(packages, hours):
+    """
+    packages : {nom: (cache, hour_file, present_a_l_echeance_0)}.
+    Une echeance est incomplete si un fichier manque, ou si un paquet y a
+    moins de champs que son maximum sur le run (fichier tronque). Les paquets
+    absents par nature a l'echeance 0 (TKE, flux) n'y sont pas controles.
+    Retourne {echeance: [raisons]}.
+    """
+    problems = {}
+    for name, (cache, hour_file, at_step0) in packages.items():
+        counts = {h: count_fields(cache, hour_file, h) for h in hours}
+        expected = max((c for h, c in counts.items() if c and (at_step0 or h > 0)), default=0)
+        for h, c in counts.items():
+            if c is None:
+                problems.setdefault(h, []).append(f"{name} absent")
+            elif (at_step0 or h > 0) and c < expected:
+                problems.setdefault(h, []).append(f"{name} {c}/{expected} champs")
+    return problems
+
+def empty_hour_result(h_coulim=np.nan):
+    """Echeance non calculee : profils NaN (colonne vide de Cn2), seeing NaN."""
+    nan = np.full(len(HEIGHTS), np.nan)
+    keys = ("U", "V", "T", "P", "TKE", "theta", "dtheta_dz", "dU_dz", "dV_dz", "L", "Cn2")
+    return {
+        "z": HEIGHTS.copy(), **{k: nan.copy() for k in keys},
+        "H_COULIM": h_coulim, "z_combined": HEIGHTS.copy(), "Cn2_combined": nan.copy(),
+        "r0": np.nan, "seeing": np.nan,
+    }
 
 # ============================================================================
 # FICHIERS
@@ -260,19 +294,6 @@ def build_hour_file_map(files, max_hour):
             hour_map[hour] = path
     return hour_map
 
-def select_file_for_hour(files_or_map, hour):
-    # Compatibilite : accepte encore une liste de fichiers.
-    if isinstance(files_or_map, dict):
-        try:
-            return files_or_map[hour]
-        except KeyError:
-            raise FileNotFoundError(f"Aucun fichier pour H+{hour}")
-    for path in files_or_map:
-        start, end = parse_forecast_range(path)
-        if start <= hour <= end:
-            return path
-    raise FileNotFoundError(f"Aucun fichier pour H+{hour}")
-
 # ============================================================================
 # SP2 : H_COULIM + ALTITUDE h
 # ============================================================================
@@ -283,7 +304,10 @@ def get_h_coulim(sp2_data, hour):
         if values:
             value = next(iter(values.values()))
             if np.isfinite(value):
-                return float(value)
+                # Arrondi au decimetre : le codage GRIB donne 9.99999714 m
+                # pour le plancher de 10 m, ce qui excluait le niveau 10 m
+                # de la couche limite (z <= H_COULIM).
+                return round(float(value), 1)
     return np.nan
 
 def read_surface_h(path):
@@ -357,6 +381,10 @@ def build_hag_profile(hp1_data, hp2_data, hour, grid_lat, grid_lon):
     T = arr(hp1, "t")
     U = arr(hp1, "u")
     V = arr(hp1, "v")
+    # Dans HP1, le vent a 10 m est code "10u"/"10v" et non "u"/"v".
+    for out, name in ((U, "10u"), (V, "10v")):
+        if 10.0 in hp1.get(name, {}):
+            out[HEIGHTS == 10.0] = hp1[name][10.0]
     P = arr(hp1, "pres")
     TKE = arr(hp2, "tke") if hp2 is not None else np.full(len(HEIGHTS), np.nan)
 
@@ -396,6 +424,7 @@ def make_isobaric_profile(ip1_data, hour, surface_altitude, grid_lat, grid_lon):
     T = np.asarray([ip1.get("t", {}).get(lev, np.nan) for lev in levels], dtype=float)
     U = np.asarray([ip1.get("u", {}).get(lev, np.nan) for lev in levels], dtype=float)
     V = np.asarray([ip1.get("v", {}).get(lev, np.nan) for lev in levels], dtype=float)
+    P = np.asarray(levels, dtype=float)
 
     # IP1 Z -> altitude AGL par rapport au relief SP2/h.
     if np.isfinite(surface_altitude):
@@ -410,22 +439,22 @@ def make_isobaric_profile(ip1_data, hour, surface_altitude, grid_lat, grid_lon):
         & (z > 0)
     )
 
-    z, T, U, V = z[valid], T[valid], U[valid], V[valid]
+    z, T, U, V, P = z[valid], T[valid], U[valid], V[valid], P[valid]
 
     order = np.argsort(z)
-    z, T, U, V = z[order], T[order], U[order], V[order]
+    z, T, U, V, P = z[order], T[order], U[order], V[order], P[order]
 
     # Suppression des doublons éventuels en altitude.
     if z.size:
         keep = np.r_[True, np.diff(z) > 1e-6]
-        z, T, U, V = z[keep], T[keep], U[keep], V[keep]
+        z, T, U, V, P = z[keep], T[keep], U[keep], V[keep], P[keep]
 
     return {
         "z": z,
         "T": T,
         "U": U,
         "V": V,
-        "P": np.asarray([lev for lev in levels], dtype=float)[valid][order],
+        "P": P,
         "surface_altitude": surface_altitude,
         "grid_lat": grid_lat,
         "grid_lon": grid_lon,
@@ -464,6 +493,13 @@ def add_ip4_tke(profile_iso, ip4_data, hour):
 # ============================================================================
 # PHYSIQUE
 # ============================================================================
+def profile_gradients(profile, theta):
+    """Gradients du profil complet s'ils sont fournis, sinon calcul local."""
+    if "dtheta_dz" in profile:
+        return profile["dtheta_dz"], profile["dU_dz"], profile["dV_dz"]
+    z = profile["z"]
+    return np.gradient(theta, z), np.gradient(profile["U"], z), np.gradient(profile["V"], z)
+
 def calculate_cn2_tke(profile):
     z = np.asarray(profile["z"], dtype=float)
     T = np.asarray(profile["T"], dtype=float)
@@ -472,10 +508,11 @@ def calculate_cn2_tke(profile):
     P = np.asarray(profile["P"], dtype=float)
     E = np.asarray(profile["TKE"], dtype=float)
 
-    # Aucun niveau dans la couche TKE :
-    # cas possible lorsque H_COULIM est inférieur au premier
-    # niveau vertical disponible.
-    if z.size < 2:
+    # Aucun niveau dans la couche TKE (H_COULIM sous le premier niveau), ou
+    # un seul niveau sans gradients du profil complet pour le deriver.
+    # Avec les gradients du profil complet, un seul niveau suffit
+    # (H_COULIM = 10 m la nuit).
+    if z.size == 0 or (z.size < 2 and "dtheta_dz" not in profile):
         return {
             **profile,
             "theta": np.full_like(z, np.nan, dtype=float),
@@ -487,9 +524,7 @@ def calculate_cn2_tke(profile):
         }
 
     theta = T * (P0_HPA / P) ** R_OVER_CP
-    dtheta_dz = np.gradient(theta, z)
-    dU_dz = np.gradient(U, z)
-    dV_dz = np.gradient(V, z)
+    dtheta_dz, dU_dz, dV_dz = profile_gradients(profile, theta)
     L = np.full_like(z, np.nan)
 
     stable = (
@@ -543,6 +578,12 @@ def calculate_cn2_tke(profile):
 # ============================================================================
 def get_sshf_accum(sp3_cache, sp3_hour_file, hour):
     """Valeur cumulee (depuis le debut du run) de SP3:sshf a une echeance."""
+    if not sp3_hour_file:
+        return np.nan
+    if hour == 0:
+        # Cumul nul par definition ; Meteo-France ne fournit pas les flux
+        # a l'echeance 0 (sinon w'theta'0 serait NaN a H+1).
+        return 0.0
     if hour not in sp3_hour_file:
         return np.nan
     source = sp3_cache[sp3_hour_file[hour]]["data"].get(hour, {}).get("sshf", {})
@@ -647,6 +688,14 @@ def calculate_cn2_convective(profile, w_theta0, zi, theta0):
     }
 
 def calculate_cn2_shear(profile):
+    """
+    Gladstone modifie (Cuevas et al. 2024, MNRAS 529, 2208, eq. 9-11) avec
+    TKE = S^2 au-dessus de la couche limite.
+
+    Avec TKE = S^2 (en s^-2), L = sqrt(2/Ri) est sans dimension : K_CIS joue
+    le role de phi et porte une longueur cachee l^(4/3), l = K_CIS^(3/4) m.
+    K_CIS n'est donc pas directement comparable a K_TKE.
+    """
     z = np.asarray(profile["z"], dtype=float)
     T = np.asarray(profile["T"], dtype=float)
     U = np.asarray(profile["U"], dtype=float)
@@ -654,9 +703,7 @@ def calculate_cn2_shear(profile):
     P = np.asarray(profile["P"], dtype=float)
 
     theta = T * (P0_HPA / P) ** R_OVER_CP
-    dtheta_dz = np.gradient(theta, z)
-    dU_dz = np.gradient(U, z)
-    dV_dz = np.gradient(V, z)
+    dtheta_dz, dU_dz, dV_dz = profile_gradients(profile, theta)
 
     S = np.sqrt(dU_dz ** 2 + dV_dz ** 2)
     E = S ** 2
@@ -693,71 +740,6 @@ def calculate_cn2_shear(profile):
     }
 
 # ============================================================================
-# ASSEMBLAGE PHYSIQUE
-# ============================================================================
-def combine_full_profile(hag, iso, h_coulim):
-    """
-    Profil physique Cn2 en respectant la priorite verticale HAG -> IP1.
-
-    Regles :
-      - TKE sur les niveaux HAG jusqu'a H_COULIM si H_COULIM <= 3000 m ;
-      - cisaillement sur les niveaux HAG entre H_COULIM et 3000 m ;
-      - si H_COULIM > 3000 m, TKE HAG jusqu'a 3000 m puis TKE IP4
-        sur les niveaux isobares entre 3000 m et H_COULIM ;
-      - au-dessus de max(H_COULIM, 3000 m), cisaillement IP1.
-
-    Ainsi, H_COULIM definit la frontiere entre les modeles, mais ne
-    provoque jamais un passage premature des variables HAG vers IP1.
-    """
-    if not np.isfinite(h_coulim):
-        raise RuntimeError("H_COULIM indisponible.")
-
-    keys = ("z", "T", "U", "V", "P", "TKE")
-    parts = {key: [] for key in keys}
-
-    # 1) Partie TKE HAG : toujours les niveaux HAG disponibles sous H_COULIM.
-    mask_hag_tke = np.isfinite(hag["z"]) & (hag["z"] <= h_coulim)
-    for key in keys:
-        parts[key].append(np.asarray(hag[key])[mask_hag_tke])
-
-    # 2) Si H_COULIM > 3000 m, prolongement TKE par IP4 au-dessus de 3000 m.
-    mask_iso_tke = (
-        np.isfinite(iso["z"])
-        & (iso["z"] > 3000.0)
-        & (iso["z"] <= h_coulim)
-    )
-    for key in ("z", "T", "U", "V", "P"):
-        parts[key].append(np.asarray(iso[key])[mask_iso_tke])
-    parts["TKE"].append(np.asarray(iso["TKE"])[mask_iso_tke])
-
-    # 3) Cisaillement : PRIORITE AUX HAG jusqu'a 3000 m.
-    #    C'est le point essentiel : si H_COULIM < 3000 m, le cisaillement
-    #    utilise les niveaux HAG situes au-dessus de H_COULIM.
-    mask_hag_shear = (
-        np.isfinite(hag["z"])
-        & (hag["z"] > h_coulim)
-        & (hag["z"] <= 3000.0)
-    )
-    for key in ("z", "T", "U", "V", "P"):
-        parts[key].append(np.asarray(hag[key])[mask_hag_shear])
-    parts["TKE"].append(np.full(np.count_nonzero(mask_hag_shear), np.nan))
-
-    # 4) Au-dessus de la limite HAG (3000 m), cisaillement sur IP1.
-    shear_start = max(float(h_coulim), 3000.0)
-    mask_iso_shear = np.isfinite(iso["z"]) & (iso["z"] > shear_start)
-    for key in ("z", "T", "U", "V", "P"):
-        parts[key].append(np.asarray(iso[key])[mask_iso_shear])
-    parts["TKE"].append(np.full(np.count_nonzero(mask_iso_shear), np.nan))
-
-    result = {key: np.concatenate(parts[key]) for key in keys}
-
-    order = np.argsort(result["z"])
-    for key in result:
-        result[key] = result[key][order]
-
-    return result
-
-# ============================================================================
 # PROFIL METEOROLOGIQUE POUR AFFICHAGE
 # ============================================================================
 def build_display_profile(hag, iso):
@@ -768,8 +750,8 @@ def build_display_profile(hag, iso):
     - au-dessus de 3000 m, utilise les niveaux IP1 ;
     - ne tronque PAS le profil avec H_COULIM.
 
-    H_COULIM sert uniquement a choisir le modele Cn2 dans
-    `combine_full_profile` et dans le calcul physique de la BL/FA.
+    Ce profil sert aussi au calcul physique : les deux modeles Cn2 y sont
+    evalues, et H_COULIM ne sert qu'a couper l'integrale (calculate_seeing).
     """
     keys = ("z", "T", "U", "V", "P", "TKE")
 
@@ -840,21 +822,40 @@ def calculate_display_diagnostics(profile):
 # ============================================================================
 # SEEING
 # ============================================================================
-def calculate_seeing(z, cn2):
+def calculate_seeing(z, cn2_bl, cn2_fa, h_coulim):
+    """
+    Integrale de Cn2 coupee exactement a H_COULIM :
+        int_{z0}^{H} Cn2_BL dz  +  int_{H}^{ztop} Cn2_FA dz
+    Les deux modeles sont definis sur les memes niveaux z. La valeur de
+    chaque modele EN H_COULIM est interpolee lineairement entre ses deux
+    niveaux voisins (borne de l'integrale uniquement). Les trous (Cn2 non
+    calculable) valent 0 : aucun trou n'est comble par ses voisins.
+    """
     z = np.asarray(z, dtype=float)
-    cn2 = np.asarray(cn2, dtype=float)
-    valid = np.isfinite(z) & np.isfinite(cn2) & (cn2 >= 0)
+    valid = np.isfinite(z)
+    order = np.argsort(z[valid])
+    zv = z[valid][order]
 
-    if np.count_nonzero(valid) < 2:
+    def clean(c):
+        c = np.asarray(c, dtype=float)[valid][order]
+        ok = np.isfinite(c) & (c >= 0)
+        return np.where(ok, c, 0.0), ok
+
+    c_bl, ok_bl = clean(cn2_bl)
+    c_fa, ok_fa = clean(cn2_fa)
+
+    if zv.size < 2 or not (np.any(ok_bl) or np.any(ok_fa)):
         return np.nan, np.nan, np.nan
 
-    zv = z[valid]
-    cv = cn2[valid]
-    order = np.argsort(zv)
-    zv = zv[order]
-    cv = cv[order]
+    # H_COULIM ramene dans l'etendue du profil (pas d'extrapolation).
+    h = float(np.clip(h_coulim, zv[0], zv[-1]))
+    below = zv < h
+    above = zv > h
 
-    integral = np.trapezoid(cv, zv)
+    integral = (
+        np.trapezoid(np.r_[c_bl[below], np.interp(h, zv, c_bl)], np.r_[zv[below], h])
+        + np.trapezoid(np.r_[np.interp(h, zv, c_fa), c_fa[above]], np.r_[h, zv[above]])
+    )
     if not np.isfinite(integral) or integral <= 0:
         return integral, np.nan, np.nan
 
@@ -921,35 +922,6 @@ def get_grib_cycle_datetime(path):
 # ============================================================================
 # FIGURE
 # ============================================================================
-def load_observed_seeing(csv_path):
-    """Charge la courbe SBIG et reconstruit son axe temporel directement en TU.
-
-    Les colonnes date/heure du CSV d'extraction ne sont pas utilisées pour
-    l'axe temporel, car elles contiennent les anciennes dates d'affichage.
-    Les valeurs de seeing sont conservées telles quelles.
-
-    La séquence correspond à la nuit :
-        12/09/2026 20:45 -> 13/09/2026 05:55 heure locale France
-        13/09/2026 18:50 -> 14/09/2026 03:45 TU
-    """
-    if not csv_path.exists():
-        return None, None
-
-    obs = pd.read_csv(csv_path, sep=";")
-
-    required = {"seeing_arcsec"}
-    if not required.issubset(obs.columns):
-        raise ValueError(
-            f"Le CSV {csv_path.name} doit contenir la colonne "
-            f"'seeing_arcsec'."
-        )
-
-    obs_seeing = pd.to_numeric(obs["seeing_arcsec"], errors="coerce")
-
-    valid = obs_seeing.notna() & np.isfinite(obs_seeing)
-    if not np.any(valid):
-        return None, None
-
 def make_one_figure(results_by_hour, df, forecast_reference):
     hours = sorted(results_by_hour)
     valid_dates = [forecast_reference + timedelta(hours=int(h)) for h in hours]
@@ -1007,7 +979,7 @@ def make_one_figure(results_by_hour, df, forecast_reference):
     )
 
     def heatmap(ax, data, title, label, log=False, manual_log=False,
-                log_vmin=None, log_vmax=None):
+                log_vmin=None, log_vmax=None, cb_pad=0.02):
         data = np.asarray(data, dtype=float)
 
         if log:
@@ -1077,7 +1049,7 @@ def make_one_figure(results_by_hour, df, forecast_reference):
         ax.set_ylim(display_z.min(), affichage_altitude_max)
         ax.grid(True, alpha=0.18, linestyle=":")
 
-        cb = fig.colorbar(mesh, ax=ax, pad=0.02, fraction=0.046)
+        cb = fig.colorbar(mesh, ax=ax, pad=cb_pad, fraction=0.046)
         cb.set_label(label)
 
     heatmap(axes[0, 0], matrices["U"], r"$U$ [m/s]", r"$U$ [m/s]")
@@ -1096,6 +1068,7 @@ def make_one_figure(results_by_hour, df, forecast_reference):
         manual_log=HEATMAP_LOG_MANUAL,
         log_vmin=CN2_LOG_VMIN,
         log_vmax=CN2_LOG_VMAX,
+        cb_pad=0.16,          # place pour l'axe du seeing superpose
     )
 
     ax = axes[2, 1]
@@ -1103,7 +1076,16 @@ def make_one_figure(results_by_hour, df, forecast_reference):
     if np.any(valid_h):
         ax.plot(np.asarray(valid_dates, dtype=object)[valid_h], H[valid_h], color="white", linewidth=2,
                 label=r"$H_{COULIM}$", zorder=20)
-        ax.legend(loc="best")
+    # Seeing superpose au Cn2, sur un second axe a droite.
+    ax_seeing = ax.twinx()
+    ax_seeing.plot(valid_dates, df["seeing_arcsec"].to_numpy(), color="black", linewidth=3.2, zorder=21)
+    ax_seeing.plot(valid_dates, df["seeing_arcsec"].to_numpy(), color="white", linewidth=1.4,
+                   marker="o", markersize=2.5, zorder=22, label="Seeing")
+    ax_seeing.set_ylabel("Seeing [arcsec]", labelpad=2)
+    ax_seeing.set_ylim(0, None)
+    ax_seeing.set_xlim(valid_dates[0], valid_dates[-1])
+    lignes = ax.get_legend_handles_labels()[0] + ax_seeing.get_legend_handles_labels()[0]
+    ax.legend(lignes, [l.get_label() for l in lignes], loc="upper right", fontsize=8)
 
     ax9 = axes[2, 2]
     ax9.set_title("Seeing", fontsize=12, fontweight="bold")
@@ -1134,44 +1116,29 @@ def make_one_figure(results_by_hour, df, forecast_reference):
     ax9.legend(loc="best")
     ax9.grid(True, alpha=0.18, linestyle=":")
 
-    # Graduations toutes les 6 h, mais affichees en date/heure reelles.
-    tick_dates = [d for d in valid_dates if (d - forecast_reference).total_seconds() % (6 * 3600) == 0]
-    tick_labels = [d.strftime("%d/%m %Hh") for d in tick_dates]
+    # Graduation a chaque heure ; heure ecrite seulement aux heures paires,
+    # avec la date a 00 h.
+    tick_dates = list(valid_dates)
+    tick_labels = ["" if d.hour % 2 else (d.strftime("%d/%m %Hh") if d.hour == 0 else d.strftime("%Hh"))
+                   for d in tick_dates]
 
     for ax in axes.flat:
         ax.set_xticks(tick_dates)
-        ax.set_xticklabels(tick_labels, rotation=45, ha="right")
+        ax.set_xticklabels(tick_labels, rotation=90, fontsize=7)
         ax.set_xlim(valid_dates[0], valid_dates[-1])
         # Lignes verticales quotidiennes conservees a 06 h et 18 h.
         for d in valid_dates:
             if d.hour in (6, 18):
                 ax.axvline(d, color="black", linestyle="--", linewidth=1.0, alpha=0.6, zorder=15)
 
-    fig.subplots_adjust(left=0.055, right=0.965, bottom=0.07, top=0.91,
-                        wspace=0.28, hspace=0.30)
+    fig.subplots_adjust(left=0.055, right=0.965, bottom=0.08, top=0.91,
+                        wspace=0.28, hspace=0.50)
     plt.show()
 
 # ============================================================================
 # MAIN
 # ============================================================================
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Calcul du seeing optique AROME a partir des GRIB2 deja telecharges."
-    )
-    parser.add_argument(
-        "data_dir",
-        nargs="?",
-        type=Path,
-        default=Path("."),
-        help="Folder containing the downloaded AROME GRIB2 files (default: current directory).",
-    )
-    return parser.parse_args()
-
-
 def main():
-    global DATA_DIR
-    DATA_DIR = parse_args().data_dir
-
     print("\n" + "=" * 80)
     print("CALCUL SEEING AROME — PROFIL COMPLET HAG + ISOBARIQUE")
     print("=" * 80)
@@ -1224,31 +1191,31 @@ def main():
     sp2_hour_file = build_hour_file_map(sp2_files, FORECAST_HOURS)
     sp3_hour_file = build_hour_file_map(sp3_files, FORECAST_HOURS) if sp3_files else {}
 
-    for path in hp1_files:
+    for path in sorted(set(hp1_hour_file.values())):   # uniquement les fichiers utiles a FORECAST_HOURS
         print("Lecture HP1 :")
-        data, lat, lon = read_grib_package(path, {"t", "u", "v", "pres"})
+        data, lat, lon = read_grib_package(path, {"t", "u", "v", "10u", "10v", "pres"})
         hp1_cache[path] = {"data": data, "lat": lat, "lon": lon}
 
-    for path in hp2_files:
+    for path in sorted(set(hp2_hour_file.values())):   # uniquement les fichiers utiles a FORECAST_HOURS
         print("Lecture HP2 :")
         data, lat, lon = read_grib_package(path, {"tke"})
         hp2_cache[path] = {"data": data, "lat": lat, "lon": lon}
 
-    for path in ip1_files:
+    for path in sorted(set(ip1_hour_file.values())):   # uniquement les fichiers utiles a FORECAST_HOURS
         print("Lecture IP1 :")
         data, lat, lon = read_grib_package(
             path, {"t", "u", "v", "z"}, allowed_types={"isobaricInhPa"}
         )
         ip1_cache[path] = {"data": data, "lat": lat, "lon": lon}
 
-    for path in ip4_files:
+    for path in sorted(set(ip4_hour_file.values())):   # uniquement les fichiers utiles a FORECAST_HOURS
         print("Lecture IP4 :")
         data, lat, lon = read_grib_package(
             path, {"tke"}, allowed_types={"isobaricInhPa"}
         )
         ip4_cache[path] = {"data": data, "lat": lat, "lon": lon}
 
-    for path in sp2_files:
+    for path in sorted(set(sp2_hour_file.values())):   # uniquement les fichiers utiles a FORECAST_HOURS
         print("Lecture SP2 :")
         data, lat, lon = read_grib_package(
             path, {"blh", "h_coulim"}, allowed_types={"surface"}
@@ -1256,7 +1223,7 @@ def main():
         sp2_cache[path] = {"data": data, "lat": lat, "lon": lon}
 
     sp3_cache = {}
-    for path in sp3_files:
+    for path in sorted(set(sp3_hour_file.values())):   # uniquement les fichiers utiles a FORECAST_HOURS
         print("Lecture SP3 :")
         data, lat, lon = read_grib_package(path, {"sshf"})
         sp3_cache[path] = {"data": data, "lat": lat, "lon": lon}
@@ -1275,22 +1242,47 @@ def main():
     rows = []
     results_by_hour = {}
 
-    for hour in range(FORECAST_HOURS + 1):
+    # Echeances incompletes (fichier absent, tronque, ou H_COULIM manquant) :
+    # elles ne sont pas calculees -> colonne vide de Cn2, trou dans le seeing.
+    hours = list(range(FORECAST_HOURS + 1))
+    packages = {
+        "HP1": (hp1_cache, hp1_hour_file, True),
+        "HP2": (hp2_cache, hp2_hour_file, False),
+        "IP1": (ip1_cache, ip1_hour_file, True),
+        "IP4": (ip4_cache, ip4_hour_file, False),
+        "SP2": (sp2_cache, sp2_hour_file, True),
+    }
+    if sp3_files:
+        packages["SP3"] = (sp3_cache, sp3_hour_file, False)
+    incomplete = find_incomplete_hours(packages, hours)
+
+    for hour in hours:
+        h_coulim = np.nan
+        if hour not in incomplete:
+            h_coulim = get_h_coulim(sp2_cache[sp2_hour_file[hour]]["data"], hour)
+            if not np.isfinite(h_coulim):
+                incomplete[hour] = ["H_COULIM absent"]
+
+        if hour in incomplete:
+            print(f"H+{hour:02d} | ⚠️ échéance incomplète ({', '.join(incomplete[hour])}) : non calculée")
+            results_by_hour[hour] = empty_hour_result(h_coulim)
+            rows.append({
+                "forecast_hour": hour, "grid_lat": np.nan, "grid_lon": np.nan,
+                "surface_altitude_m": surface_altitude, "H_COULIM_m": h_coulim,
+                "integral_Cn2": np.nan, "r0_m": np.nan, "seeing_arcsec": np.nan,
+                "tke_min": np.nan, "tke_max": np.nan,
+            })
+            continue
+
         hp1_file = hp1_hour_file[hour]
         hp2_file = hp2_hour_file[hour]
         ip1_file = ip1_hour_file[hour]
         ip4_file = ip4_hour_file[hour]
-        sp2_file = sp2_hour_file[hour]
 
         hp1_data = hp1_cache[hp1_file]["data"]
         hp2_data = hp2_cache[hp2_file]["data"]
         ip1_data = ip1_cache[ip1_file]["data"]
         ip4_data = ip4_cache[ip4_file]["data"]
-        sp2_data = sp2_cache[sp2_file]["data"]
-
-        h_coulim = get_h_coulim(sp2_data, hour)
-        if not np.isfinite(h_coulim):
-            raise RuntimeError(f"H_COULIM/blh indisponible à H+{hour}.")
 
         hag = build_hag_profile(
             hp1_data, hp2_data, hour,
@@ -1302,47 +1294,38 @@ def main():
         )
         iso["TKE"] = add_ip4_tke(iso, ip4_data, hour)
 
-        # Profil physique TKE : HP2 + IP4 uniquement jusqu'à H_COULIM.
-        # Pour calculer le Cn2 TKE sur une grille continue, on concatene
-        # explicitement HP2 et IP4 dans la BL.
-        mask_hag_bl = hag["z"] <= h_coulim
-        mask_iso_bl = (iso["z"] > 3000.0) & (iso["z"] <= h_coulim)
-
-        tke_bl = {
-            "z": np.concatenate([hag["z"][mask_hag_bl], iso["z"][mask_iso_bl]]),
-            "T": np.concatenate([hag["T"][mask_hag_bl], iso["T"][mask_iso_bl]]),
-            "U": np.concatenate([hag["U"][mask_hag_bl], iso["U"][mask_iso_bl]]),
-            "V": np.concatenate([hag["V"][mask_hag_bl], iso["V"][mask_iso_bl]]),
-            "P": np.concatenate([hag["P"][mask_hag_bl], iso["P"][mask_iso_bl]]),
-            "TKE": np.concatenate([hag["TKE"][mask_hag_bl], iso["TKE"][mask_iso_bl]]),
-        }
-
         # ------------------------------------------------------------------
-        # Le modele TKE (formule Masciadri existante, avec la vraie TKE
-        # HP2/IP4) reste le calcul principal partout dans la BL. La
-        # fermeture convective ne fait que COMBLER les niveaux ou ce calcul
-        # echoue (Cn2 = NaN, i.e. dtheta_dz <= 0 -- les trous d'origine) ;
-        # elle ne remplace jamais le profil TKE la ou il est deja valide.
-        # Le cisaillement au-dessus de la BL n'est pas touche.
+        # Profil complet (HAG jusqu'a 3000 m puis IP1/IP4) : theta et
+        # gradients calcules une seule fois. Les deux modeles sont evalues
+        # sur TOUT le profil ; H_COULIM ne sert qu'a couper l'integrale.
+        #   - Cn2_BL : Masciadri avec la vraie TKE HP2/IP4. La fermeture
+        #     convective comble ses trous (dtheta_dz <= 0) sous H_COULIM
+        #     quand w'theta'0 > 0 ; elle ne remplace jamais une valeur valide.
+        #   - Cn2_FA : cisaillement Gm (TKE = S^2).
         # ------------------------------------------------------------------
-        result_tke = calculate_cn2_tke(tke_bl)
+        display_profile = build_display_profile(hag, iso)
+        display_diag = calculate_display_diagnostics(display_profile)
+        full = {**display_profile, **display_diag}
+        z_full = full["z"]
+
+        cn2_bl = calculate_cn2_tke(full)["Cn2"]
 
         n_holes = 0
         w_theta0 = np.nan
-        if tke_bl["z"].size:
-            theta0 = tke_bl["T"][0] * (P0_HPA / tke_bl["P"][0]) ** R_OVER_CP
+        if z_full.size:
+            theta0 = full["T"][0] * (P0_HPA / full["P"][0]) ** R_OVER_CP
             w_theta0 = compute_w_theta0(
-                sp3_cache, sp3_hour_file, hour, tke_bl["T"][0], tke_bl["P"][0]
+                sp3_cache, sp3_hour_file, hour, full["T"][0], full["P"][0]
             )
 
             if np.isfinite(w_theta0) and w_theta0 > 0:
-                holes = ~np.isfinite(result_tke["Cn2"])
+                holes = ~np.isfinite(cn2_bl) & (z_full <= h_coulim)
                 n_holes = int(np.count_nonzero(holes))
                 if n_holes:
                     conv_result = calculate_cn2_convective(
-                        tke_bl, w_theta0, h_coulim, theta0
+                        full, w_theta0, h_coulim, theta0
                     )
-                    result_tke["Cn2"][holes] = conv_result["Cn2"][holes]
+                    cn2_bl[holes] = conv_result["Cn2"][holes]
 
         if n_holes:
             print(
@@ -1350,56 +1333,18 @@ def main():
                 f"fermeture convective (w'theta0={w_theta0:.4f} K.m/s)"
             )
 
-        # Atmosphere libre : PRIORITE AUX HAG jusqu'a 3000 m.
-        # Si H_COULIM < 3000 m, le cisaillement est donc calcule sur les
-        # niveaux HAG au-dessus de H_COULIM, puis sur IP1 au-dessus de 3000 m.
-        mask_hag_shear = (
-            np.isfinite(hag["z"])
-            & (hag["z"] > h_coulim)
-            & (hag["z"] <= 3000.0)
-        )
-        mask_iso_shear = (
-            np.isfinite(iso["z"])
-            & (iso["z"] > max(float(h_coulim), 3000.0))
-        )
+        cn2_fa = calculate_cn2_shear(full)["Cn2"]
 
-        shear_profile = {
-            k: np.concatenate([
-                np.asarray(hag[k])[mask_hag_shear],
-                np.asarray(iso[k])[mask_iso_shear],
-            ])
-            for k in ("z", "T", "U", "V", "P")
-        }
-        result_shear = calculate_cn2_shear(shear_profile)
+        integral, r0, seeing = calculate_seeing(z_full, cn2_bl, cn2_fa, h_coulim)
 
-        # Profil meteorologique independant de H_COULIM pour l'affichage :
-        # tous les niveaux HAG jusqu'a 3000 m sont conserves.
-        display_profile = build_display_profile(hag, iso)
-        display_diag = calculate_display_diagnostics(display_profile)
+        # Sans TKE (echeance 0 : l'analyse Meteo-France ne contient ni TKE
+        # ni flux), le modele de couche limite est inutilisable : pas de seeing.
+        if not np.any(np.isfinite(full["TKE"])):
+            integral, r0, seeing = np.nan, np.nan, np.nan
 
-        # Cn2 natif combine pour l'integration.
-        # L'ordre TKE puis cisaillement est deja croissant en altitude.
-        z_cn2 = np.concatenate([result_tke["z"], result_shear["z"]])
-        cn2 = np.concatenate([result_tke["Cn2"], result_shear["Cn2"]])
-
-        integral, r0, seeing = calculate_seeing(z_cn2, cn2)
-
-        # Projection rapide de Cn2 sur le profil d'affichage.
-        # Les altitudes natives sont communes entre les profils : un
-        # dictionnaire evite les recherches np.where/isclose imbriquees.
-        cn2_by_z = {}
-        for z0, c0 in zip(result_tke["z"], result_tke["Cn2"]):
-            if np.isfinite(c0):
-                cn2_by_z[round(float(z0), 6)] = float(c0)
-        for z0, c0 in zip(result_shear["z"], result_shear["Cn2"]):
-            if np.isfinite(c0):
-                cn2_by_z[round(float(z0), 6)] = float(c0)
-
-        cn2_display = np.array(
-            [cn2_by_z.get(round(float(z0), 6), np.nan)
-             for z0 in display_profile["z"]],
-            dtype=float,
-        )
+        # Cn2 affiche : modele BL sous H_COULIM, cisaillement au-dessus.
+        cn2_display = np.where(z_full <= h_coulim, cn2_bl, cn2_fa)
+        z_cn2, cn2 = z_full, cn2_display
 
         display_profile.update(display_diag)
         display_profile["Cn2"] = cn2_display

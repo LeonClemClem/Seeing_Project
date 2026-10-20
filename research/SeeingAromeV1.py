@@ -22,8 +22,6 @@ IMPORTANT :
 - Le script ne telecharge rien.
 - Il utilise les GRIB2 deja presents dans DATA_DIR.
 """
-
-import argparse
 from pathlib import Path
 import re
 from datetime import datetime, timedelta
@@ -34,9 +32,7 @@ from eccodes import (codes_grib_new_from_file,codes_get,codes_get_array,codes_re
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-# Valeur par defaut ; ecrasee par l'argument data_dir passe en ligne de
-# commande (voir parse_args / main).
-DATA_DIR = Path(".")
+DATA_DIR = Path("C:/Users/clement/Documents/Seeing_project/modele/Arome_runs/AROME_download_2509_16h")
 FORECAST_HOURS = 51
 # ======    Sites d'observations    =========
 # LAT_SITE = 43.9500;  LON_SITE  =  4.81667   #   Avignon 
@@ -50,14 +46,14 @@ FORECAST_HOURS = 51
 
 # LAT_SITE = 44.1952; LON_SITE = 5.4716  #cosmodrome
 
-LAT_SITE = 44.6988; LON_SITE =  6.9083   #Observatoire Saint Veran
-K_TKE = 1.8 ; K_CIS = 1
+# LAT_SITE = 44.6988; LON_SITE =  6.9083   #Observatoire Saint Veran
+# K_TKE = 1.8 ; K_CIS = 1
 
 # ============================================================================
 #                         VERCLAUSE
 # ============================================================================
-# LAT_SITE = 44.3814;  LON_SITE  =  5.4286   #   VERCLAUSE
-# K_TKE = 4 ; K_CIS = 40
+LAT_SITE = 44.3814;  LON_SITE  =  5.4286   #   VERCLAUSE
+K_TKE = 4; K_CIS = 40
 # ============================================================================
 
 
@@ -83,7 +79,7 @@ K_TKE = 1.8 ; K_CIS = 1
 
 
 #=============================
-affichage_altitude = 4000
+affichage_altitude = 2000
 #======= Coeef ===============
 # K_TKE = 4
 # K_CIS = 40
@@ -1031,24 +1027,7 @@ def make_one_figure(results_by_hour, df, forecast_reference):
 # MAIN
 # ============================================================================
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Calcul du seeing optique AROME a partir des GRIB2 deja telecharges."
-    )
-    parser.add_argument(
-        "data_dir",
-        nargs="?",
-        type=Path,
-        default=Path("."),
-        help="Folder containing the downloaded AROME GRIB2 files (default: current directory).",
-    )
-    return parser.parse_args()
-
-
 def main():
-    global DATA_DIR
-    DATA_DIR = parse_args().data_dir
-
     print("\n" + "=" * 80)
     print("CALCUL SEEING AROME — PROFIL COMPLET HAG + ISOBARIQUE")
     print("=" * 80)
