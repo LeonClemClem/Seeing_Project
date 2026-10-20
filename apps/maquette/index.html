@@ -64,6 +64,11 @@ h2{font-family:var(--f-display);font-weight:500;font-size:17px;margin:0 0 6px}
 .res table.list{font-size:12px}.res table.list td,.res table.list th{padding:4px 6px}.res .note{font-size:11px;margin-top:6px}.res button{font-size:12px;padding:4px 9px}
 @keyframes lxst{from{transform:scaleX(.55);opacity:.35}to{transform:scaleX(1);opacity:1}}
 #lxhist{transform-origin:left center}
+#v-prevision{display:grid;grid-template-columns:minmax(0,1fr) 210px;column-gap:16px;align-items:start}
+#v-prevision>*{grid-column:1}
+#popts{grid-column:2;grid-row:1/span 4;position:sticky;top:calc(env(safe-area-inset-top,0px) + 108px);display:flex;flex-direction:column;align-items:flex-start;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+#popts .chip{margin:0}
+@media (max-width:980px){#v-prevision{display:block}#popts{position:static;flex-direction:row;flex-wrap:wrap;margin-bottom:14px}}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .seg button{border:none;border-radius:0;background:none;color:var(--muted)}
 .seg button.on{background:#173257;color:#cfe3ff}
@@ -167,7 +172,7 @@ svg{max-width:100%;height:auto;display:block}
 <section id="v-prevision" data-view hidden>
  <h1 id="ptitle">Prévision</h1>
  <p class="lead">Seeing V2bd au lieu, panneau Cn², historique et corrélation avec tes mesures, avec les K en service pour ce lieu. Les K se règlent dans l'onglet Calibrer.</p>
- <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-6px 0 14px"><span class="chip on" id="obsT" role="switch" aria-checked="true" tabindex="0">Afficher les mesures du seeing monitor</span><span class="small muted">Mesures :</span><span class="chip on" data-m="brut" role="switch" aria-checked="true" tabindex="0">brutes</span><span class="chip on" data-m="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span style="width:12px"></span><span class="small muted">Corrélation :</span><span class="chip on" data-c="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span class="chip on" data-c="nuit" role="switch" aria-checked="true" tabindex="0">☾ médianes nocturnes</span><span class="chip" data-c="brut" role="switch" aria-checked="false" tabindex="0">brutes</span><span style="width:12px"></span><span class="small muted">Nuit seulement (17h30–06h TU)</span></div>
+ <div id="popts"><span class="chip on" id="obsT" role="switch" aria-checked="true" tabindex="0">Afficher les mesures du seeing monitor</span><span class="small muted">Mesures :</span><span class="chip on" data-m="brut" role="switch" aria-checked="true" tabindex="0">brutes</span><span class="chip on" data-m="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span style="width:12px"></span><span class="small muted">Corrélation :</span><span class="chip on" data-c="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span class="chip on" data-c="nuit" role="switch" aria-checked="true" tabindex="0">☾ médianes nocturnes</span><span class="chip" data-c="brut" role="switch" aria-checked="false" tabindex="0">brutes</span><span style="width:12px"></span><span class="small muted">Nuit seulement (17h30–06h TU)</span></div>
  <div class="stack">
   <div class="panel">
    <h2>Seeing prévu</h2>
@@ -788,7 +793,8 @@ function lxCn2(l,SV="lxcn2",TT="lxcn2t",OB=true,KR=null){const sv=$(SV),w=l.cn2w
   lev.forEach(([a,b],k)=>{if(b<=za||a>=zb)return;const v=val(h,k,K);if(v==null)return;const y0=Yz(b),y1=Yz(a);g+=`<rect x="${x}" y="${y0}" width="${cw}" height="${y1-y0+0.4}" fill="rgb(${turbo((v-lo)/(hi-lo))})"/>`});
   let k=0;while(k<Z.length){if(h.c[k]=="1"){let k2=k;while(k2+1<Z.length&&h.c[k2+1]=="1")k2++;const a=lev[k][0],b=lev[k2][1];if(b>za&&a<zb){const y0=Yz(b),y1=Yz(a);g+=`<rect x="${x}" y="${y0}" width="${cw}" height="${y1-y0}" fill="url(#hwb${SV})" opacity=".85"/><line x1="${x}" x2="${x+cw}" y1="${y0}" y2="${y0}" stroke="#000" stroke-width="0.9"/>`}k=k2+1}else k++}}
  const hcs=[];let sg=[];for(let i=i0;i<i1;i++){const h=w.h[i];if(h&&h.hc!=null)sg.push([X(i+0.5),Yz(h.hc)]);else{if(sg.length>1)hcs.push(sg);sg=[]}}if(sg.length>1)hcs.push(sg);
- hcs.forEach(s=>g+=pl(s,'stroke="#000" stroke-width="2.4"')+pl(s,'stroke="#fff" stroke-width="1" stroke-dasharray="4 3"'));
+ hcs.forEach(s=>g+=pl(s,'stroke="#000" stroke-width="3.6"')+pl(s,'stroke="#ff3cf0" stroke-width="1.8"'));
+ {const lab=hcs.flat().find(p=>p[1]>T+14&&p[1]<T+ph-6&&p[0]>L+40&&p[0]<L+pw-140);if(lab)g+=`<text x="${lab[0]+4}" y="${lab[1]-6}" font-size="12" font-weight="500" fill="#ff3cf0" stroke="#000" stroke-width="3" paint-order="stroke">boundary layer</text>`}
  const step=zb-za>8000?2000:zb-za>2000?500:100;for(let z=Math.ceil(za/step)*step;z<=zb;z+=step)g+=`<line x1="${L-4}" x2="${L}" y1="${Yz(z)}" y2="${Yz(z)}" stroke="${C_TXT}"/><text x="${L-7}" y="${Yz(z)+4}" text-anchor="end" font-size="10" fill="${C_TXT}">${z>=1000?(z/1000)+" km":z+" m"}</text>`;
  g+=`<text x="14" y="${T+ph/2}" text-anchor="middle" font-size="11" fill="${C_TXT}" transform="rotate(-90 14 ${T+ph/2})">altitude au-dessus du sol</text>`;
  const tstep=n>96?3:1,lstep=n>96?12:2;for(let i=i0;i<=i1;i++){const d=tt(i),hh=d.getUTCHours();if(hh%tstep)continue;g+=`<line x1="${X(i)}" x2="${X(i)}" y1="${T+ph}" y2="${T+ph+(hh%lstep?3:5)}" stroke="${C_TXT}"/>`;if(hh%lstep==0&&i<i1)g+=`<text x="${X(i)}" y="${T+ph+17}" text-anchor="middle" font-size="10" fill="${hh==0?"#e6ebf6":C_TXT}" ${hh==0?'font-weight="500"':''}>${hh==0?fr(d):hh+"h"}</text>`}
@@ -821,15 +827,17 @@ $("lxcards").onclick=e=>{const b=e.target.closest("[data-i]");if(b){lxSel=+b.dat
 function prevReal(l,OB){const w=l.cn2w,sv=$("p1");sv.setAttribute("viewBox","0 0 900 220");
  if(!w){sv.innerHTML=`<text x="450" y="110" text-anchor="middle" font-size="13" fill="${C_TXT}">Pas de prévision enregistrée pour ce lieu.</text>`;return}
  const last=w.runs.length-1,T0=pd(w.t0).getTime(),tL=pd(w.run_t[last]).getTime(),a0=Math.max(0,Math.round((tL-T0)/3600000)),n=w.n-a0,t0=new Date(T0+a0*3600000);
- const W=900,H=220,L=36,R=10,T=12,B=30,pw=W-L-R,ph=H-T-B,X=i=>L+i/n*pw,tt=i=>new Date(t0.getTime()+i*3600000),K=l.K;
+ const W=900,H=220,L=36,R=10,T=12,B=30,pw=W-L-R,ph=H-T-B,tt=i=>new Date(t0.getTime()+i*3600000),K=l.K;
+ const wt=i=>isNd(tt(i))?1:0.5,cum=[0];for(let i=0;i<n;i++)cum.push(cum[i]+wt(i));
+ const X=x=>{const k=Math.max(0,Math.min(n-1,Math.floor(x)));return L+(x<=0?0:x>=n?cum[n]:cum[k]+(x-k)*wt(k))/cum[n]*pw};   /* jour : demi-largeur */
  const sv2=[];for(let i=0;i<n;i++){const h=w.h[a0+i];if(h&&isNd(tt(i))){const s=seeJ(K[0]*h.J[0]+K[2]*h.J[1]+K[1]*h.J[2]);if(s>0)sv2.push([i,s])}}
  const inR=s=>{const v=pd(s).getTime();return v>=t0.getTime()&&isNd(pd(s))};
  const mv=OB&&MESF.horaire?w.mesures.filter(p=>p[1]!=null&&inR(p[0])):[],raw=OB&&MESF.brut?w.brut.filter(p=>p[1]!=null&&inR(p[0])):[];
  const ymax=Math.max(3,Math.ceil(Math.max(...sv2.map(p=>p[1]),...mv.map(p=>p[1]),0)*1.15)),Y=v=>T+ph-Math.min(v,ymax)/ymax*ph;
- let g="",s0=null,cur=null;for(let i=0;i<=n;i++){const nn=i<n?isNd(tt(i)):!cur;if(i<n&&!nn)g+=`<rect x="${X(i)}" y="${T}" width="${pw/n+0.5}" height="${ph}" fill="${C_DAY}"/>`;
+ let g="",s0=null,cur=null;for(let i=0;i<=n;i++){const nn=i<n?isNd(tt(i)):!cur;if(i<n&&!nn)g+=`<rect x="${X(i)}" y="${T}" width="${X(i+1)-X(i)+0.5}" height="${ph}" fill="${C_DAY}"/>`;
   if(cur===null){cur=nn;s0=i}else if(nn!==cur||i==n){if(i-s0>=3)g+=dnText((X(s0)+X(i))/2,T+13,cur);cur=nn;s0=i}}
  g+=yaxis(Y,L,W-R,ymax,ymax>8?2:1);
- for(let i=0;i<=n;i++){const d=tt(i),hh=d.getUTCHours();g+=`<line x1="${X(i)}" x2="${X(i)}" y1="${T+ph}" y2="${T+ph+4}" stroke="${C_LINE}"/>`;if(hh%2==0&&i<n)g+=`<text x="${X(i)}" y="${T+ph+16}" text-anchor="middle" font-size="11" fill="${hh==0?"#e6ebf6":C_TXT}" ${hh==0?'font-weight="500"':''}>${hh==0?fr(d):hh}</text>`}
+ for(let i=0;i<=n;i++){const d=tt(i),hh=d.getUTCHours();g+=`<line x1="${X(i)}" x2="${X(i)}" y1="${T+ph}" y2="${T+ph+4}" stroke="${C_LINE}"/>`;if(hh%(isNd(d)?2:4)==0&&i<n)g+=`<text x="${X(i)}" y="${T+ph+16}" text-anchor="middle" font-size="11" fill="${hh==0?"#e6ebf6":C_TXT}" ${hh==0?'font-weight="500"':''}>${hh==0?fr(d):hh}</text>`}
  let seg=[],prev=-2;const fl=()=>{if(seg.length>1)g+=pl(seg,`stroke="${C_AR}" stroke-width="2.2"`);seg=[]};sv2.forEach(([i,v])=>{if(i!=prev+1)fl();seg.push([X(i+0.5),Y(v)]);prev=i});fl();
  const xs=s=>X((pd(s).getTime()-t0.getTime())/3600000+0.5);
  raw.forEach(p=>g+=`<circle cx="${xs(p[0])}" cy="${Y(p[1])}" r="1.7" fill="${C_OBS}"/>`);
@@ -842,9 +850,9 @@ lieuxSelect();
 
 /* ---------- panneau Cn2 : vue, altitude, profil sous la souris ---------- */
 const CN2V={vue:"semaine",alt:"4"},CN2CTX={};
-const CN2ALT={bl:[0,1000],"4":[0,4000],jet:[6000,14000],tout:[0,16000]};
+const CN2ALT={bl:[0,1000],"4":[0,4000],jet:[8000,16000],tout:[0,16000]};
 function ensureCn2UI(SV){if($(SV+"ui"))return;const sv=$(SV),ui=document.createElement("div");ui.id=SV+"ui";ui.style.cssText="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 6px";
- ui.innerHTML=`<div class="seg" role="group" aria-label="Période du panneau Cn2"><button data-cv="semaine">Semaine (7 j max)</button><button data-cv="dernier">Dernières prévisions</button></div><label class="small muted" for="${SV}alt">Altitude</label><select id="${SV}alt" data-ca="1"><option value="bl">0–1 km (couche limite)</option><option value="4">0–4 km</option><option value="jet">jet stream (6–14 km)</option><option value="tout">jusqu'en haut (16 km)</option></select><span class="small muted">survole le panneau : profil à l'heure choisie</span>`;
+ ui.innerHTML=`<div class="seg" role="group" aria-label="Période du panneau Cn2"><button data-cv="semaine">Semaine (7 j max)</button><button data-cv="dernier">Dernières prévisions</button></div><label class="small muted" for="${SV}alt">Altitude</label><select id="${SV}alt" data-ca="1"><option value="bl">0–1 km (couche limite)</option><option value="4">0–4 km</option><option value="jet">jet stream (8–16 km)</option><option value="tout">jusqu'en haut (16 km)</option></select><span class="small muted">survole le panneau : profil à l'heure choisie</span>`;
  sv.parentNode.insertBefore(ui,sv);const wrap=document.createElement("div");wrap.style.cssText="display:flex;gap:10px;align-items:stretch;flex-wrap:wrap";sv.parentNode.insertBefore(wrap,sv);wrap.appendChild(sv);sv.style.flex="1 1 520px";sv.style.minWidth="0";
  const pf=document.createElementNS("http://www.w3.org/2000/svg","svg");pf.id=SV+"pf";pf.setAttribute("viewBox","0 0 260 380");pf.setAttribute("role","img");pf.setAttribute("aria-label","Profil de Cn2 à l'heure survolée");pf.style.cssText="flex:0 1 260px;max-width:100%";wrap.appendChild(pf);
  ui.onclick=e=>{const b=e.target.closest("[data-cv]");if(!b)return;CN2V.vue=b.dataset.cv;cn2Redraw()};ui.querySelector("select").onchange=e=>{CN2V.alt=e.target.value;cn2Redraw()};
@@ -857,11 +865,12 @@ function cn2Profile(SV,i){const c=CN2CTX[SV],pf=$(SV+"pf");if(!c||!pf)return;con
  g+=`<text x="${L}" y="16" font-size="11" fill="#e6ebf6" font-weight="500">Profil ${fr(d)} ${String(d.getUTCHours()).padStart(2,"0")}h TU</text>`;
  if(!h){pf.innerHTML=g+`<text x="${L+pw/2}" y="${T+ph/2}" text-anchor="middle" font-size="11" fill="${C_TXT}">pas de Cn² (H+0 ou trou)</text>`;return}
  const s=seeJ(c.K[0]*h.J[0]+c.K[2]*h.J[1]+c.K[1]*h.J[2]);
- c.w.z.forEach((z,k)=>{if(h.c[k]=="1"){const [a,b]=c.lev[k];if(b>c.za&&a<c.zb)g+=`<rect x="${L}" y="${Yz(b)}" width="${pw}" height="${Yz(a)-Yz(b)}" fill="#fff" opacity=".12"/>`}});
+ c.w.z.forEach((z,k)=>{if(h.c[k]=="1"){const [a,b]=c.lev[k];if(b>c.za&&a<c.zb)g+=`<rect x="${L}" y="${Yz(Math.min(b,c.zb))}" width="${pw}" height="${Yz(Math.max(a,c.za))-Yz(Math.min(b,c.zb))}" fill="#fff" opacity=".14"/>`}});
  for(let q=Math.ceil(x0);q<=Math.floor(x1);q++)g+=`<line x1="${X(q)}" x2="${X(q)}" y1="${T}" y2="${T+ph}" stroke="#3a4258"/><text x="${X(q)}" y="${T+ph+14}" text-anchor="middle" font-size="9" fill="${C_TXT}">1e${q}</text>`;
  const pts=[];c.w.z.forEach((z,k)=>{if(z<c.za||z>c.zb)return;const v=c.val(h,k,c.K);if(v!=null)pts.push([X(v),Yz(z)])});
- if(pts.length>1)g+=pl(pts,'stroke="#fff" stroke-width="1.8"');pts.forEach(([x,y])=>g+=`<circle cx="${x}" cy="${y}" r="1.8" fill="#fff"/>`);
- if(h.hc!=null&&h.hc>=c.za&&h.hc<=c.zb)g+=`<line x1="${L}" x2="${L+pw}" y1="${Yz(h.hc)}" y2="${Yz(h.hc)}" stroke="#fff" stroke-dasharray="4 3"/><text x="${L+pw-2}" y="${Yz(h.hc)-3}" text-anchor="end" font-size="9" fill="#fff">H_COULIM ${Math.round(h.hc)} m</text>`;
+ if(pts.length>1)g+=pl(pts,'stroke="#5eead4" stroke-width="2"');pts.forEach(([x,y])=>g+=`<circle cx="${x}" cy="${y}" r="2" fill="#5eead4"/>`);
+ if(h.hc!=null&&h.hc>=c.za&&h.hc<=c.zb)g+=`<line x1="${L}" x2="${L+pw}" y1="${Yz(h.hc)}" y2="${Yz(h.hc)}" stroke="#ff3cf0" stroke-width="1.6"/><text x="${L+4}" y="${Math.min(T+ph-4,Yz(h.hc)+(Yz(0)-Yz(h.hc)>26?Math.min(16,(Yz(0)-Yz(h.hc))/2):-4))}" font-size="12" font-weight="500" fill="#ff3cf0" stroke="#000" stroke-width="3" paint-order="stroke">BL</text><text x="${L+pw-2}" y="${Yz(h.hc)-3}" text-anchor="end" font-size="9" fill="#ff3cf0">${Math.round(h.hc)} m</text>`;
+ {let k=0;const Zc=c.w.z;while(k<Zc.length){if(h.c[k]=="1"){let k2=k;while(k2+1<Zc.length&&h.c[k2+1]=="1")k2++;const a=c.lev[k][0],b=c.lev[k2][1];if(b>c.za&&a<c.zb){const ym=(Yz(Math.max(a,c.za))+Yz(Math.min(b,c.zb)))/2;g+=`<text x="${L+pw-4}" y="${ym+4}" text-anchor="end" font-size="11" font-weight="500" fill="#fff" stroke="#000" stroke-width="3" paint-order="stroke">Conv</text>`}k=k2+1}else k++}}
  const step=c.zb-c.za>8000?2000:c.zb-c.za>2000?500:100;for(let z=Math.ceil(c.za/step)*step;z<=c.zb;z+=step)g+=`<text x="${L-4}" y="${Yz(z)+4}" text-anchor="end" font-size="9" fill="${C_TXT}">${z>=1000?(z/1000)+" km":z+" m"}</text>`;
  g+=`<text x="${L+pw/2}" y="${H-6}" text-anchor="middle" font-size="10" fill="${C_TXT}">Cn² [m⁻²ᐟ³]</text><text x="${L}" y="${T-6}" font-size="10" fill="${C_TXT}">seeing ${s>0?s.toFixed(2)+'"':"–"}${isNd(d)?"":" (jour, non affiché)"}</text>`;
  pf.innerHTML=g}
