@@ -34,6 +34,10 @@ DELTA_V2BD = 100.0  # width of the V2bd smooth transition at H_COULIM (m)
 MAX_RAW_PER_PERIOD = 400  # raw measurements kept per period (sub-sampled above)
 LAMBDA = 500e-9  # wavelength for the seeing (m)
 MAIN_RUNS = ("00Z", "06Z", "12Z", "18Z")  # only the main AROME runs are used (user rule)
+# full-height grid for the week panel: the AROME height levels up to 3000 m, then every 250 m up to 16 km
+WEEK_Z = np.concatenate([[10, 20, 35, 50, 75, 100, 150, 200, 250, 375, 500, 625, 750, 875, 1000, 1125, 1250,
+                          1375, 1500, 1750, 2000, 2250, 2500, 2750, 3000], np.arange(3250.0, 16001.0, 250.0)]).astype(float)
+WEEK_DAYS = 7  # at most one week of Cn2 panels (runs glued, most recent run wins)
 
 
 def load_module(name, filename):
@@ -121,6 +125,71 @@ class Exporter:
         cn2[empty], conv_mask[empty] = np.nan, False
         return pd.DatetimeIndex(times), cn2, conv_mask, seeing, h_coulim, zones, integrals
 
+    def week_hours(self, name, mesh, run):
+        """Per hour of one saved run: zones at K = 1 on WEEK_Z, convective mask, integrals, H_COULIM."""
+        path = self.panels / f"pan_{name}_{mesh}_{run}.pkl"
+        if not path.exists():
+            return {}
+        with open(path, "rb") as fh:
+            p = pickle.load(fh)
+        k0, out = tuple(p["K"]), {}
+        for i, hour in enumerate(sorted(p["r"])):
+            t = p["ref"] + pd.Timedelta(hours=int(hour))
+            z, tke, conv, shear = self.zones_k1(p, i, hour, k0)
+            ok = np.isfinite(p["df"].seeing_arcsec.iloc[i])  # H+0 (no TKE) or incomplete hour -> empty
+            cv = p["conv"][i]
+            zc = np.asarray(cv["z"])
+            oc = np.argsort(zc)
+            mask = np.asarray(cv["conv"])[oc][np.clip(np.searchsorted(zc[oc], WEEK_Z), 0, len(zc) - 1)] & (WEEK_Z <= zc.max())
+            out[t] = {"ok": bool(ok), "run": run, "hc": float(p["r"][hour]["H_COULIM"]),
+                      "zones": [np.interp(WEEK_Z, z, part, left=np.nan, right=np.nan) for part in (tke, conv, shear)],
+                      "J": [float(np.trapezoid(part, z)) for part in (tke, conv, shear)], "conv": mask}
+        return out
+
+    def week_panel(self, name, obs_median, obs):
+        """Up to WEEK_DAYS of main runs glued hour by hour (most recent run wins, except its hours without TKE)."""
+        meshes = ("ancienne", "nouvelle") if name == "Copernic" else ("site",)
+        runs = sorted({f.stem.rsplit("_", 2)[-2] + "_" + f.stem.rsplit("_", 1)[-1]
+                       for f in self.panels.glob(f"pan_{name}_{meshes[-1]}_*.pkl")})
+        runs = [r for r in runs if r[-3:] in MAIN_RUNS]
+        if not runs:
+            return None
+        run_time = lambda r: pd.Timestamp(r[:10]) + pd.Timedelta(hours=int(r[11:13]))  # noqa: E731
+        last = run_time(runs[-1])
+        runs = [r for r in runs if run_time(r) >= last - pd.Timedelta(days=WEEK_DAYS)]
+        hours = {}
+        for run in runs:  # chronological: later runs overwrite
+            per_mesh = [self.week_hours(name, m, run) for m in meshes]
+            for t in set.intersection(*(set(d) for d in per_mesh)):
+                rec = per_mesh[0][t]
+                if len(per_mesh) == 2:  # Copernic: mean of the two meshes
+                    b = per_mesh[1][t]
+                    rec = {"ok": rec["ok"] and b["ok"], "run": run, "hc": (rec["hc"] + b["hc"]) / 2,
+                           "zones": [(x + y) / 2 for x, y in zip(rec["zones"], b["zones"])],
+                           "J": [(x + y) / 2 for x, y in zip(rec["J"], b["J"])], "conv": rec["conv"] | b["conv"]}
+                if rec["ok"] or t not in hours:
+                    hours[t] = rec
+        times = sorted(hours)
+        t0, t1 = times[0], times[-1]
+        n = int((t1 - t0) / pd.Timedelta(hours=1)) + 1
+        rows = []
+        for i in range(n):
+            rec = hours.get(t0 + pd.Timedelta(hours=i))
+            if rec is None or not rec["ok"]:
+                rows.append(None)
+                continue
+            rows.append({"r": runs.index(rec["run"]), "hc": r2(rec["hc"], 0),
+                         "J": [float(f"{v:.4g}") for v in rec["J"]],
+                         "c": "".join("1" if v else "0" for v in rec["conv"]),
+                         "z": [[log10_or_none(v) for v in part] for part in rec["zones"]]})
+        raw = obs[(obs.t >= t0) & (obs.t <= t1 + pd.Timedelta(hours=1))]
+        if len(raw) > 3000:
+            raw = raw.iloc[:: int(np.ceil(len(raw) / 3000))]
+        return {"runs": runs, "run_t": [ts(run_time(r)) for r in runs], "t0": ts(t0), "n": n, "z": WEEK_Z.tolist(),
+                "h": rows,
+                "mesures": [[ts(x), r2(v)] for x, v in obs_median.items() if t0 <= x <= t1],
+                "brut": [[ts(x), r2(v)] for x, v in zip(raw.t, raw.seeing)]}
+
     def latest_run(self, name, mesh):
         """Latest MAIN run (00/06/12/18Z) with saved profiles for this site."""
         runs = sorted(f.stem.rsplit("_", 2)[-2] + "_" + f.stem.rsplit("_", 1)[-1]
@@ -148,7 +217,7 @@ class Exporter:
         k = tuple(cfg["K_new"])
         lat, lon = h.COORDS[name]
         obs = h.observations(name)
-        fc = h.forecasts_site(name) if name not in getattr(h, "SITES_HORS_PREVISION", set()) else None
+        fc = h.forecasts_site(name)  # Pic du Midi included (cached forecasts exist even if the site is off the daily chain)
         item = {"nom": name, "lat": lat, "lon": lon, "K": [r2(x, 3) for x in k], "modele": h.nom_v2(),
                 "mesures_n": int(len(obs)), "mesures_de": ts(obs.t.min()) if len(obs) else None,
                 "mesures_a": ts(obs.t.max()) if len(obs) else None, "episodes": [], "paires": [], "cn2": None}
@@ -183,6 +252,7 @@ class Exporter:
                 item["r_" + key] = r2(h.wcorr(q.prevu, q.mesure, np.ones(len(q))) if len(q) >= 3 else np.nan)
                 item["n_" + key] = int(len(q))
                 item["biais_" + key] = r2((q.prevu - q.mesure).mean()) if len(q) else None
+        item["cn2w"] = self.week_panel(name, median, obs)
         run, panel = self.site_panel(name)
         if panel is not None:
             times, cn2, conv_mask, seeing, h_coulim, zones, integrals = panel
