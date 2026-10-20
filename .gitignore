@@ -46,3 +46,6 @@ crash.log
 research/chemins_locaux.json
 donnees/
 *.log
+
+# Donnees reelles de la maquette (regenerees par research/export_lieux_site.py)
+apps/maquette/lieux_data.js
