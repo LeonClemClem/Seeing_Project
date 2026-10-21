@@ -64,8 +64,8 @@ h2{font-family:var(--f-display);font-weight:500;font-size:17px;margin:0 0 6px}
 .res table.list{font-size:12px}.res table.list td,.res table.list th{padding:4px 6px}.res .note{font-size:11px;margin-top:6px}.res button{font-size:12px;padding:4px 9px}
 @keyframes lxst{from{transform:scaleX(.55);opacity:.35}to{transform:scaleX(1);opacity:1}}
 #lxhist{transform-origin:left center}
-#popts{position:sticky;top:calc(env(safe-area-inset-top,0px) + 104px);z-index:4;display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:fit-content;max-width:100%;margin:0 0 14px auto;background:var(--panel);border:1px solid #3a4a72;border-radius:12px;padding:8px 12px;box-shadow:0 8px 20px rgba(0,0,0,.45)}
-#popts .chip{margin:0}
+#popts,#copts{position:sticky;top:calc(env(safe-area-inset-top,0px) + 104px);z-index:4;display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:fit-content;max-width:100%;margin:0 0 14px auto;background:var(--panel);border:1px solid #3a4a72;border-radius:12px;padding:8px 12px;box-shadow:0 8px 20px rgba(0,0,0,.45)}
+#popts .chip,#copts .chip{margin:0}
 #calgrid{grid-template-columns:minmax(0,1fr) 230px}
 #kpanel{padding:10px 12px}#kpanel .chip{font-size:11px;padding:2px 8px;margin:0}#kpanel .krows .kr>span:first-child{font-size:12px}#kpanel .res h2{margin:0 0 2px}#kpanel .res{margin-top:8px!important;padding-top:8px!important}
 #kpanel h2{font-size:15px}
@@ -123,18 +123,20 @@ svg{max-width:100%;height:auto;display:block}
 <!-- ========================= CARTE ========================= -->
 <section id="v-carte" data-view>
  <h1>Carte globale du seeing</h1>
- <p class="lead">Seeing V2bd sur toute la France, recalculé toutes les 6 heures, à chaque run principal d'AROME (00Z, 06Z, 12Z, 18Z). Survole la carte pour lire une maille ; clique pour créer un lieu à cet endroit.</p>
+ <p class="lead">Seeing V2bd sur tout le domaine AROME (France, îles Britanniques, péninsule Ibérique, Benelux, Allemagne, Alpes, Italie), recalculé toutes les 6 heures, à chaque run principal d'AROME (00Z, 06Z, 12Z, 18Z). Sur la vue du domaine, clique n'importe où dans une zone (France, Royaume-Uni…) pour zoomer dessus ; une fois zoomé, survole la carte pour lire une maille et clique pour créer un lieu.</p>
  <div class="grid2">
   <div class="panel">
    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">
-    <div style="display:flex;gap:6px;align-items:center"><div class="seg" role="group" aria-label="Étendue"><button id="mvF" class="on">France</button><button id="mvZ">Mon lieu</button></div><button id="mzi" aria-label="Zoomer">+</button><button id="mzo" aria-label="Dézoomer">−</button></div>
+    <div style="display:flex;gap:6px;align-items:center"><div class="seg" role="group" aria-label="Étendue"><button id="mvF" class="on">Domaine AROME</button><button id="mvZ">Mon lieu</button></div><select id="mreg" aria-label="Zone"><option value="">Zone…</option><option value="0">France</option><option value="1">Royaume-Uni & Irlande</option><option value="2">Espagne & Portugal</option><option value="3">Benelux & Allemagne</option><option value="4">Suisse & Alpes</option><option value="5">Italie</option><option value="6">Corse & Sardaigne</option></select><button id="mzi" aria-label="Zoomer">+</button><button id="mzo" aria-label="Dézoomer">−</button></div>
     <div class="seg" role="group" aria-label="Calibration" id="mcalseg" hidden><button id="mc0">Sans calibration</button><button id="mc1" class="on">Avec calibration</button></div>
    </div>
-   <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
-    <div class="seg" role="group" aria-label="Affichage du temps"><button id="mmM" class="on">Moyenne 20h–04h</button><button id="mmH">Heure par heure (nuits)</button></div>
-    <button id="mpl" aria-label="Animer la carte">▶</button>
-    <input type="range" id="mhr" min="0" max="17" step="1" value="0" style="flex:1;min-width:120px" aria-label="Heure de la carte">
-    <span id="mhl" class="mono" style="min-width:110px;text-align:right;font-weight:500"></span>
+   <div id="mapset" style="border:1px solid #3a4a72;border-radius:12px;padding:10px 12px;margin-bottom:10px;background:var(--panel2)">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px;margin-bottom:8px"><b>Réglage</b><span class="small muted">run <span class="mono">12/10 12Z</span> · prévision jusqu'à <span class="mono">+51 h</span> (14/10 15h TU) · nuits seulement (20h–04h TU)</span></div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px"><span class="small muted" style="min-width:52px">Nuit</span><div class="seg" role="group" aria-label="Nuit" id="mnseg"></div></div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px"><span class="small muted" style="min-width:52px">Affichage</span><div class="seg" role="group" aria-label="Affichage du temps"><button id="mmM" class="on">Moyenne de la nuit</button><button id="mmH">Heure par heure</button></div></div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="small muted" style="min-width:52px">Heure</span><button id="mpl" aria-label="Animer la carte sur les heures de nuit">▶</button>
+    <input type="range" id="mhr" min="0" max="17" step="1" value="0" style="flex:1;min-width:120px" aria-label="Date et heure de la carte">
+    <span id="mhl" class="mono" style="min-width:210px;text-align:right;font-weight:500"></span></div>
    </div>
    <canvas id="map" width="720" height="700" style="cursor:grab;touch-action:none" aria-label="Carte globale du seeing de la nuit, déplaçable et zoomable"></canvas>
    <div style="display:flex;align-items:center;gap:8px;margin-top:8px"><span class="small muted mono">0"</span><div id="mapcb" style="flex:1;height:9px;border-radius:2px"></div><span class="small muted mono">6"</span></div>
@@ -145,7 +147,7 @@ svg{max-width:100%;height:auto;display:block}
     <h2>Ce que montre la carte</h2>
     <div class="legend" style="flex-direction:column;gap:6px">
      <span><span class="sw" style="width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid #000"></span>Seeing monitor public (position exacte)</span>
-     <span><span class="sw" style="width:14px;height:12px;border:1.5px dashed #fff"></span>Lieu partagé (secteur de 0,25°, position floutée)</span>
+     <span><span class="sw" style="width:12px;height:12px;background:#9cc7ff;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)"></span>Lieu partagé (<b>position floutée à 5–11 km</b>)</span>
      <span><span class="sw" style="width:12px;height:12px;background:#f2a23a;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)"></span>Mes lieux</span>
      <span><span class="sw" style="width:14px;border-top:1px solid rgba(0,0,0,.6)"></span>Relief AROME, isolignes tous les 1000 m (500 m en zoom)</span>
      <span><span class="sw" style="width:14px;height:12px;background:#1b2740"></span>Mer, hors bande côtière : non calculée</span>
@@ -158,14 +160,17 @@ svg{max-width:100%;height:auto;display:block}
      <div class="tile"><div class="l">Meilleure maille</div><div class="v" id="mbest"></div></div>
      <div class="tile"><div class="l">Médiane de la zone</div><div class="v" id="mmed"></div></div>
     </div>
-    <p class="note">Calcul global sur la France (terre et bande côtière de 106 km) toutes les 6 heures, à chaque run principal : 00Z, 06Z, 12Z, 18Z ; les runs secondaires ne sont pas utilisés. Les K appliqués ici sont ceux du lieu sélectionné. Hors de France, un lieu passe par la file d'attente.</p>
+    <p class="note">Calcul global sur tout le domaine AROME (terres et bande côtière de 106 km) toutes les 6 heures, à chaque run principal : 00Z, 06Z, 12Z, 18Z ; les runs secondaires ne sont pas utilisés. La carte est calibrée une fois pour toutes par l'administrateur : elle ne change pas avec la calibration des lieux. Hors du domaine, ou en mer au-delà de la bande côtière, un lieu passe par la file d'attente.</p>
    </div>
    <div class="panel" id="newlieu" hidden>
     <h2>Nouveau lieu</h2>
-    <p class="small muted" id="nlpos"></p>
+    <p class="small muted" style="margin:0 0 8px">Clique sur la carte ou saisis les coordonnées GPS (degrés décimaux : 44.1234 et 5.6789, ou degrés minutes secondes : 44°07'24" N et 5°40'44" E).</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px"><div><label class="small muted" for="nllat">Latitude</label><input id="nllat" class="mono" style="width:100%;margin-top:2px" placeholder="44.1234 ou 44°07'24&quot; N" autocomplete="off"></div><div><label class="small muted" for="nllon">Longitude</label><input id="nllon" class="mono" style="width:100%;margin-top:2px" placeholder="5.6789 ou 5°40'44&quot; E" autocomplete="off"></div></div>
+    <p class="small muted" id="nlpos" style="margin:0 0 8px"></p>
     <label class="small muted" for="nlname">Nom</label>
     <input id="nlname" style="width:100%;margin:2px 0 8px" value="Nouveau lieu">
-    <label class="small" style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="checkbox" id="nlshare"> Partager avec la communauté (position floutée à 0,25°)</label>
+    <label class="small" style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="checkbox" id="nlshare"> Partager avec la communauté</label>
+    <p style="margin:-4px 0 10px;font-size:15px;font-weight:700;color:#f2c14e"><span style="display:inline-flex;width:20px;height:20px;border-radius:50%;background:#f2c14e;color:#000;justify-content:center;align-items:center;margin-right:6px;font-weight:800">!</span>Position floutée à 5–11 km</p>
     <button class="primary" id="nlok">Créer le lieu</button>
     <p class="okmsg" id="nlmsg"></p>
    </div>
@@ -177,7 +182,7 @@ svg{max-width:100%;height:auto;display:block}
 <section id="v-prevision" data-view hidden>
  <h1 id="ptitle">Prévision</h1>
  <p class="lead">Seeing V2bd au lieu, panneau Cn², historique et corrélation avec tes mesures, avec les K en service pour ce lieu. Les K se règlent dans l'onglet Calibrer.</p>
- <div id="popts"><span class="chip on" id="obsT" role="switch" aria-checked="true" tabindex="0">Afficher les mesures du seeing monitor</span><span class="small muted">Mesures :</span><span class="chip on" data-m="brut" role="switch" aria-checked="true" tabindex="0">brutes</span><span class="chip on" data-m="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span style="width:12px"></span><span class="small muted">Nuit seulement (17h30–06h TU)</span></div>
+ <div id="popts"><span class="chip on" id="obsT" role="switch" aria-checked="true" tabindex="0">Afficher les mesures du seeing monitor</span><span class="small muted">Données :</span><span class="chip on" data-p="brut" role="switch" aria-checked="true" tabindex="0">brutes</span><span class="chip on" data-p="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span class="chip on" data-p="courbe" role="switch" aria-checked="true" tabindex="0">courbe médiane horaire</span><span class="chip on" data-p="nuit" role="switch" aria-checked="true" tabindex="0">☾ médianes nocturnes</span><span style="width:12px"></span><span class="small muted">Nuit seulement (17h30–06h TU)</span></div>
  <div class="stack">
   <div class="panel">
    <h2>Seeing prévu</h2>
@@ -194,10 +199,10 @@ svg{max-width:100%;height:auto;display:block}
   <div class="panel">
    <h2 id="histT">Historique (prévisions et mesures du lieu)</h2>
    <div class="legend"><span><span class="sw" style="width:16px;height:3px;background:var(--arome)"></span>V2bd</span><span class="obs-leg"><span class="sw" style="width:6px;height:6px;border-radius:50%;background:var(--obs)"></span>Mesures</span><span class="obs-leg"><span class="sw" style="width:8px;height:8px;background:var(--obs-d)"></span>Médiane horaire</span><span class="mono">||</span><span>coupure entre épisodes</span></div>
-   <div style="display:flex;gap:6px;align-items:center;margin:4px 0"><span class="small muted">Zoom :</span><button data-z="p4" data-f="0.5">−</button><button data-z="p4" data-f="2">+</button><button data-z="p4" data-f="0">tout voir</button><span class="small muted" id="p4zl"></span></div><div style="overflow-x:auto"><svg id="p4" viewBox="0 0 900 220" role="img" aria-label="Historique"></svg></div><p class="small muted" id="p4note" style="margin:4px 0 0"></p>
+   <div style="display:flex;gap:6px;align-items:center;margin:4px 0"><span class="small muted">Zoom :</span><button data-z="p4" data-f="0.5">−</button><button data-z="p4" data-f="2">+</button><button data-z="p4" data-f="0">tout voir</button><span class="chip on" data-h="p4" role="switch" aria-checked="true" tabindex="0" style="margin:0 0 0 6px">étirement vertical auto</span><span class="small muted" id="p4zl"></span></div><div style="overflow-x:auto"><svg id="p4" viewBox="0 0 900 220" role="img" aria-label="Historique"></svg></div><p class="small muted" id="p4note" style="margin:4px 0 0"></p>
   </div>
   <div class="panel">
-   <h2>Corrélation prévu / mesuré (nuit)</h2><p class="small muted mono" id="p5t" style="margin:0 0 2px"></p><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px 0 6px"><span class="small muted">Afficher :</span><span class="chip on" data-c="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span class="chip on" data-c="nuit" role="switch" aria-checked="true" tabindex="0">☾ médianes nocturnes</span><span class="chip" data-c="brut" role="switch" aria-checked="false" tabindex="0">données brutes</span></div><svg id="p5" viewBox="0 0 340 320" role="img" aria-label="Corrélation du lieu" style="max-width:520px"></svg>
+   <h2>Corrélation prévu / mesuré (nuit)</h2><p class="small muted mono" id="p5t" style="margin:0 0 2px"></p><svg id="p5" viewBox="0 0 340 320" role="img" aria-label="Corrélation du lieu" style="max-width:520px"></svg>
   </div>
 
  </div>
@@ -247,12 +252,15 @@ svg{max-width:100%;height:auto;display:block}
 <!-- ========================= CALIBRER ========================= -->
 <section id="v-calibrer" data-view hidden>
  <h1>Calibrer avec tes mesures</h1>
- <p class="lead">Dépose tes fichiers CSV de seeing (colonnes <span class="mono">date_TU ; seeing_arcsec</span>). Ils s'ajoutent les uns aux autres, sans pondération. Le calage se fait sur la nuit (17h30–06h TU) : un facteur unique sous 60 h, K_TKE et K_CIS indépendants au-delà. K_conv reste à 0,1.</p>
+ <p class="lead">Dépose tes fichiers CSV de seeing (colonnes <span class="mono">date ; seeing_arcsec</span>, en TU ou en heure locale). Ils s'ajoutent les uns aux autres, sans pondération. Le calage se fait sur la nuit (17h30–06h TU) : un facteur unique sous 60 h, K_TKE et K_CIS indépendants au-delà. K_conv reste à 0,1.</p>
+ <div class="panel" id="calpub" hidden style="border-color:#f2c14e;margin-bottom:14px"><b>Site public : résultats de la calibration seulement.</b><p class="small muted" style="margin:4px 0 8px">Ce site est calibré par l'administrateur : tu vois les résultats (courbes, Cn², historique, corrélation, qualité du calage), mais les outils de calibration (import CSV, réglage des K, calibration auto) ne fonctionnent que sur tes lieux personnels.</p><button class="primary" id="calmine">Passer à mon lieu</button></div>
  <div class="grid2" id="calgrid">
   <div class="stack">
+  <div id="copts"><span class="chip on" id="obsTc" role="switch" aria-checked="true" tabindex="0">Afficher les mesures du seeing monitor</span><span class="small muted">Données :</span><span class="chip on" data-p="brut" role="switch" aria-checked="true" tabindex="0">brutes</span><span class="chip on" data-p="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span class="chip on" data-p="courbe" role="switch" aria-checked="true" tabindex="0">courbe médiane horaire</span><span class="chip on" data-p="nuit" role="switch" aria-checked="true" tabindex="0">☾ médianes nocturnes</span><span style="width:12px"></span><span class="small muted">Nuit seulement (17h30–06h TU)</span><div id="calfilt" style="flex-basis:100%;display:flex;gap:6px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line);padding-top:6px;margin-top:2px"><span class="small muted">Filtres du calage :</span><span class="chip" data-f="pics" role="switch" aria-checked="false" tabindex="0" title="heures dont la médiane repose sur beaucoup moins de mesures que d'habitude">pics peu fournis</span><span class="chip" data-f="courtes" role="switch" aria-checked="false" tabindex="0" title="nuits sans au moins 3 heures comparées successives">nuits &lt; 3 h successives</span><span class="small muted" style="margin-left:4px">heures au-dessus du modèle :</span><div class="seg" id="ftop"><button data-p="0" class="on">0</button><button data-p="1">1 %</button><button data-p="5">5 %</button><button data-p="10">10 %</button></div><span class="small muted" id="fnote"></span></div></div>
    <div class="panel">
-    <div class="drop" id="dz" tabindex="0" role="button" aria-label="Ajouter un fichier CSV"><b>Ajouter un fichier CSV</b><div class="small muted">ou dépose-le ici · 2026-10-09 21:30 ou 09/10/2026 21:30, séparateur ; , ou tabulation</div><input type="file" id="fi" accept=".csv,.txt" multiple hidden></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button id="ex1">+ Nuit d'exemple</button><button id="ex6">+ 6 nuits</button><span class="err" id="cerr"></span></div>
+    <div id="csvopts" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 8px"><span class="small muted">Heure du fichier :</span><div class="seg" id="ctzs"><button id="ctzU" class="on">TU</button><button id="ctzL">Locale</button></div><select id="coff" aria-label="Fuseau horaire" hidden><option value="paris" selected>Europe/Paris (UTC+1, UTC+2 l'été, auto)</option><option value="-12.0">UTC−12</option><option value="-11.0">UTC−11</option><option value="-10.0">UTC−10</option><option value="-9.0">UTC−9</option><option value="-8.0">UTC−8</option><option value="-7.0">UTC−7</option><option value="-6.0">UTC−6</option><option value="-5.0">UTC−5</option><option value="-4.0">UTC−4</option><option value="-3.5">UTC−3:30</option><option value="-3.0">UTC−3</option><option value="-2.0">UTC−2</option><option value="-1.0">UTC−1</option><option value="0.0">UTC+0</option><option value="1.0">UTC+1</option><option value="2.0">UTC+2</option><option value="3.0">UTC+3</option><option value="3.5">UTC+3:30</option><option value="4.0">UTC+4</option><option value="4.5">UTC+4:30</option><option value="5.0">UTC+5</option><option value="5.5">UTC+5:30</option><option value="5.75">UTC+5:45</option><option value="6.0">UTC+6</option><option value="6.5">UTC+6:30</option><option value="7.0">UTC+7</option><option value="8.0">UTC+8</option><option value="9.0">UTC+9</option><option value="9.5">UTC+9:30</option><option value="10.0">UTC+10</option><option value="10.5">UTC+10:30</option><option value="11.0">UTC+11</option><option value="12.0">UTC+12</option><option value="12.75">UTC+12:45</option><option value="13.0">UTC+13</option><option value="14.0">UTC+14</option></select><span class="small muted" style="margin-left:6px">Format de date :</span><select id="cfmt" aria-label="Format de date"><option value="auto">Détection auto</option><option value="ymd">AAAA-MM-JJ hh:mm (ISO 8601)</option><option value="dmy">JJ/MM/AAAA hh:mm</option><option value="mdy">MM/JJ/AAAA hh:mm (US)</option><option value="ymd2">AAAA/MM/JJ hh:mm</option><option value="dmyp">JJ.MM.AAAA hh:mm</option><option value="dmyd">JJ-MM-AAAA hh:mm</option><option value="dmy2">JJ/MM/AA hh:mm</option><option value="unix">Horodatage Unix (secondes)</option><option value="excel">Date Excel (nombre de jours)</option></select></div>
+    <div class="drop" id="dz" tabindex="0" role="button" aria-label="Ajouter un fichier CSV"><b>Ajouter un fichier CSV</b><div class="small muted">ou dépose-le ici · date et heure dans la 1re colonne (ou date ; heure dans deux colonnes), seeing dans la dernière · séparateur ; , ou tabulation · secondes facultatives</div><input type="file" id="fi" accept=".csv,.txt" multiple hidden></div>
+    <div id="calexrow" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button id="ex1">+ Nuit d'exemple</button><button id="ex6">+ 6 nuits</button><span class="err" id="cerr"></span></div>
     <div id="chips" style="margin-top:8px"></div>
     <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:4px"><span id="cmode"></span><span id="chours" class="mono"></span></div>
     <div style="height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin:4px 0 10px"><div id="cbar" style="height:100%;width:0;background:var(--arome)"></div></div>
@@ -265,7 +273,7 @@ svg{max-width:100%;height:auto;display:block}
    </div>
    <div class="panel">
     <h2>Historique (prévisions avec les K en service et mesures, nuit)</h2>
-    <div style="display:flex;gap:6px;align-items:center;margin:4px 0"><span class="small muted">Zoom :</span><button data-z="chist" data-f="0.5">−</button><button data-z="chist" data-f="2">+</button><button data-z="chist" data-f="0">tout voir</button><span class="chip on" id="chstr" role="switch" aria-checked="true" tabindex="0" style="margin:0 0 0 6px">étirement vertical auto</span><span class="small muted" id="chistzl"></span></div>
+    <div style="display:flex;gap:6px;align-items:center;margin:4px 0"><span class="small muted">Zoom :</span><button data-z="chist" data-f="0.5">−</button><button data-z="chist" data-f="2">+</button><button data-z="chist" data-f="0">tout voir</button><span class="chip on" data-h="chist" role="switch" aria-checked="true" tabindex="0" style="margin:0 0 0 6px">étirement vertical auto</span><span class="small muted" id="chistzl"></span></div>
     <div style="overflow-x:auto"><svg id="chist" viewBox="0 0 1100 240" role="img" aria-label="Historique du lieu"></svg></div>
     <p class="small muted" id="chistnote" style="margin:4px 0 0"></p>
    </div>
@@ -288,15 +296,12 @@ svg{max-width:100%;height:auto;display:block}
      <h2 style="margin:0">Réglage des coefficients</h2>
     </div>
     <button class="primary" id="cuse" style="width:100%;justify-content:center;flex-direction:column;gap:2px;margin-bottom:4px">Calibration auto<span class="small mono" style="font-weight:400">K_TKE <span id="ck1"></span> · K_CIS <span id="ck2"></span></span></button>
-    <div class="seg" style="margin-bottom:8px"><button id="kmA" class="on">K calés</button><button id="kmM">Manuel</button></div>
+    <div class="seg" id="kmodeseg" style="margin-bottom:8px"><button id="kmA" class="on">K calés</button><button id="kmM">Manuel</button></div>
     <div id="kbox2"></div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0 0;border-top:1px solid var(--line);padding-top:10px"><span class="small muted" style="width:100%">Corrélation :</span><span class="chip on" data-c="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span class="chip on" data-c="nuit" role="switch" aria-checked="true" tabindex="0">☾ médianes nocturnes</span><span class="chip" data-c="brut" role="switch" aria-checked="false" tabindex="0">données brutes</span></div>
+    
     <div class="res" style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
     <h2>Résultat du calage</h2>
-    <div class="tiles"><div class="tile"><div class="l">r (nuits)</div><div class="v" id="cr"></div></div><div class="tile"><div class="l">Biais</div><div class="v" id="cb2"></div></div><div class="tile"><div class="l">Erreur relative</div><div class="v" id="ce"></div></div></div>
-    <div class="tablewrap" style="margin-top:10px"><table class="list mono"><thead><tr><th></th><th>K_TKE</th><th>K_CIS</th><th>K_conv</th></tr></thead><tbody>
-     <tr><td class="muted" style="font-family:var(--f-body)" id="cdl">Défaut (voisins)</td><td id="cd1">9.6</td><td id="cd2">17.2</td><td id="cd3">0.1</td></tr>
-    </tbody></table></div>
+    <div class="tiles"><div class="tile"><div class="l">r (nuits)</div><div class="v" id="cr"></div></div><div class="tile"><div class="l">Biais</div><div class="v" id="cb2"></div></div><div class="tile"><div class="l">Précision horaire</div><div class="v" id="ce"></div></div></div>
        </div>
    </div>
 
@@ -308,12 +313,12 @@ svg{max-width:100%;height:auto;display:block}
 <!-- ========================= MES LIEUX ========================= -->
 <section id="v-lieux" data-view hidden>
  <h1>Mes lieux</h1>
- <p class="lead">Les lieux suivis avec un seeing monitor : historique des prévisions et des mesures, jour et nuit, corrélation et panneau Cn² du dernier run. <b>Données réelles</b> (calcul AROME V2bd et mesures des monitors), contrairement au reste de la maquette.</p>
+ <p class="lead">Tes lieux personnels : historique des prévisions et des mesures, corrélation et panneau Cn². Les lieux publics des autres se consultent dans Prévision. <b>Données réelles</b> pour l'OHP (calcul AROME V2bd et mesures du monitor), contrairement au reste de la maquette.</p>
  <div id="lxcards" class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"></div>
  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px">
   <span class="small muted">Nuit seulement (17h30–06h TU)</span>
   <span style="width:12px"></span>
-  <span class="small muted">Mesures :</span><span class="chip on" data-m="brut" role="switch" aria-checked="true" tabindex="0">brutes</span><span class="chip on" data-m="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span>
+  <span class="small muted">Mesures :</span><span class="chip on" data-m="brut" role="switch" aria-checked="true" tabindex="0">brutes</span><span class="chip on" data-m="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span class="chip on" data-m="courbe" role="switch" aria-checked="true" tabindex="0">courbe médiane horaire</span>
  </div>
  <div class="stack" style="margin-top:16px">
   <div class="panel">
@@ -321,14 +326,14 @@ svg{max-width:100%;height:auto;display:block}
     <h2 id="lxtitle">Historique</h2><span class="small muted mono" id="lxsub"></span>
    </div>
    <div class="legend"><span><span class="sw" style="width:16px;height:3px;background:var(--arome)"></span>AROME <span id="lxmod"></span></span><span><span class="sw" style="width:6px;height:6px;border-radius:50%;background:var(--obs)"></span>Mesures</span><span><span class="sw" style="width:8px;height:8px;background:var(--obs-d)"></span>Médiane horaire</span><span><span class="sw" style="width:12px;height:10px;background:#253c6b"></span>Jour 06h–17h30 TU (nuit en sombre)</span><span class="mono">||</span><span>coupure entre épisodes</span></div>
-   <div style="display:flex;gap:6px;align-items:center;margin:4px 0"><span class="small muted">Zoom :</span><button data-z="lxhist" data-f="0.5">−</button><button data-z="lxhist" data-f="2">+</button><button data-z="lxhist" data-f="0">tout voir</button><span class="small muted" id="lxhistzl"></span></div><div style="overflow-x:auto"><svg id="lxhist" viewBox="0 0 1100 240" role="img" aria-label="Historique du lieu"></svg></div>
+   <div style="display:flex;gap:6px;align-items:center;margin:4px 0"><span class="small muted">Zoom :</span><button data-z="lxhist" data-f="0.5">−</button><button data-z="lxhist" data-f="2">+</button><button data-z="lxhist" data-f="0">tout voir</button><span class="chip on" data-h="lxhist" role="switch" aria-checked="true" tabindex="0" style="margin:0 0 0 6px">étirement vertical auto</span><span class="small muted" id="lxhistzl"></span></div><div style="overflow-x:auto"><svg id="lxhist" viewBox="0 0 1100 240" role="img" aria-label="Historique du lieu"></svg></div>
    <p class="small muted" id="lxhistnote" style="margin:4px 0 0"></p>
   </div>
   <div class="grid2" style="grid-template-columns:minmax(0,1fr) minmax(0,1.6fr)">
    <div class="panel">
     <h2>Corrélation prévu / mesuré</h2>
     <p class="small muted mono" id="lxct" style="margin:0 0 2px"></p>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px 0 6px"><span class="small muted">Afficher :</span><span class="chip on" data-c="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span class="chip on" data-c="nuit" role="switch" aria-checked="true" tabindex="0">☾ médianes nocturnes</span><span class="chip" data-c="brut" role="switch" aria-checked="false" tabindex="0">données brutes</span></div><svg id="lxcorr" viewBox="0 0 340 320" role="img" aria-label="Corrélation du lieu"></svg>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px 0 6px"><span class="small muted">Afficher :</span><span class="chip on" data-c="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span class="chip on" data-c="nuit" role="switch" aria-checked="true" tabindex="0">☾ médianes nocturnes</span><span class="chip on" data-c="brut" role="switch" aria-checked="true" tabindex="0">données brutes</span></div><svg id="lxcorr" viewBox="0 0 340 320" role="img" aria-label="Corrélation du lieu"></svg>
     <div class="legend"><span><span class="sw" style="width:8px;height:8px;border-radius:50%;background:var(--night);border:1px solid #fff"></span>médiane horaire (nuit)</span><span><span class="sw" style="width:12px;height:12px;border-radius:50%;border:2px solid var(--night)"></span>☾ médiane d'une nuit</span></div>
     <div class="tiles" style="margin-top:8px"><div class="tile"><div class="l">r nuit</div><div class="v" id="lxrn"></div><div class="small muted" id="lxnn"></div></div><div class="tile"><div class="l">biais nuit</div><div class="v" id="lxrj"></div><div class="small muted" id="lxnj"></div></div></div>
    </div>
@@ -346,7 +351,7 @@ svg{max-width:100%;height:auto;display:block}
    <thead><tr><th>Lieu</th><th>Visibilité</th><th>Mesures</th><th>K (TKE / CIS)</th><th>Prévision</th></tr></thead>
    <tbody>
     <tr><td><b style="font-weight:500">OHP</b> <span class="pill p-ok">mon lieu</span><div class="small muted mono">43.932 N · 5.713 E</div></td><td><span class="pill p-acc">lieu public (observatoire)</span></td><td>seeing monitor Miratlas · <span class="mono">9 537</span> mesures</td><td class="mono">0.767 / 48.4 <span class="pill p-pro" style="font-family:var(--f-body)">indépendants</span></td><td><span class="pill p-ok">données réelles</span></td></tr>
-    <tr><td><b style="font-weight:500">Jardin</b><div class="small muted mono">44.300 N · 5.300 E</div></td><td><span class="pill p-acc">partagé · secteur 0,25°</span></td><td>3 CSV · <span class="mono">42 h</span> de nuit</td><td class="mono">11.6 / 20.8 <span class="pill p-acc" style="font-family:var(--f-body)">facteur</span></td><td><span class="pill p-ok">run global 12Z</span></td></tr>
+    <tr><td><b style="font-weight:500">Jardin</b><div class="small muted mono">44.300 N · 5.300 E</div></td><td><span class="pill p-acc">partagé · position approchée</span></td><td>3 CSV · <span class="mono">42 h</span> de nuit</td><td class="mono">11.6 / 20.8 <span class="pill p-acc" style="font-family:var(--f-body)">facteur</span></td><td><span class="pill p-ok">run global 12Z</span></td></tr>
     <tr><td><b style="font-weight:500">Col de la Croix</b><div class="small muted mono">44.612 N · 5.701 E</div></td><td><span class="pill p-mut">privé</span></td><td>8 CSV · <span class="mono">96 h</span> de nuit</td><td class="mono">6.1 / 33 <span class="pill p-pro" style="font-family:var(--f-body)">indépendants</span></td><td><span class="pill p-ok">run global 12Z</span></td></tr>
     <tr><td><b style="font-weight:500">Star party</b><div class="small muted mono">46.912 N · 10.540 E</div></td><td><span class="pill p-mut">privé</span></td><td class="muted">aucune</td><td class="mono">9.6 / 17.2 <span class="pill p-mut" style="font-family:var(--f-body)">voisins</span></td><td><span class="pill p-warn">hors France · en file, 2e</span></td></tr>
    </tbody>
@@ -355,7 +360,7 @@ svg{max-width:100%;height:auto;display:block}
  </div>
  <div class="tiles" style="margin-top:16px">
   <div class="tile"><div class="l">Fisheye</div><div class="v" style="font-size:15px">1 par jour · utilisé</div><div class="small muted">remise à zéro à 00h TU</div></div>
-  <div class="tile"><div class="l">Demandes hors France</div><div class="v" style="font-size:15px">file d'attente</div><div class="small muted">1 en cours</div></div>
+  <div class="tile"><div class="l">Demandes hors domaine AROME</div><div class="v" style="font-size:15px">file d'attente</div><div class="small muted">1 en cours</div></div>
   <div class="tile"><div class="l">Recalcul</div><div class="v" style="font-size:15px">chaque run principal</div><div class="small muted">00Z · 06Z · 12Z · 18Z</div></div>
  </div>
 </section>
@@ -363,6 +368,7 @@ svg{max-width:100%;height:auto;display:block}
 <!-- ========================= COMPTE ========================= -->
 <section id="v-compte" data-view hidden>
  <h1>Compte</h1>
+ <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px"><span class="small muted">Vue de la maquette :</span><div class="seg"><button id="roleU" class="on">Utilisateur</button><button id="roleA">Administrateur</button></div><span class="small muted">Les K des sites publics ne sont visibles que par l'administrateur ; chacun voit les K de ses propres lieux.</span></div>
  <p class="lead">Un compte est nécessaire pour enregistrer des lieux, importer des mesures, régler les K et calculer un fisheye. Sans compte, on peut consulter la carte et les lieux partagés.</p>
  <div class="grid2">
   <div class="panel">
@@ -377,7 +383,7 @@ svg{max-width:100%;height:auto;display:block}
   <div class="panel">
    <h2>Vie privée et données</h2>
    <ul class="small" style="margin:0;padding-left:18px;display:grid;gap:6px">
-    <li>Un lieu partagé n'apparaît aux autres que comme un secteur de 0,25° (environ 28 × 20 km), sans nom ni distance exacte.</li>
+    <li>Un lieu partagé apparaît aux autres par un symbole à <b>5–11 km</b> de sa vraie position (2 à 4 cellules AROME), toujours au même endroit, sans nom ni position exacte.</li>
     <li>La position exacte sert seulement au calcul de la maille AROME et des K par défaut des voisins.</li>
     <li>Les mesures partagées aident à caler les K des lieux voisins.</li>
     <li>Tu peux exporter toutes tes données ou supprimer ton compte à tout moment.</li>
@@ -409,7 +415,10 @@ const KDEF=[9.6,17.2,0.1];
 const S={KCAL:[11.6,20.8,0.1],K:[11.6,20.8,0.1],mode:"A"};
 const listeners=[];
 function setK(K,mode){S.K=[clip(K[0]),clip(K[1]),K[2]??0.1];if(mode)S.mode=mode;listeners.forEach(f=>f())}
-function kstrip(){$("kstrip").textContent=`${fmt(S.K[0])} / ${fmt(S.K[1])} / ${fmt(S.K[2])} · ${S.mode=="A"?"calés":"manuels"}`}
+/* K des sites publics : connus de l'administrateur seul (le lieu de l'utilisateur reste visible) */
+let ADMIN=false;const kHid=()=>!ADMIN&&/^pub:/.test(($("lieu")||{}).value||""),kHidL=l=>!ADMIN&&LX.indexOf(l)!=MON_LIEU;
+const kTxt=(K,hid,f=v=>v)=>hid?"K confidentiels":`K_TKE = ${f(K[0])}  K_CIS = ${f(K[1])}  K_conv = ${f(K[2])}`;
+function kstrip(){$("kstrip").textContent=kHid()?"confidentiels":`${fmt(S.K[0])} / ${fmt(S.K[1])} / ${fmt(S.K[2])} · ${S.mode=="A"?"calés":"manuels"}`}
 listeners.push(kstrip);
 
 /* ---------- navigation ---------- */
@@ -429,9 +438,10 @@ listeners.push(()=>{const v=(views.find(s=>!s.hidden)||{}).id;if(v=="v-prevision
 const hhOf=i=>((i%24)+24)%24,isN=i=>{const h=hhOf(i);return h>=17.5||h<6};
 const lab=i=>{const d=new Date(Date.UTC(2026,9,12)+i*3600000);return String(d.getUTCDate()).padStart(2,"0")+"/"+String(d.getUTCMonth()+1).padStart(2,"0")};
 function taxis(X,i0,i1,y){let g="";for(let i=Math.ceil(i0);i<=i1;i++){const h=hhOf(i);g+=`<line x1="${X(i)}" x2="${X(i)}" y1="${y}" y2="${y+4}" stroke="${C_LINE}"/>`;if(h%2==0)g+=`<text x="${X(i)}" y="${y+16}" text-anchor="middle" font-size="11" fill="${h==0?"#e6ebf6":C_TXT}" ${h==0?'font-weight="500"':''}>${h==0?lab(i):h}</text>`}return g}
-function yaxis(Y,L,R,ymax,st){let g="";for(let v=0;v<=ymax+1e-9;v+=st)g+=`<line x1="${L}" x2="${R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${C_LINE}" stroke-width="0.6"/><text x="${L-5}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="${C_TXT}">${v}"</text>`;return g}
+function yaxis(Y,L,R,ymax,st,ymin=0){let g="";for(let v=Math.ceil(ymin/st-1e-9)*st;v<=ymax+1e-9;v=+(v+st).toFixed(6))g+=`<line x1="${L}" x2="${R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${C_LINE}" stroke-width="0.6"/><text x="${L-5}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="${C_TXT}">${v}"</text>`;return g}
 const dnText=(x,y,night)=>`<text x="${x}" y="${y}" text-anchor="middle" font-size="11" font-weight="500" fill="${night?"#9cc7ff":"#f2c14e"}" stroke="#0a0f1d" stroke-width="3" paint-order="stroke">${night?"Nuit":"Jour"}</text>`;
 function nightLabels(X,i0,i1,y){let g="",s=Math.floor(i0),cur=isN(s);for(let i=s+1;i<=i1;i++){const n=i<i1?isN(i):!cur;if(n!==cur||i==i1){if(i-s>=3)g+=dnText((X(s)+X(i))/2,y,cur);s=i;cur=n}}return g}
+const medCurve=q=>{let s=[],o="",pv=null;const st=`stroke="${C_OBSD}" stroke-width="1.4"`;q.forEach(([x,y,h])=>{if(pv!=null&&h-pv>1.01){if(s.length>1)o+=pl(s,st);s=[]}s.push([x,y]);pv=h});if(s.length>1)o+=pl(s,st);return o};   /* courbe mediane horaire */
 const pl=(pts,st)=>`<polyline fill="none" ${st} points="${pts.map(p=>p.join(",")).join(" ")}"/>`;
 
 /* ---------- modèle fictif (profils Cn2 par zone) ---------- */
@@ -490,7 +500,7 @@ function drawPrev(){
  $("histT").textContent=OB?"Historique (prévisions et mesures du lieu)":"Historique des prévisions du lieu";
  $("obsT").classList.toggle("on",OB);$("obsT").setAttribute("aria-checked",OB);
  const lsel=$("lieu").value;
- if(/^(pub|mine):/.test(lsel)){const l=LX[+lsel.split(":")[1]];prevReal(l,OB);lxCn2(l,"p2","nan",OB);lxHist(l,"p4","p4note",OB);lxCorr(l,"p5","p5t",false);$("kread").textContent=`K_TKE = ${l.K[0]}  K_CIS = ${l.K[1]}  K_conv = ${l.K[2]} (calés pour ce lieu, données réelles)`;return}
+ if(/^(pub|mine):/.test(lsel)){const l=LX[+lsel.split(":")[1]];prevReal(l,OB);lxCn2(l,"p2","nan",OB);lxHist(l,"p4","p4note",OB);lxCorr(l,"p5","p5t",false);$("kread").textContent=`${kTxt(l.K,kHidL(l))} (calés pour ce lieu, données réelles)`;return}
  $("p1").setAttribute("viewBox","0 0 900 220");$("p2").setAttribute("viewBox","0 0 900 270");$("p4").setAttribute("viewBox","0 0 900 220");$("p4note").textContent="";$("p5").innerHTML=`<text x="170" y="160" text-anchor="middle" font-size="12" fill="${C_TXT}">Corrélation : choisis un lieu avec seeing monitor.</text>`;$("p5t").textContent="";
  {const W=900,H=220,L=36,R=10,T=10,B=30,pw=W-L-R,ph=H-T-B,X=i=>L+(i-I0)/(I1-I0)*pw;
   const r=[];for(let i=I0+1;i<=I1;i++)r.push(i);
@@ -521,45 +531,68 @@ function drawPrev(){
 }
 function kBox(id){const el=$(id);
  const row=(lab,k,info)=>`<div class="kr"><span>${lab}</span><div class="kb" data-k="${k}"><button data-f="0.5">÷2</button><button data-f="0.833">−</button><button data-f="1.2">+</button><button data-f="2">×2</button></div><span class="mono" data-v="${k}">${info||""}</span></div>`;
- el.innerHTML=`<div class="krows">`+row("Niveau (les deux)","L","")+row("Couche limite · K_TKE","0")+row("Cisaillement · K_CIS","1")+`</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px"><button data-act="reset">Revenir aux K calés</button><button data-act="save">Enregistrer pour ce lieu</button><span class="small muted">K_conv figé</span><span class="okmsg" data-msg></span></div>`;
- const upd=()=>{const bt=v=>(v>=149.99||v<=0.0101)?' <span class="pill p-warn">butée</span>':"";el.querySelector('[data-v="0"]').innerHTML=fmt(S.K[0])+bt(S.K[0]);el.querySelector('[data-v="1"]').innerHTML=fmt(S.K[1])+bt(S.K[1])};
+ el.innerHTML=`<div class="krows">`+row("Niveau (les deux)","L","")+row("Couche limite · K_TKE","0")+row("Cisaillement · K_CIS","1")+`</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px"><button data-act="save">Enregistrer pour ce lieu</button><span class="small muted">K_conv figé</span><span class="okmsg" data-msg></span></div>`;
+ const upd=()=>{const bt=v=>(v>=149.99||v<=0.0101)?' <span class="pill p-warn">butée</span>':"";const h=kHid();el.querySelector('[data-v="0"]').innerHTML=h?"•••":fmt(S.K[0])+bt(S.K[0]);el.querySelector('[data-v="1"]').innerHTML=h?"•••":fmt(S.K[1])+bt(S.K[1])};
  el.onclick=e=>{const b=e.target.closest("button");if(!b)return;const f=parseFloat(b.dataset.f),msg=el.querySelector("[data-msg]");
   if(f){const k=b.parentElement.dataset.k,K=[...S.K];if(k=="L"){K[0]*=f;K[1]*=f}else K[+k]*=f;msg.textContent="";setK(K,"M")}
   else if(b.dataset.act=="reset"){msg.textContent="";setK(S.KCAL,"A")}
-  else if(b.dataset.act=="save"){msg.textContent=`Enregistré : K_TKE = ${fmt(S.K[0])}, K_CIS = ${fmt(S.K[1])}, K_conv = 0.1.`}};
+  else if(b.dataset.act=="save"){msg.textContent=kHid()?"Enregistré.":`Enregistré : K_TKE = ${fmt(S.K[0])}, K_CIS = ${fmt(S.K[1])}, K_conv = 0.1.`}};
  listeners.push(upd);upd()}
 S.showObs=true;
-$("obsT").onclick=()=>{S.showObs=!S.showObs;drawPrev()};
+function redrawView(){const v=(views.find(s=>!s.hidden)||{}).id;if(v=="v-prevision")drawPrev();else if(v=="v-calibrer")drawCal();else if(v=="v-lieux")lxShow()}
+function syncObs(){["obsT","obsTc"].forEach(i=>{$(i).classList.toggle("on",S.showObs);$(i).setAttribute("aria-checked",S.showObs)})}
+$("obsT").onclick=()=>{S.showObs=!S.showObs;syncObs();drawPrev()};
+$("obsTc").onclick=()=>{S.showObs=!S.showObs;syncObs();drawCal()};
+$("obsTc").onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();$("obsTc").click()}};
 $("obsT").onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();$("obsT").click()}};
 $("kmA").onclick=()=>setK(S.KCAL,"A");$("kmM").onclick=()=>{S.mode="M";listeners.forEach(f=>f())};
 
 /* ---------- CARTE ---------- */
 /* étendues : France (boîte du calcul global) et zoom autour du lieu ; même champ fictif dans les deux */
+/* domaine AROME 0,025° (37,5–55,4 N ; 12 W–16 E) : terres en contours grossiers, coupes aux bords du domaine */
+const DOM={la0:37.5,la1:55.4,lo0:-12,lo1:16};
+const CONT=[[37.5,-8.8],[38.7,-9.5],[39.4,-9.3],[40.6,-8.7],[41.9,-8.9],[42.9,-9.3],[43.4,-8.2],[43.7,-7.6],[43.55,-5.8],[43.45,-3.8],[43.35,-1.8],[43.5,-1.5],[44.7,-1.25],[45.6,-1.2],[46.5,-1.8],[47.3,-2.5],[47.75,-3.4],[47.95,-4.4],[48.6,-4.7],[48.85,-3.0],[48.65,-1.55],[49.65,-1.6],[49.4,-0.2],[49.7,0.2],[50.1,1.5],[50.95,1.6],[51.05,2.37],[51.35,3.4],[51.9,4.1],[52.5,4.6],[53.2,4.9],[53.45,6.0],[53.55,7.2],[53.6,8.3],[53.9,8.8],[54.4,8.6],[54.9,8.3],[55.4,8.4],[55.4,10.0],[54.8,9.9],[54.4,10.2],[54.3,11.0],[54.1,11.8],[54.4,12.8],[54.5,13.6],[54.1,14.2],[54.25,16.0],[43.5,16.0],[44.1,15.2],[45.0,14.5],[45.3,14.3],[45.6,13.8],[45.75,13.2],[45.6,12.4],[45.0,12.4],[44.2,12.4],[43.6,13.5],[42.9,13.9],[42.3,14.5],[41.9,15.2],[41.9,16.0],[38.2,16.0],[37.95,15.65],[38.6,15.85],[39.4,15.9],[40.0,15.6],[40.25,14.9],[40.6,14.5],[40.8,14.1],[41.25,13.6],[41.45,12.9],[41.75,12.2],[42.4,11.2],[42.9,10.6],[43.6,10.3],[44.05,9.8],[44.4,8.9],[44.2,8.3],[43.8,7.6],[43.75,7.5],[43.55,7.0],[43.15,6.6],[43.1,6.0],[43.3,5.35],[43.55,4.6],[43.35,3.5],[43.0,3.05],[42.43,3.15],[41.9,3.2],[41.3,2.1],[40.7,0.9],[40.0,0.0],[39.2,-0.25],[38.7,0.2],[38.2,-0.6],[37.6,-0.8],[37.5,-1.0]];
+const GB=[[55.4,-1.6],[54.6,-1.1],[54.1,-0.2],[53.6,0.1],[53.0,0.3],[52.9,1.4],[52.5,1.75],[51.9,1.3],[51.4,1.4],[51.1,1.2],[50.8,0.3],[50.75,-0.8],[50.6,-1.9],[50.6,-3.4],[50.2,-4.2],[50.05,-5.6],[50.7,-4.6],[51.2,-4.2],[51.55,-3.0],[51.6,-4.3],[51.7,-5.1],[52.1,-4.6],[52.8,-4.5],[53.3,-4.4],[53.3,-3.1],[53.8,-3.0],[54.2,-3.2],[54.6,-3.6],[54.9,-3.4],[54.85,-4.8],[55.0,-5.1],[55.4,-4.7]];
+const IRL=[[55.25,-7.3],[55.2,-6.1],[54.6,-5.5],[54.0,-6.1],[53.4,-6.1],[52.6,-6.2],[52.15,-6.4],[52.0,-7.6],[51.6,-8.5],[51.45,-9.8],[51.8,-10.3],[52.3,-9.9],[52.6,-9.6],[53.2,-9.9],[53.5,-10.1],[54.2,-10.0],[54.3,-8.6],[54.6,-8.8],[55.1,-8.3]];
+const SARD=[[41.25,9.2],[40.9,9.7],[40.4,9.8],[39.9,9.7],[39.2,9.6],[39.1,9.0],[38.9,8.6],[39.1,8.4],[39.9,8.4],[40.6,8.2],[40.95,8.3],[41.1,8.8]];
+const SICI=[[38.25,15.65],[37.9,15.3],[37.5,15.1],[37.5,12.5],[37.6,12.6],[38.0,12.45],[38.2,12.9],[38.1,13.4],[38.05,14.0],[38.1,14.8],[38.3,15.5]];
+const MALL=[[39.95,3.2],[39.75,3.45],[39.35,3.2],[39.5,2.4],[39.85,2.7]];
+/* zones cliquables : zoom predefini */
+const ZONES=[["France",46.6,2.4,{la0:41.2,la1:51.3,lo0:-5.3,lo1:9.8}],["Royaume-Uni & Irlande",53.1,-4.6,{la0:49.8,la1:55.4,lo0:-11,lo1:2}],["Espagne & Portugal",40.2,-4.2,{la0:37.5,la1:44,lo0:-10,lo1:4}],
+ ["Benelux & Allemagne",51.6,9.6,{la0:47.2,la1:55.4,lo0:2.5,lo1:16}],["Suisse & Alpes",46.7,10.6,{la0:44.6,la1:48.2,lo0:5.5,lo1:14}],["Italie",42.6,13.2,{la0:37.5,la1:47,lo0:6.5,lo1:16}],["Corse & Sardaigne",40.1,9.1,{la0:38.8,la1:43.1,lo0:7.8,lo1:10.2}]];
 const HOME={la0:41.2,la1:51.3,lo0:-5.3,lo1:9.8},ZOOM={la0:43.55,la1:45.25,lo0:4.3,lo1:6.84};
-let VW={...HOME};
+let VW={...DOM};
 const ZMIN=100/111.2;   /* zoom maximal = 100 km de haut, comme les cartes zoom de carte_seeing.py (rayon 50 km) */
 const isZoom=()=>(VW.la1-VW.la0)<3.2,isoStep=()=>{const s=VW.la1-VW.la0;return s>4?1000:s>1.2?500:250};
 const FRA=[[51.05,2.37],[50.95,1.6],[50.1,1.5],[49.7,0.2],[49.4,-0.2],[49.65,-1.6],[48.65,-1.55],[48.85,-3.0],[48.6,-4.7],[47.95,-4.4],[47.75,-3.4],[47.3,-2.5],[46.5,-1.8],[45.6,-1.2],[44.7,-1.25],[43.5,-1.5],[43.3,-1.8],[42.8,-0.3],[42.7,0.7],[42.5,1.7],[42.43,3.15],[43.0,3.05],[43.35,3.5],[43.55,4.6],[43.3,5.35],[43.1,6.0],[43.15,6.6],[43.55,7.0],[43.75,7.5],[44.1,7.7],[44.4,6.95],[45.1,7.1],[45.9,7.0],[46.4,6.8],[46.2,6.1],[46.6,6.4],[47.5,7.0],[47.6,7.6],[48.6,7.8],[49.0,8.2],[49.2,6.8],[49.5,6.4],[49.55,5.8],[50.1,4.85],[50.0,4.2],[50.35,3.7],[50.8,2.6]];
 const CORSE=[[42.95,9.4],[42.6,9.45],[41.95,9.4],[41.4,9.2],[41.6,8.8],[41.9,8.6],[42.3,8.6],[42.6,8.8]];
-const MT=[[45.6,6.7,2600,0.7,0.45],[44.6,6.7,2100,0.5,0.35],[42.8,0.5,2300,0.22,1.5],[45.3,2.9,1100,0.85,0.75],[46.7,6.0,1000,0.35,0.3],[48.1,7.0,900,0.4,0.22],[42.2,9.05,1500,0.35,0.18],[44.174,5.279,1650,0.10,0.14],[44.12,5.80,1100,0.08,0.22],[44.33,5.40,700,0.12,0.16],[44.85,5.45,1200,0.14,0.12],[44.25,6.35,1500,0.22,0.2],[44.95,6.10,1700,0.12,0.12],[43.9,3.3,700,0.3,0.5]];
+const MT=[[45.6,6.7,2600,0.7,0.45],[44.6,6.7,2100,0.5,0.35],[42.8,0.5,2300,0.22,1.5],[45.3,2.9,1100,0.85,0.75],[46.7,6.0,1000,0.35,0.3],[48.1,7.0,900,0.4,0.22],[42.2,9.05,1500,0.35,0.18],[44.174,5.279,1650,0.10,0.14],[44.12,5.80,1100,0.08,0.22],[44.33,5.40,700,0.12,0.16],[44.85,5.45,1200,0.14,0.12],[44.25,6.35,1500,0.22,0.2],[44.95,6.10,1700,0.12,0.12],[43.9,3.3,700,0.3,0.5],[46.5,8.5,2300,0.5,1.1],[47.0,11.6,2200,0.45,1.4],[43.0,-5.0,1500,0.3,1.2],[40.4,-4.2,1300,0.35,1.5],[40.0,-3.5,600,2.4,3.0],[43.2,12.6,1300,1.2,0.45],[52.6,-3.7,550,0.4,0.4],[54.5,-3.1,700,0.25,0.3],[48.0,8.2,1000,0.4,0.25],[40.1,9.2,900,0.4,0.2],[50.5,7.5,500,0.6,1.0]];
 function relief(la,lo){let h=110+40*Math.sin(la*3.1)*Math.cos(lo*2.3);MT.forEach(([a,b,H,sa,sb])=>h+=H*Math.exp(-(((la-a)/sa)**2+((lo-b)/sb)**2)));h+=50*Math.sin(la*41)*Math.cos(lo*37);return Math.max(5,h)}
 /* animation : une image par heure de 20h à 04h TU, ou la moyenne ; « sans calibration » = K par défaut (voisins) */
 const MAPH=[20,21,22,23,0,1,2,3,4,20,21,22,23,0,1,2,3,4],TREND=[1.14,1.06,1.0,0.95,0.92,0.93,0.97,1.01,1.07,1.18,1.1,1.03,0.98,0.94,0.95,0.99,1.04,1.1];   /* deux nuits, aucune heure de jour */
 let MMODE="m",MI=0,MCAL=true,mtimer=null;const MC={};
 const kfac=K=>Math.pow((K[0]*0.6+K[1]*0.4)/(S.KCAL[0]*0.6+S.KCAL[1]*0.4),0.6);
-const mapK=()=>isZoom()&&MCAL?S.K:KDEF;
+const KGLOB=KDEF,mapK=()=>KGLOB;   /* carte globale : calibration de l'administrateur, independante des lieux */
 const baseSee=(la,lo,r)=>Math.max(0.5,4.3-3.0*Math.min(1,r/1500)+0.25*(la-46)/5+0.6*Math.sin(la*1.7+lo*0.9)*Math.cos(lo*1.3-la*0.5)+0.3*Math.sin(la*7.1+1)*Math.cos(lo*6.3));
 const hourFac=(i,la,lo)=>TREND[i]*(1+0.2*Math.sin(la*1.3+i*0.55)*Math.cos(lo*0.9-i*0.4));
-function frameFac(la,lo){if(MMODE=="m"){let s=0;for(let i=0;i<9;i++)s+=hourFac(i,la,lo);return s/9}return hourFac(MI,la,lo)}   /* moyenne = premiere nuit, 20h-04h */
-function mapSeeing(la,lo){return baseSee(la,lo,relief(la,lo))*frameFac(la,lo)*kfac(mapK())}
+/* run 12/10 12Z, echeances jusqu'a +51 h : seules les heures de nuit (20h-04h TU) sont animees ; une moyenne par nuit */
+const RUN0=Date.UTC(2026,9,12,12),LEADMAX=51,JS=["dim.","lun.","mar.","mer.","jeu.","ven.","sam."];
+const frameT=i=>{const k=Math.floor(i/9),h=MAPH[i],d=new Date(Date.UTC(2026,9,12+k,20));if(h<12)d.setUTCDate(d.getUTCDate()+1);d.setUTCHours(h);return d};
+const NIGHTS=[0,1].map(k=>{const a=frameT(k*9),b=frameT(k*9+8);return{i0:k*9,i1:k*9+8,lab:`${String(a.getUTCDate()).padStart(2,"0")} au ${String(b.getUTCDate()).padStart(2,"0")}/${String(b.getUTCMonth()+1).padStart(2,"0")}`}}).filter(n=>(frameT(n.i0)-RUN0)/3600000<=LEADMAX);
+let MNI=0;
+function frameFac(la,lo){if(MMODE=="m"){const n=NIGHTS[MNI];let s=0;for(let i=n.i0;i<=n.i1;i++)s+=hourFac(i,la,lo);return s/(n.i1-n.i0+1)}return hourFac(MI,la,lo)}   /* moyenne = nuit choisie, 20h-04h */
+function mapSeeing(la,lo){return baseSee(la,lo,relief(la,lo))*frameFac(la,lo)}
 const LUT=[...Array(256)].map((_,k)=>turbo(k/255));
 const MON=[["ROSA (Verclause)",44.3814,5.4286],["Copernic",44.5618,5.9976],["Saint-Véran",44.6988,6.9083],["OHP",43.9317,5.7128],["Villeneuve",43.85,5.65]];
 const MINE=[["Jardin",44.30,5.30],["Col de la Croix",44.612,5.701]];
-const SHARED=[[44.0,5.0],[44.5,4.75],[44.75,5.75],[44.0,6.0],[48.75,2.25],[45.5,4.5],[43.5,1.25],[47.25,-1.75],[46.0,6.25],[42.75,2.75],[49.0,7.25],[45.75,3.0]];
+const SHARED=[[44.0,5.0],[44.5,4.75],[44.75,5.75],[44.0,6.0],[48.75,2.25],[45.5,4.5],[43.5,1.25],[47.25,-1.75],[46.0,6.25],[42.75,2.75],[49.0,7.25],[45.75,3.0]].map(([la,lo])=>[la+0.13,lo+0.11]);
+/* lieux partages : position montree aux autres decalee de 2 a 4 cellules AROME (0,025°), toujours la meme pour un lieu */
+const CELL=0.025,fuzz=(la,lo)=>{const h=hash(la.toFixed(4)+","+lo.toFixed(4)),a=(h%360)*D2R,d=(2+(h>>3)%3)*CELL;return[la+d*Math.sin(a),lo+d*Math.cos(a)/Math.cos(la*D2R)]};
+const SHAREDV=SHARED.map(([la,lo])=>fuzz(la,lo));
 let mapCache=null;
 function landMask(V,W,H){const c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d");const P=(la,lo)=>[(lo-V.lo0)/(V.lo1-V.lo0)*W,(V.la1-la)/(V.la1-V.la0)*H];
- g.fillStyle="#000";[FRA,CORSE].forEach(poly=>{g.beginPath();poly.forEach((q,k)=>{const[x,y]=P(...q);k?g.lineTo(x,y):g.moveTo(x,y)});g.closePath();g.fill()});
- g.strokeStyle="#000";g.lineWidth=Math.max(2,W/(V.lo1-V.lo0)*0.12);[FRA,CORSE].forEach(poly=>{g.beginPath();poly.forEach((q,k)=>{const[x,y]=P(...q);k?g.lineTo(x,y):g.moveTo(x,y)});g.closePath();g.stroke()});
+ g.fillStyle="#000";[CONT,GB,IRL,CORSE,SARD,SICI,MALL].forEach(poly=>{g.beginPath();poly.forEach((q,k)=>{const[x,y]=P(...q);k?g.lineTo(x,y):g.moveTo(x,y)});g.closePath();g.fill()});
+ g.strokeStyle="#000";g.lineWidth=Math.max(2,W/(V.lo1-V.lo0)*0.12);[CONT,GB,IRL,CORSE,SARD,SICI,MALL].forEach(poly=>{g.beginPath();poly.forEach((q,k)=>{const[x,y]=P(...q);k?g.lineTo(x,y):g.moveTo(x,y)});g.closePath();g.stroke()});
  return g.getImageData(0,0,W,H).data}
 function viewCache(W,H){const key=[VW.la0,VW.la1,VW.lo0,VW.lo1].map(v=>v.toFixed(5)).join(",");if(MC.key==key)return MC.c;
  const V=VW,iso0=isoStep(),n=W*H,mask=landMask(V,W,H),base=new Float32Array(n),las=new Float32Array(n),los=new Float32Array(n),sea=new Uint8Array(n),iso=new Uint8Array(n),rel=new Float32Array(n);
@@ -567,56 +600,87 @@ function viewCache(W,H){const key=[VW.la0,VW.la1,VW.lo0,VW.lo1].map(v=>v.toFixed
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const j=y*W+x,la=LA(y),lo=LO(x),r=relief(la,lo);rel[j]=r;base[j]=baseSee(la,lo,r);las[j]=la;los[j]=lo;sea[j]=!mask[j*4+3]?1:0}
  for(let y=1;y<H;y++)for(let x=1;x<W;x++){const j=y*W+x;if(sea[j])continue;const a=Math.floor(rel[j]/iso0);if(a!=Math.floor(rel[j-1]/iso0)||a!=Math.floor(rel[j-W]/iso0))iso[j]=1}
  MC.key=key;return MC.c={LA,LO,base,las,los,sea,iso,mask}}
-function drawMap(){const V=VW,cv=$("map"),cx=cv.getContext("2d"),W=cv.width,H=cv.height,img=cx.createImageData(W,H),D=img.data,C=viewCache(W,H),kf=kfac(mapK()),{LA,LO}=C;let all=[];
+function drawMap(){const V=VW,cv=$("map"),cx=cv.getContext("2d"),W=cv.width,H=cv.height,img=cx.createImageData(W,H),D=img.data,C=viewCache(W,H),kf=1,{LA,LO}=C;let all=[];
  for(let j=0;j<W*H;j++){const p=j*4;if(C.sea[j]){D[p]=27;D[p+1]=39;D[p+2]=64;D[p+3]=255;continue}
   const s=C.base[j]*frameFac(C.las[j],C.los[j])*kf,c=LUT[Math.min(255,Math.round(s/6*255))],d=C.iso[j]?.45:1;if(!(j%7)&&!((j/W|0)%7))all.push(s);D[p]=c[0]*d;D[p+1]=c[1]*d;D[p+2]=c[2]*d;D[p+3]=255}
  cx.putImageData(img,0,0);
  const mask=C.mask,big=isZoom();
- $("mhl").textContent=MMODE=="m"?"moyenne de la nuit":(MI<9?"nuit du 12 au 13/10 · ":"nuit du 13 au 14/10 · ")+String(MAPH[MI]).padStart(2,"0")+"h TU";
- $("mcalseg").hidden=!big;
+ {const d=frameT(MI),ld=Math.round((d-RUN0)/3600000);$("mhl").textContent=MMODE=="m"?`moyenne nuit du ${NIGHTS[MNI].lab}`:`${JS[d.getUTCDay()]} ${String(d.getUTCDate()).padStart(2,"0")}/${String(d.getUTCMonth()+1).padStart(2,"0")} · ${String(d.getUTCHours()).padStart(2,"0")}h TU · +${ld} h`;
+  document.querySelectorAll("#mnseg button").forEach((b,k)=>b.classList.toggle("on",k==MNI))}
+ $("mcalseg").hidden=true;
  const P=(la,lo)=>[(lo-V.lo0)/(V.lo1-V.lo0)*W,(V.la1-la)/(V.la1-V.la0)*H];
- cx.strokeStyle="rgba(255,255,255,.7)";cx.lineWidth=1;[FRA,CORSE].forEach(poly=>{cx.beginPath();poly.forEach((q,k)=>{const[x,y]=P(...q);k?cx.lineTo(x,y):cx.moveTo(x,y)});cx.closePath();cx.stroke()});
- cx.setLineDash([4,3]);cx.strokeStyle="#fff";cx.lineWidth=1.3;SHARED.forEach(([la,lo])=>{const[x0,y0]=P(la+0.25,lo),[x1,y1]=P(la,lo+0.25);cx.strokeRect(x0,y0,x1-x0,y1-y0)});cx.setLineDash([]);
+ cx.strokeStyle="rgba(255,255,255,.55)";cx.lineWidth=1;[CONT,GB,IRL,SARD,SICI,MALL].forEach(poly=>{cx.beginPath();poly.forEach((q,k)=>{const[x,y]=P(...q);k?cx.lineTo(x,y):cx.moveTo(x,y)});cx.closePath();cx.stroke()});
+ cx.strokeStyle="rgba(255,255,255,.8)";[FRA,CORSE].forEach(poly=>{cx.beginPath();poly.forEach((q,k)=>{const[x,y]=P(...q);k?cx.lineTo(x,y):cx.moveTo(x,y)});cx.closePath();cx.stroke()});
+ SHAREDV.forEach(([la,lo])=>{const[x,y]=P(la,lo),r=big?7:5;cx.beginPath();cx.moveTo(x,y-r);cx.lineTo(x+r,y);cx.lineTo(x,y+r);cx.lineTo(x-r,y);cx.closePath();cx.fillStyle="#9cc7ff";cx.fill();cx.strokeStyle="#000";cx.lineWidth=1.4;cx.stroke()});
  cx.font="500 12px 'IBM Plex Sans',sans-serif";
  const label=(t,x,y)=>{cx.lineWidth=3;cx.strokeStyle="rgba(0,0,0,.8)";cx.strokeText(t,x,y);cx.fillStyle="#fff";cx.fillText(t,x,y)};
  MON.forEach(([n,la,lo])=>{const[x,y]=P(la,lo);cx.fillStyle="#fff";cx.strokeStyle="#000";cx.lineWidth=2;cx.beginPath();cx.arc(x,y,big?6:4,0,7);cx.fill();cx.stroke();if(big)label(n,x+9,y+4)});
  const star=(x,y,r)=>{cx.beginPath();for(let k=0;k<10;k++){const a=-Math.PI/2+k*Math.PI/5,rr=k%2?r*0.45:r;cx.lineTo(x+rr*Math.cos(a),y+rr*Math.sin(a))}cx.closePath();cx.fillStyle="#f2a23a";cx.fill();cx.strokeStyle="#000";cx.lineWidth=1.2;cx.stroke()};
  MINE.forEach(([n,la,lo])=>{const[x,y]=P(la,lo);star(x,y,big?10:7);if(big)label(n,x+12,y+4)});
+ const zh=[];if(V.la1-V.la0>12){cx.font="600 13px 'IBM Plex Sans',sans-serif";ZONES.forEach((z,i)=>{const[x,y]=P(z[1],z[2]),w=cx.measureText(z[0]).width+18,h=24,on=MZH==i;
+  cx.fillStyle=on?"rgba(242,193,78,.95)":"rgba(10,15,29,.78)";cx.strokeStyle=on?"#000":"rgba(255,255,255,.75)";cx.lineWidth=1.2;cx.beginPath();cx.roundRect(x-w/2,y-h/2,w,h,12);cx.fill();cx.stroke();
+  cx.fillStyle=on?"#000":"#fff";cx.textAlign="center";cx.fillText(z[0],x,y+4.5);cx.textAlign="left";zh.push([x-w/2,y-h/2,w,h,i]);
+  if(on){const b=z[3],[x0,y0]=P(b.la1,b.lo0),[x1,y1]=P(b.la0,b.lo1);cx.setLineDash([6,4]);cx.strokeStyle="#f2c14e";cx.lineWidth=1.6;cx.strokeRect(x0,y0,x1-x0,y1-y0);cx.setLineDash([])}});cx.font="500 12px 'IBM Plex Sans',sans-serif"}
  if(S.newPt){const[x,y]=P(S.newPt[0],S.newPt[1]);cx.strokeStyle="#fff";cx.lineWidth=2;cx.beginPath();cx.arc(x,y,9,0,7);cx.moveTo(x-14,y);cx.lineTo(x+14,y);cx.moveTo(x,y-14);cx.lineTo(x,y+14);cx.stroke()}
  const km=Math.round((V.lo1-V.lo0)*111.32*Math.cos((V.la0+V.la1)/2*D2R));
- const Kshow=mapK();label(`${big?(MCAL?"Avec calibration":"Sans calibration"):"K par défaut"} · K_TKE = ${fmt(Kshow[0])}  K_CIS = ${fmt(Kshow[1])}  K_conv = 0.1`,10,H-12);
+ label(`Calibration globale (administrateur)${ADMIN?` · K_TKE = ${fmt(KGLOB[0])}  K_CIS = ${fmt(KGLOB[1])}  K_conv = ${fmt(KGLOB[2])}`:""}`,10,H-12);
  const hkm=Math.round((V.la1-V.la0)*111.2),zmax=(V.la1-V.la0)<=ZMIN+1e-6;label(`${hkm} × ${km} km${zmax?" · zoom maximal":""} · isolignes ${isoStep()} m`,W-(zmax?300:200),H-12);
  all.sort((a,b)=>a-b);$("mbest").textContent=all.length?all[0].toFixed(1)+'"':"–";$("mmed").textContent=all.length?med(all).toFixed(1)+'"':"–";
- mapCache={LA,LO,W,H,mask}}
+ mapCache={LA,LO,W,H,mask,zh}}
 grad($("mapcb"));
 const onLand=(x,y)=>!!mapCache.mask[(Math.floor(y)*mapCache.W+Math.floor(x))*4+3];
 const canvasXY=e=>{const r=$("map").getBoundingClientRect();if(!r.width||!r.height)return[mapCache.W/2,mapCache.H/2];return[(e.clientX-r.left)/r.width*mapCache.W,(e.clientY-r.top)/r.height*mapCache.H]};
-function setView(v,btn){const sl=v.la1-v.la0,so=v.lo1-v.lo0,sl2=Math.min(HOME.la1-HOME.la0,Math.max(ZMIN,sl)),f=sl2/sl,cla=(v.la0+v.la1)/2,clo=(v.lo0+v.lo1)/2;
- const nl=Math.min(53,Math.max(40,cla)),no=Math.min(11,Math.max(-7,clo));VW={la0:nl-sl2/2,la1:nl+sl2/2,lo0:no-so*f/2,lo1:no+so*f/2};
- ["mvF","mvZ"].forEach(id=>$(id).classList.toggle("on",id==btn));drawMap()}
+var MZH=-1;   /* zone survolee */
+function fitBox(b){const cv=$("map"),r=cv.width/cv.height,cla=(b.la0+b.la1)/2,c=Math.cos(cla*D2R);let sl=b.la1-b.la0,so=b.lo1-b.lo0;if(so*c/sl>r)sl=so*c/r;else so=sl*r/c;return{la0:cla-sl/2,la1:cla+sl/2,lo0:(b.lo0+b.lo1)/2-so/2,lo1:(b.lo0+b.lo1)/2+so/2}}
+function setView(v,btn){const DV=fitBox(DOM),sl=v.la1-v.la0,so=v.lo1-v.lo0,sl2=Math.min(DV.la1-DV.la0,Math.max(ZMIN,sl)),f=sl2/sl,cla=(v.la0+v.la1)/2,clo=(v.lo0+v.lo1)/2;
+ const nl=Math.min(DOM.la1,Math.max(DOM.la0,cla)),no=Math.min(DOM.lo1,Math.max(DOM.lo0,clo));VW={la0:nl-sl2/2,la1:nl+sl2/2,lo0:no-so*f/2,lo1:no+so*f/2};
+ ["mvF","mvZ"].forEach(id=>$(id).classList.toggle("on",id==btn));if(btn!="mreg")$("mreg").value="";drawMap()}
+VW=fitBox(DOM);
+const inPoly=(la,lo,poly)=>{let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const[a1,o1]=poly[i],[a2,o2]=poly[j];if((a1>la)!=(a2>la)&&lo<(o2-o1)*(la-a1)/(a2-a1)+o1)c=!c}return c};
+/* zone sous le curseur : l'etiquette, ou (vue large) n'importe quel point de terre de la zone ; France et iles d'abord, sinon la plus petite boite */
+const zoneAt=(x,y)=>{const zh=(mapCache&&mapCache.zh)||[],e=zh.find(([a,b,w,h])=>x>=a&&x<=a+w&&y>=b&&y<=b+h);if(e||!zh.length||!onLand(x,y))return e;
+ const la=mapCache.LA(y),lo=mapCache.LO(x),Z=i=>zh.find(q=>q[4]==i);if(inPoly(la,lo,FRA))return Z(0);if(inPoly(la,lo,CORSE)||inPoly(la,lo,SARD))return Z(6);
+ let best=null,ba=1e9;ZONES.forEach((z,i)=>{const b=z[3];if(i==0||i==6||la<b.la0||la>b.la1||lo<b.lo0||lo>b.lo1)return;const ar=(b.la1-b.la0)*(b.lo1-b.lo0);if(ar<ba){ba=ar;best=i}});return best==null?undefined:Z(best)};
 function zoomAt(x,y,f){const la=mapCache.LA(y),lo=mapCache.LO(x);setView({la0:la-(la-VW.la0)*f,la1:la+(VW.la1-la)*f,lo0:lo-(lo-VW.lo0)*f,lo1:lo+(VW.lo1-lo)*f})}
 let drag=null;const snap=document.createElement("canvas");
 $("map").addEventListener("wheel",e=>{if(!mapCache)return;e.preventDefault();const[x,y]=canvasXY(e);zoomAt(x,y,e.deltaY<0?0.8:1.25)},{passive:false});
 $("map").onpointerdown=e=>{if(!mapCache)return;const[x,y]=canvasXY(e);drag={x,y,moved:false};snap.width=mapCache.W;snap.height=mapCache.H;snap.getContext("2d").drawImage($("map"),0,0);$("map").setPointerCapture(e.pointerId)};
 $("map").onpointermove=e=>{if(!mapCache)return;const[x,y]=canvasXY(e);
  if(drag){const dx=x-drag.x,dy=y-drag.y;if(Math.hypot(dx,dy)>4)drag.moved=true;if(drag.moved){const c=$("map").getContext("2d");c.fillStyle="#1b2740";c.fillRect(0,0,mapCache.W,mapCache.H);c.drawImage(snap,dx,dy)}return}
+ const zz=zoneAt(x,y),zi=zz?zz[4]:-1;if(zi!=MZH){MZH=zi;$("map").style.cursor=zi>=0?"pointer":"grab";drawMap()}
+ if(zz){$("maptip").innerHTML=`Clique pour zoomer sur <b>${ZONES[zi][0]}</b>`;return}
  const la=mapCache.LA(y),lo=mapCache.LO(x);
  $("maptip").innerHTML=onLand(x,y)?`<span class="mono">${la.toFixed(3)} N · ${lo.toFixed(3)} E</span> · seeing <b class="mono">${mapSeeing(la,lo).toFixed(1)}"</b> · relief AROME <span class="mono">${Math.round(relief(la,lo))} m</span>`:`<span class="mono">${la.toFixed(2)} N · ${lo.toFixed(2)} E</span> · hors de la zone du calcul global`};
 $("map").onpointerup=e=>{if(!drag)return;const[x,y]=canvasXY(e),d=drag;drag=null;
  if(d.moved){const dla=(y-d.y)/mapCache.H*(VW.la1-VW.la0),dlo=(x-d.x)/mapCache.W*(VW.lo1-VW.lo0);setView({la0:VW.la0+dla,la1:VW.la1+dla,lo0:VW.lo0-dlo,lo1:VW.lo1-dlo});return}
- const in_=onLand(x,y);S.newPt=[mapCache.LA(y),mapCache.LO(x)];$("newlieu").hidden=false;$("nlmsg").textContent="";$("nlpos").textContent=`${S.newPt[0].toFixed(3)} N · ${S.newPt[1].toFixed(3)} E · `+(in_?"prévision immédiate (zone du calcul global)":"hors de la zone du calcul global : prévision via la file d'attente");drawMap()};
+ {const zz=zoneAt(x,y);if(zz){const z=ZONES[zz[4]];MZH=-1;$("map").style.cursor="grab";$("mreg").value=String(zz[4]);setView(fitBox(z[3]),"mreg");return}}
+ S.newPt=[mapCache.LA(y),mapCache.LO(x)];$("newlieu").hidden=false;$("nlmsg").textContent="";$("nllat").value=S.newPt[0].toFixed(4);$("nllon").value=S.newPt[1].toFixed(4);nlInfo();drawMap()};
 $("map").onpointercancel=()=>{drag=null;drawMap()};
-$("mvF").onclick=()=>setView({...HOME},"mvF");
+$("mvF").onclick=()=>setView(fitBox(DOM),"mvF");
+$("mreg").onchange=e=>{const z=ZONES[+e.target.value];if(e.target.value!==""&&z)setView(fitBox(z[3]),"mreg")};
 $("mvZ").onclick=()=>setView({...ZOOM},"mvZ");
 $("mzi").onclick=()=>zoomAt(mapCache.W/2,mapCache.H/2,0.67);
 $("mzo").onclick=()=>zoomAt(mapCache.W/2,mapCache.H/2,1.5);$("mc0").onclick=()=>{MCAL=false;$("mc0").classList.add("on");$("mc1").classList.remove("on");drawMap()};
 $("mc1").onclick=()=>{MCAL=true;$("mc1").classList.add("on");$("mc0").classList.remove("on");drawMap()};
 const setMode=m=>{MMODE=m;$("mmM").classList.toggle("on",m=="m");$("mmH").classList.toggle("on",m=="h")};
 $("mmM").onclick=()=>{if(mtimer){clearInterval(mtimer);mtimer=null;$("mpl").textContent="▶"}setMode("m");drawMap()};
-$("mmH").onclick=()=>{setMode("h");drawMap()};
-$("mhr").oninput=e=>{MI=+e.target.value;setMode("h");drawMap()};
-$("mpl").onclick=()=>{if(mtimer){clearInterval(mtimer);mtimer=null;$("mpl").textContent="▶";return}setMode("h");$("mpl").textContent="❚❚";mtimer=setInterval(()=>{MI=(MI+1)%MAPH.length;$("mhr").value=MI;drawMap()},900)};
-$("nlok").onclick=()=>{const n=$("nlname").value.trim();if(!n){$("nlmsg").textContent="";$("nlmsg").className="err";$("nlmsg").textContent="Donne un nom au lieu.";return}$("nlmsg").className="okmsg";$("nlmsg").textContent=`« ${n} » créé${$("nlshare").checked?", partagé en secteur 0,25°":", privé"}. K de départ : ceux des voisins.`};
+$("mmH").onclick=()=>{setMode("h");if(MI<NIGHTS[MNI].i0||MI>NIGHTS[MNI].i1){MI=NIGHTS[MNI].i0;$("mhr").value=MI}drawMap()};
+$("mnseg").innerHTML=NIGHTS.map((n,k)=>`<button data-n="${k}"${k?"":' class="on"'}>Nuit du ${n.lab}</button>`).join("");$("mhr").max=NIGHTS[NIGHTS.length-1].i1;
+$("mnseg").onclick=e=>{const b=e.target.closest("button");if(!b)return;MNI=+b.dataset.n;if(MMODE=="h"){MI=NIGHTS[MNI].i0;$("mhr").value=MI}drawMap()};
+$("mhr").oninput=e=>{MI=+e.target.value;MNI=NIGHTS.findIndex(n=>MI>=n.i0&&MI<=n.i1);setMode("h");drawMap()};
+$("mpl").onclick=()=>{if(mtimer){clearInterval(mtimer);mtimer=null;$("mpl").textContent="▶";return}setMode("h");$("mpl").textContent="❚❚";mtimer=setInterval(()=>{MI=(MI+1)%(NIGHTS[NIGHTS.length-1].i1+1);MNI=NIGHTS.findIndex(n=>MI>=n.i0&&MI<=n.i1);$("mhr").value=MI;drawMap()},900)};
+/* coordonnees GPS : degres decimaux ou degres minutes secondes, N/S/E/W (ou O) */
+function parseCoord(s,lat){s=(s||"").trim().toUpperCase().replace(/,/g,".");if(!s)return null;
+ let sg=1;if(/[SWO]$|^[SWO]|^-/.test(s))sg=-1;const n=s.match(/\d+(\.\d+)?/g);if(!n||n.length>3)return null;
+ const v=sg*(+n[0]+(+(n[1]||0))/60+(+(n[2]||0))/3600);if(n.length>1&&(+n[1]>=60||+(n[2]||0)>=60))return null;
+ return isFinite(v)&&Math.abs(v)<=(lat?90:180)?v:null}
+function nlInfo(){if(!S.newPt){$("nlpos").textContent="";return}const[la,lo]=S.newPt,inD=la>=DOM.la0&&la<=DOM.la1&&lo>=DOM.lo0&&lo<=DOM.lo1;
+ $("nlpos").textContent=`${la.toFixed(4)} N · ${lo.toFixed(4)} E · `+(inD?"dans le domaine AROME : prévision dès le prochain run principal":"hors du domaine AROME : prévision via la file d'attente")}
+function nlFromInputs(){const la=parseCoord($("nllat").value,true),lo=parseCoord($("nllon").value,false);
+ if(la==null||lo==null){S.newPt=null;$("nlpos").textContent=($("nllat").value||$("nllon").value)?"Coordonnées non reconnues.":"";drawMap();return}
+ S.newPt=[la,lo];nlInfo();if(la>=DOM.la0&&la<=DOM.la1&&lo>=DOM.lo0&&lo<=DOM.lo1){const v=VW;if(la<v.la0||la>v.la1||lo<v.lo0||lo>v.lo1)setView({la0:la-(v.la1-v.la0)/2,la1:la+(v.la1-v.la0)/2,lo0:lo-(v.lo1-v.lo0)/2,lo1:lo+(v.lo1-v.lo0)/2});else drawMap()}else drawMap()}
+$("nllat").oninput=nlFromInputs;$("nllon").oninput=nlFromInputs;
+$("nlok").onclick=()=>{const n=$("nlname").value.trim();if(!S.newPt){$("nlmsg").className="err";$("nlmsg").textContent="Clique sur la carte ou saisis des coordonnées GPS valides.";return}if(!n){$("nlmsg").textContent="";$("nlmsg").className="err";$("nlmsg").textContent="Donne un nom au lieu.";return}$("nlmsg").className="okmsg";$("nlmsg").textContent=`« ${n} » créé${$("nlshare").checked?", partagé (position approchée)":", privé"}. K de départ : ceux des voisins.`};
 
 /* ---------- CIEL ---------- */
 const LAT=44.3,LON=5.3,T0=Date.UTC(2026,9,12,19,0),ELMIN=5;
@@ -687,11 +751,30 @@ function comp(key){const s=hash(key),a=[];for(let i=0;i<=24;i++)a.push({t:0.03+0
 const seeC=(K,c)=>Math.pow(K[0]*c.t+K[1]*c.c,0.6)*0.85;
 const nights=new Map();let csel=null,ne=0;
 function chourly(pts){const H=[];for(let h=0;h<=24;h++){const w=pts.filter(p=>Math.abs(p.x-h)<=0.5).map(p=>p.v);if(w.length)H.push({h,m:med(w)})}return H}
-function addCSV(txt,name){let n=0;txt.split(/\r?\n/).forEach(l=>{const c=l.split(/[;,\t]/);if(c.length<2)return;const s=c[0].trim().replace(/"/g,"");let m=s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})/),y,mo,d,H,M;if(m){[y,mo,d,H,M]=m.slice(1).map(Number)}else{m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[ T](\d{1,2}):(\d{2})/);if(!m)return;[d,mo,y,H,M]=m.slice(1).map(Number)}
+/* import CSV : formats de date courants, heure TU ou locale (decalage fixe ou Europe/Paris ete/hiver) */
+const CSVO={tz:"TU",off:"paris",fmt:"auto"};
+function parisOff(ms){const p=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Paris",hourCycle:"h23",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}).formatToParts(new Date(ms)),g=k=>+p.find(x=>x.type==k).value;
+ return (Date.UTC(g("year"),g("month")-1,g("day"),g("hour"),g("minute"))-ms)/3600000}
+function csvDate(s,fmt){s=s.trim().replace(/"/g,"");let m,y,mo,d,H=0,M=0,S=0,z=null;
+ if(fmt=="unix"||(fmt=="auto"&&/^\d{9,11}(\.\d+)?$/.test(s))){const v=+s;return isNaN(v)?null:v*1000}
+ if(fmt=="excel"||(fmt=="auto"&&/^\d{5}\.\d+$/.test(s))){const v=parseFloat(s.replace(",","."));return isNaN(v)?null:{loc:Math.round((v-25569)*86400000)}}
+ const tm=s.match(/[ T](\d{1,2})[:h](\d{2})(?::(\d{2})(?:[.,]\d+)?)?\s*(Z|[+-]\d{2}:?\d{2})?\s*$/i);if(!tm)return null;
+ H=+tm[1];M=+tm[2];S=+(tm[3]||0);if(tm[4])z=tm[4].toUpperCase()=="Z"?0:(tm[4][0]=="-"?-1:1)*(+tm[4].slice(1,3)+ +tm[4].slice(-2)/60);
+ const ds=s.slice(0,tm.index).trim();
+ if((fmt=="auto"||fmt=="ymd"||fmt=="ymd2")&&(m=ds.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/)))[y,mo,d]=m.slice(1).map(Number);
+ else if(m=ds.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2}|\d{4})$/)){let [a,b,c]=m.slice(1).map(Number);if(c<100)c+=2000;
+  const us=fmt=="mdy"||(fmt=="auto"&&b>12&&a<=12);if(fmt=="ymd"||fmt=="ymd2")return null;[d,mo,y]=us?[b,a,c]:[a,b,c]}
+ else return null;
+ if(mo<1||mo>12||d<1||d>31||H>23||M>59)return null;const loc=Date.UTC(y,mo-1,d,H,M,S);
+ return z!=null?loc-z*3600000:{loc}}
+function csvUTC(r){if(r==null)return null;if(typeof r=="number")return r;   /* deja en TU (Unix, ou fuseau ecrit dans la date) */
+ if(CSVO.tz=="TU")return r.loc;if(CSVO.off!="paris")return r.loc-CSVO.off*3600000;
+ let u=r.loc-parisOff(r.loc)*3600000;return r.loc-parisOff(u)*3600000}
+function addCSV(txt,name){let n=0;txt.split(/\r?\n/).forEach(l=>{const c=l.split(/[;,\t]/);if(c.length<2)return;let r=csvDate(c[0],CSVO.fmt);if(r==null&&c.length>2)r=csvDate(c[0]+" "+c[1],CSVO.fmt);const ms=csvUTC(r);if(ms==null||isNaN(ms))return;const U=new Date(ms),y=U.getUTCFullYear(),mo=U.getUTCMonth()+1,d=U.getUTCDate(),H=U.getUTCHours(),M=U.getUTCMinutes();
  const v=parseFloat(c[c.length-1].replace(",","."));if(isNaN(v)||v<=0||v>30)return;
  const dt=new Date(Date.UTC(y,mo-1,d));if(H<12)dt.setUTCDate(dt.getUTCDate()-1);const key=dt.toISOString().slice(0,10);
  if(!nights.has(key))nights.set(key,[]);nights.get(key).push({x:(H+M/60-12+24)%24,v});csel=key;n++});
- if(n<3){$("cerr").textContent=name+" : moins de 3 mesures lisibles. Vérifie le séparateur et le format de date.";return}
+ if(n<3){$("cerr").textContent=name+" : moins de 3 mesures lisibles. Vérifie le séparateur, le format de date et l'heure (TU ou locale).";return}
  $("cerr").textContent="";drawCal()}
 function example(){const d=new Date(Date.UTC(2026,8,28+ne));ne++;const key=d.toISOString().slice(0,10),C=comp(key);let t="date_TU;seeing_arcsec\n";
  for(let m=17*60;m<=31*60;m+=5){const x=m/60-12,i=Math.min(Math.floor(x),23),f=x-i,a=C[i],b=C[i+1];let v=seeC([14,24,0.1],{t:a.t*(1-f)+b.t*f,c:a.c*(1-f)+b.c*f})*(0.8+0.4*rnd(m+ne*999));if(rnd(m*7+ne)>0.985)v*=2.5;
@@ -702,16 +785,16 @@ function calib(){const P=[];nights.forEach((pts,key)=>{const C=comp(key);chourly
  const err=K=>P.reduce((s,p)=>s+Math.abs(Math.log(seeC(K,p.c)/p.m)),0)/P.length;
  if(P.length<60){const f=Math.exp(P.reduce((s,p)=>s+Math.log(p.m/seeC(KDEF,p.c)),0)/P.length),a=Math.pow(f,5/3);return{P,K:[clip(KDEF[0]*a),clip(KDEF[1]*a),0.1],mode:"facteur unique (niveau seul)"}}
  let best=1e9,K;for(let i=0;i<=48;i++)for(let j=0;j<=48;j++){const k=[0.01*Math.pow(15000,i/48),0.01*Math.pow(15000,j/48),0.1],e=err(k);if(e<best){best=e;K=k}}return{P,K,mode:"K_TKE et K_CIS indépendants"}}
-function cstats(P,K){if(!P.length)return{r:NaN,b:NaN,e:NaN};const o=P.map(p=>p.m),pr=P.map(p=>seeC(K,p.c));return{r:corr(o,pr),b:pr.reduce((s,v,i)=>s+v-o[i],0)/o.length,e:(Math.exp(pr.reduce((s,v,i)=>s+Math.abs(Math.log(v/o[i])),0)/o.length)-1)*100}}
+function cstats(P,K){if(!P.length)return{r:NaN,b:NaN,e:NaN,q:NaN};const o=P.map(p=>p.m),pr=P.map(p=>seeC(K,p.c));return{r:corr(o,pr),b:pr.reduce((s,v,i)=>s+v-o[i],0)/o.length,e:(Math.exp(pr.reduce((s,v,i)=>s+Math.abs(Math.log(v/o[i])),0)/o.length)-1)*100,q:Math.sqrt(pr.reduce((s,v,i)=>s+(v-o[i])**2,0)/o.length)}}
 let lastAuto=null;
-function drawCal(){
+function drawCal(){CALRM=new Set();const lock=kHid();$("calpub").hidden=!lock;["csvopts","dz","calexrow","cuse","kmodeseg","kbox2","calfilt"].forEach(i=>{const e=$(i);if(e)e.hidden=lock});
  const rl=realLieu();if(rl){drawCalReal(rl);return}
- $("cdl").textContent="Défaut (voisins)";$("cd1").textContent="9.6";$("cd2").textContent="17.2";$("cd3").textContent="0.1";$("p2cnote").textContent="";$("chist").innerHTML=`<text x="550" y="120" text-anchor="middle" font-size="13" fill="${C_TXT}">Historique : choisis un lieu avec seeing monitor.</text>`;$("chistnote").textContent="";$("ex1").hidden=false;$("ex6").hidden=false;
+ $("p2cnote").textContent="";$("chist").innerHTML=`<text x="550" y="120" text-anchor="middle" font-size="13" fill="${C_TXT}">Historique : choisis un lieu avec seeing monitor.</text>`;$("chistnote").textContent="";$("ex1").hidden=false;$("ex6").hidden=false;
  $("chips").innerHTML=[...nights.keys()].sort().map(k=>`<span class="chip${k==csel?" on":""}" tabindex="0" data-k="${k}">Nuit du ${k.slice(8)}/${k.slice(5,7)} · ${nights.get(k).length} pts <span data-x="${k}" role="button" aria-label="Retirer cette nuit">✕</span></span>`).join("");
  const {P,K,mode}=calib();lastAuto=K;const s=cstats(P,S.K);
  $("cmode").textContent="Mode : "+mode;$("chours").textContent=P.length+" / 60 h de nuit";$("cbar").style.width=Math.min(100,P.length/60*100)+"%";
- $("cr").textContent=isNaN(s.r)?"–":s.r.toFixed(2);$("cb2").textContent=isNaN(s.b)?"–":(s.b>=0?"+":"")+s.b.toFixed(2)+'"';$("ce").textContent=isNaN(s.e)?"–":Math.round(s.e)+" %";
- $("ck1").textContent=fmt(K[0]);$("ck2").textContent=fmt(K[1]);
+ $("cr").textContent=isNaN(s.r)?"–":s.r.toFixed(2);$("cb2").textContent=isNaN(s.b)?"–":(s.b>=0?"+":"")+s.b.toFixed(2)+'"';$("ce").textContent=isNaN(s.q)?"–":"± "+s.q.toFixed(2)+'"';
+ $("ck1").textContent=kHid()?"•••":fmt(K[0]);$("ck2").textContent=kHid()?"•••":fmt(K[1]);
  $("p2c").innerHTML=cn2Svg(S.K,true);drawCorr(S.K);$("kmA").classList.toggle("on",S.mode=="A");$("kmM").classList.toggle("on",S.mode=="M");
  if(!csel||!nights.has(csel)){$("cch").innerHTML="";return}
  const pts=nights.get(csel),C=comp(csel),H=chourly(pts);
@@ -730,23 +813,28 @@ function drawCal(){
 $("chips").onclick=e=>{const rl=realLieu();if(rl){const c=e.target.closest(".chip");if(c){cselR[rl.nom]=c.dataset.k;drawCal()}return}const x=e.target.dataset.x;if(x){nights.delete(x);csel=[...nights.keys()].sort().pop()||null;drawCal();return}const c=e.target.closest(".chip");if(c){csel=c.dataset.k;drawCal()}};
 $("ex1").onclick=example;$("ex6").onclick=()=>{for(let i=0;i<6;i++)example()};
 $("cuse").onclick=()=>{if(!lastAuto)return;S.KCAL=[...lastAuto];setK(lastAuto,"A")};
+const setRole=a=>{ADMIN=a;$("roleA").classList.toggle("on",a);$("roleU").classList.toggle("on",!a);listeners.forEach(f=>f(S.K));kstrip();drawCal();drawMap()};
+$("roleU").onclick=()=>setRole(false);$("roleA").onclick=()=>setRole(true);
+$("ctzU").onclick=()=>{CSVO.tz="TU";$("ctzU").classList.add("on");$("ctzL").classList.remove("on");$("coff").hidden=true};
+$("ctzL").onclick=()=>{CSVO.tz="L";$("ctzL").classList.add("on");$("ctzU").classList.remove("on");$("coff").hidden=false};
+$("coff").onchange=e=>{CSVO.off=e.target.value=="paris"?"paris":+e.target.value};$("cfmt").onchange=e=>{CSVO.fmt=e.target.value};
 const dz=$("dz"),fi=$("fi");dz.onclick=()=>fi.click();dz.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();fi.click()}};
 const readF=fs=>[...fs].forEach(f=>{const r=new FileReader();r.onload=()=>addCSV(r.result,f.name);r.readAsText(f)});
 fi.onchange=()=>readF(fi.files);dz.ondragover=e=>{e.preventDefault();dz.classList.add("on")};dz.ondragleave=()=>dz.classList.remove("on");dz.ondrop=e=>{e.preventDefault();dz.classList.remove("on");readF(e.dataTransfer.files)};
 
 /* ---------- LIEUX EXISTANTS (données réelles : lieux_data.js) ---------- */
-const MESF={brut:true,horaire:true};   /* mesures brutes et/ou medianes horaires (les deux = les deux) */
+const MESF={brut:true,horaire:true,courbe:true};   /* mesures brutes et/ou medianes horaires (les deux = les deux) */
 function rawIn(l,t0,n){const a=t0.getTime(),b=a+n*3600000,o=[];l.episodes.forEach(e=>e.brut.forEach(p=>{const v=pd(p[0]).getTime();if(p[1]!=null&&v>=a&&v<=b)o.push(p)}));return o}
 const LX=(window.LIEUX_DATA&&window.LIEUX_DATA.lieux)||[];let lxSel=0;const LXF={jour:false,nuit:true};   /* seeing de jour retire : nuit seulement */
-const CORRF={horaire:true,nuit:true,brut:false};   /* correlation : medianes horaires, medianes nocturnes (lunes), brutes */
-const HZ={p4:1,lxhist:1,chist:1},HSTR={chist:true},HCTX={};   /* etirement vertical auto (par defaut dans Calibrer) */   /* zoom horizontal de l'historique */
+const CORRF={horaire:true,nuit:true,brut:true};   /* correlation : medianes horaires, medianes nocturnes (lunes), brutes */
+const HZ={p4:1,lxhist:1,chist:1},HSTR={p4:true,lxhist:true,chist:true},HCTX={};   /* etirement vertical auto (par defaut dans tous les historiques) */   /* zoom horizontal de l'historique */
 const keepT=d=>isNd(d)?LXF.nuit:LXF.jour;
 const lxNone=()=>!LXF.jour&&!LXF.nuit;
 const pd=s=>new Date(s+":00Z");
 const isNd=d=>{const m=d.getUTCHours()*60+d.getUTCMinutes();return m>=17*60+30||m<6*60};
 const fr=d=>String(d.getUTCDate()).padStart(2,"0")+"/"+String(d.getUTCMonth()+1).padStart(2,"0");
 const fr2=v=>v==null?"–":(v>=0?"+":"")+v.toFixed(2);
-function lxCards(){$("lxcards").innerHTML=LX.map((l,i)=>`<button class="tile" data-i="${i}" style="text-align:left;display:block;border:1px solid ${i==lxSel?"var(--arome)":"var(--line)"};background:${i==lxSel?"#173257":"var(--panel2)"}"><div style="font-weight:500">${l.nom}</div><div class="small muted mono">${l.lat.toFixed(3)} N · ${l.lon.toFixed(3)} E</div><div class="small" style="margin-top:4px">${l.mesures_n.toLocaleString("fr-FR")} mesures</div><div class="small muted">${l.paires.length?`r nuit ${l.r_nuit??"–"} · ${l.n_nuit} h de nuit`:"pas de prévision comparée"}</div></button>`).join("")}
+function lxCards(){if(MON_LIEU>=0)lxSel=MON_LIEU;$("lxcards").innerHTML=LX.map((l,i)=>i!=MON_LIEU?"":`<button class="tile" data-i="${i}" style="text-align:left;display:block;border:1px solid ${i==lxSel?"var(--arome)":"var(--line)"};background:${i==lxSel?"#173257":"var(--panel2)"}"><div style="font-weight:500">${l.nom}</div><div class="small muted mono">${l.lat.toFixed(3)} N · ${l.lon.toFixed(3)} E</div><div class="small" style="margin-top:4px">${l.mesures_n.toLocaleString("fr-FR")} mesures</div><div class="small muted">${l.paires.length?`r nuit ${l.r_nuit??"–"} · ${l.n_nuit} h de nuit`:"pas de prévision comparée"}</div></button>`).join("")}
 /* étirement horizontal : avec un seul des deux (jour ou nuit), chaque épisode est découpé et seules les heures
    choisies sont gardées sur l'axe compressé, qui s'étire sur toute la largeur */
 function lxParts(eps){if(LXF.jour&&LXF.nuit)return eps;const out=[];const ms=s=>pd(s).getTime(),iso=t=>new Date(t).toISOString().slice(0,16);
@@ -763,9 +851,12 @@ function lxHist(l,SV="lxhist",NT="lxhistnote",OB=true){HCTX[SV]=[l,SV,NT,OB];con
  if(str){xa=sc.scrollLeft/sc.scrollWidth*W;xb=(sc.scrollLeft+sc.clientWidth)/sc.scrollWidth*W}
  {let o=L;E.forEach(e=>{const a=pd(e.a),Xp=d=>o+(d-a)/3600000*u,add=p=>{if(p[1]!=null&&keepT(pd(p[0]))){const x=Xp(pd(p[0]));if(x>=xa&&x<=xb)ys.push(p[1])}};e.prevu.forEach(add);e.mediane.forEach(add);o+=span(e)*u+gap})}
  if(!ys.length)ys=[2];
- const ymax=str?Math.max(1,Math.ceil(Math.max(...ys)*1.12*2)/2):Math.max(2,Math.ceil(Math.max(...ys)*1.15)),Y=v=>T+ph-Math.min(v,ymax)/ymax*ph,yst=ymax>8?2:ymax>3?1:0.5;
- let g=yaxis(Y,L,W-R,ymax,yst),off=L,lastDay="";
- if(str)for(let v=yst;v<=ymax;v+=yst)g+=`<text x="${xa+6}" y="${Y(v)-3}" font-size="10" fill="#e6ebf6" stroke="#0a0f1d" stroke-width="3" paint-order="stroke">${+v.toFixed(1)}"</text>`;
+ /* etire : min-max des donnees visibles sur toute la hauteur du panneau */
+ const lo=Math.min(...ys),hi=Math.max(...ys),pad=str?Math.max((hi-lo)*0.04,0.05):0,ymin=str?Math.max(0,lo-pad):0,
+  ymax=str?Math.max(hi+pad,ymin+0.2):Math.max(2,Math.ceil(hi*1.15)),rg=ymax-ymin,
+  Y=v=>T+ph-(Math.min(Math.max(v,ymin),ymax)-ymin)/rg*ph,yst=rg>8?2:rg>3?1:rg>1.5?0.5:rg>0.6?0.2:0.1;
+ let g=yaxis(Y,L,W-R,ymax,yst,ymin),off=L,lastDay="";
+ if(str)for(let v=Math.ceil(ymin/yst-1e-9)*yst;v<=ymax+1e-9;v=+(v+yst).toFixed(6))g+=`<text x="${xa+6}" y="${Y(v)-3}" font-size="10" fill="#e6ebf6" stroke="#0a0f1d" stroke-width="3" paint-order="stroke">${+v.toFixed(1)}"</text>`;
  if(sc&&!sc._hl){sc._hl=1;let tm;sc.addEventListener("scroll",()=>{if(!HSTR[SV]||(HZ[SV]||1)<=1||!HCTX[SV])return;clearTimeout(tm);tm=setTimeout(()=>lxHist(...HCTX[SV]),120)})}
  E.forEach((e,n)=>{const a=pd(e.a),o=off,X=d=>o+(d-a)/3600000*u,w=span(e)*u;
   for(let t=new Date(a);t<pd(e.b);t=new Date(t.getTime()+1800000))if(!isNd(t))g+=`<rect x="${X(t)}" y="${T}" width="${u/2+0.4}" height="${ph}" fill="${C_DAY}"/>`;
@@ -773,10 +864,12 @@ function lxHist(l,SV="lxhist",NT="lxhistnote",OB=true){HCTX[SV]=[l,SV,NT,OB];con
   if(w>36)g+=`<text x="${o+w-2}" y="${T+ph+26}" font-size="9" text-anchor="end" fill="${C_TXT}">${String(a.getUTCHours()).padStart(2,"0")}h–${String(pd(e.b).getUTCHours()).padStart(2,"0")}h</text>`;
   if(OB&&MESF.brut)e.brut.forEach(p=>p[1]!=null&&keepT(pd(p[0]))&&(g+=`<circle cx="${X(pd(p[0]))}" cy="${Y(p[1])}" r="1.4" fill="${C_OBS}" opacity=".7"/>`));
   let seg=[];const fl=()=>{if(seg.length>1)g+=pl(seg,`stroke="${C_AR}" stroke-width="1.8"`);seg=[]};e.prevu.forEach(p=>{const d=pd(p[0]);if(p[1]==null||!keepT(d)){fl();return}seg.push([X(d),Y(p[1])])});fl();
-  if(OB&&MESF.horaire)e.mediane.forEach(p=>p[1]!=null&&keepT(pd(p[0]))&&(g+=`<rect x="${X(pd(p[0]))-2.5}" y="${Y(p[1])-2.5}" width="5" height="5" fill="${C_OBSD}"/>`));
+  if(OB&&MESF.courbe)g+=medCurve(e.mediane.filter(p=>p[1]!=null&&keepT(pd(p[0]))).map(p=>[X(pd(p[0])),Y(p[1]),pd(p[0]).getTime()/3600000]));
+  const RMH=SV=="chist"?CALRM:null;if(RMH&&RMH.size)e.mediane.forEach(p=>{if(!RMH.has(p[0].slice(0,16))||!keepT(pd(p[0])))return;const x=X(pd(p[0]));g+=`<rect x="${x-u/2}" y="${T}" width="${u+0.4}" height="${ph}" fill="#ff6b6b" opacity=".14"/><rect x="${x-u/2}" y="${T+ph-6}" width="${u+0.4}" height="6" fill="#ff6b6b"/>`});
+  if(OB&&MESF.horaire)e.mediane.forEach(p=>p[1]!=null&&keepT(pd(p[0]))&&(g+=RMH&&RMH.has(p[0].slice(0,16))?`<rect x="${X(pd(p[0]))-3.5}" y="${Y(p[1])-3.5}" width="7" height="7" fill="#ff6b6b" stroke="#0a0f1d" stroke-width="0.8"/>`:`<rect x="${X(pd(p[0]))-2.5}" y="${Y(p[1])-2.5}" width="5" height="5" fill="${C_OBSD}"/>`));
   off+=w+gap;if(n<E.length-1)g+=`<text x="${off-gap/2}" y="${T+ph/2}" text-anchor="middle" font-size="11" fill="${C_TXT}">||</text>`});
  $(SV).innerHTML=g;$(NT).textContent=`${E.length} période(s) avec prévision et mesures, du ${fr(pd(E[0].a))} au ${fr(pd(E[E.length-1].b))} ; axe compressé (seules ces périodes sont montrées).`}
-function lxCorr(l,SV="lxcorr",CT="lxct",TILES=true,PF=null){
+function lxCorr(l,SV="lxcorr",CT="lxct",TILES=true,PF=null,EX=null){
  const prevAt=PF||(()=>{const m=new Map();l.episodes.forEach(e=>e.prevu.forEach(p=>p[1]!=null&&m.set(p[0],p[1])));return s=>m.get(s)})();
  const P=l.paires.filter(p=>p[3]&&p[1]!=null&&p[2]!=null);
  const PH=new Set(P.map(p=>p[0])),hs=d=>d.toISOString().slice(0,16),RAW=[];   /* comme historique_sites.mesures_brutes */
@@ -789,13 +882,19 @@ function lxCorr(l,SV="lxcorr",CT="lxct",TILES=true,PF=null){
  const W=340,H=320,L=34,T=8,B=32,R=10,pw=W-L-R,ph=H-T-B,m=Math.max(2,Math.ceil(Math.max(...(all.length?all:P.map(p=>[p[2],p[1]])).map(q=>Math.max(q[0],q[1])))*1.08)),X=v=>L+Math.min(v,m)/m*pw,Y=v=>T+ph-Math.min(v,m)/m*ph,st=m>8?2:1;
  let g="";for(let v=0;v<=m;v+=st)g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${C_LINE}" stroke-width="0.6"/><line y1="${T}" y2="${T+ph}" x1="${X(v)}" x2="${X(v)}" stroke="${C_LINE}" stroke-width="0.6"/><text x="${L-5}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="${C_TXT}">${v}"</text><text x="${X(v)}" y="${T+ph+14}" text-anchor="middle" font-size="11" fill="${C_TXT}">${v}"</text>`;
  g+=`<line x1="${X(0)}" y1="${Y(0)}" x2="${X(m)}" y2="${Y(m)}" stroke="${C_TXT}" stroke-dasharray="4 3"/>`;
- RAW.forEach(q=>g+=`<circle cx="${X(q[0])}" cy="${Y(q[1])}" r="1.6" fill="#2a78d6" opacity=".35"/>`);
- if(CORRF.horaire)P.forEach(p=>g+=`<circle cx="${X(p[2])}" cy="${Y(p[1])}" r="3.6" fill="#2a78d6" stroke="#fff" stroke-width="1.1"/>`);
- if(CORRF.nuit)MOON.forEach(([x,y])=>{const cx=X(x),cy=Y(y);g+=`<path d="M${cx+2},${cy-9} A9,9 0 1,0 ${cx+2},${cy+9} A12,12 0 0,1 ${cx+2},${cy-9} Z" fill="#f1efe8" stroke="#0a0f1d" stroke-width="1"/>`});
- g+=`<text x="${L+pw/2}" y="${H-2}" text-anchor="middle" font-size="11" fill="${C_TXT}">mesuré</text><text x="10" y="${T+ph/2}" text-anchor="middle" font-size="11" fill="${C_TXT}" transform="rotate(-90 10 ${T+ph/2})">prévu ${l.modele}</text>`;
+ RAW.forEach(q=>g+=`<circle cx="${X(q[1])}" cy="${Y(q[0])}" r="1.6" fill="#2a78d6" opacity=".35"/>`);
+ if(CORRF.horaire)P.forEach(p=>g+=`<circle cx="${X(p[1])}" cy="${Y(p[2])}" r="3.6" fill="#2a78d6" stroke="#fff" stroke-width="0.6"/>`);
+ if(CORRF.nuit)MOON.forEach(([y,x])=>{const cx=X(x),cy=Y(y);g+=`<path d="M${cx+2},${cy-9} A9,9 0 1,0 ${cx+2},${cy+9} A12,12 0 0,1 ${cx+2},${cy-9} Z" fill="#f1efe8" stroke="#0a0f1d" stroke-width="1"/>`});
+ if(EX&&EX.rm.length){const rmin=Math.min(...EX.rm.map(p=>p[2]-p[1])),kmax=Math.max(...P.map(p=>p[2]-p[1]),-1e9),thr=kmax>-1e9&&kmax<rmin?(rmin+kmax)/2:rmin;
+  EX.rm.forEach(p=>g+=`<circle cx="${X(p[1])}" cy="${Y(p[2])}" r="3.6" fill="#ff6b6b" stroke="#0a0f1d" stroke-width="0.8" opacity=".9"/>`);
+  const x0=Math.max(0,-thr),x1=Math.min(m,m-thr);if(x1>x0)g+=`<line x1="${X(x0)}" y1="${Y(x0+thr)}" x2="${X(x1)}" y2="${Y(x1+thr)}" stroke="#ff6b6b" stroke-width="1.4" stroke-dasharray="6 4"/><text x="${X(x0)+6}" y="${Y(x0+thr)-6}" font-size="11" font-weight="600" fill="#ff6b6b" stroke="#0a0f1d" stroke-width="3" paint-order="stroke">− ${EX.pct} % des heures (au-dessus)</text>`}
+ g+=`<text x="${L+pw/2}" y="${H-2}" text-anchor="middle" font-size="11" fill="${C_TXT}">prévu ${l.modele}</text><text x="10" y="${T+ph/2}" text-anchor="middle" font-size="11" fill="${C_TXT}" transform="rotate(-90 10 ${T+ph/2})">mesuré</text>`;
+ const rr=corr(P.map(p=>p[2]),P.map(p=>p[1])),bb=P.length?P.reduce((s,p)=>s+p[1]-p[2],0)/P.length:NaN,rm=MOON.length>2?corr(MOON.map(q=>q[0]),MOON.map(q=>q[1])):NaN,
+  qh=P.length?Math.sqrt(P.reduce((s,p)=>s+(p[1]-p[2])**2,0)/P.length):NaN,rb=RAW.length?corr(RAW.map(q=>q[0]),RAW.map(q=>q[1])):NaN,f2=v=>isNaN(v)?"–":v.toFixed(2);
+ const LG=[["R nuit",f2(rm)],["R horaire",f2(rr)],...(RAW.length?[["R brut",f2(rb)]]:[]),["précision horaire",isNaN(qh)?"–":"± "+qh.toFixed(2)+'"']];
+ g+=`<rect x="${L+4}" y="${T+4}" width="150" height="${LG.length*15+6}" rx="5" fill="#0a0f1d" opacity=".82"/>`+LG.map(([a,v],i)=>`<text x="${L+10}" y="${T+18+i*15}" font-size="10.5" fill="${C_TXT}">${a}</text><text x="${L+148}" y="${T+18+i*15}" text-anchor="end" font-size="10.5" font-weight="600" fill="#e8ecf6">${v}</text>`).join("");
  $(SV).innerHTML=g;
- const rr=corr(P.map(p=>p[2]),P.map(p=>p[1])),bb=P.length?P.reduce((s,p)=>s+p[1]-p[2],0)/P.length:NaN,rm=MOON.length>2?corr(MOON.map(q=>q[0]),MOON.map(q=>q[1])):NaN;
- $(CT).textContent=`nuit : r = ${isNaN(rr)?"–":rr.toFixed(2)} · n = ${P.length} h · biais ${fr2(bb)}" · ${MOON.length} nuits (r des médianes nocturnes ${isNaN(rm)?"–":rm.toFixed(2)})${RAW.length?` · R brut ${(()=>{const v=corr(RAW.map(q=>q[0]),RAW.map(q=>q[1]));return isNaN(v)?"–":v.toFixed(2)})()} (${RAW.length} mesures)`:""}`;
+ $(CT).textContent=`nuit : r = ${isNaN(rr)?"–":rr.toFixed(2)} · n = ${P.length} h · biais ${fr2(bb)}" · précision horaire ± ${f2(qh)}" · ${MOON.length} nuits (r des médianes nocturnes ${isNaN(rm)?"–":rm.toFixed(2)})${RAW.length?` · R brut ${(()=>{const v=corr(RAW.map(q=>q[0]),RAW.map(q=>q[1]));return isNaN(v)?"–":v.toFixed(2)})()} (${RAW.length} mesures)`:""}`;
  if(!TILES)return;$("lxrn").textContent=isNaN(rr)?"–":rr.toFixed(2);$("lxnn").textContent=`${P.length} h de nuit`;$("lxrj").textContent=isNaN(bb)?"–":fr2(bb)+'"';$("lxnj").textContent=`${MOON.length} nuits`}
 function lxCn2(l,SV="lxcn2",TT="lxcn2t",OB=true,KR=null){const sv=$(SV),w=l.cn2w;ensureCn2UI(SV);
  if(!w){sv.innerHTML=`<text x="450" y="190" text-anchor="middle" font-size="13" fill="${C_TXT}">Pas de panneau Cn² enregistré pour ce lieu.</text>`;$(SV+"pf").innerHTML="";$(TT).textContent="";return}
@@ -804,7 +903,7 @@ function lxCn2(l,SV="lxcn2",TT="lxcn2t",OB=true,KR=null){const sv=$(SV),w=l.cn2w
  const [za,zb]=CN2ALT[CN2V.alt],Z=w.z,lev=Z.map((z,k)=>[k?(Z[k-1]+z)/2:0,k<Z.length-1?(z+Z[k+1])/2:z+125]);
  const e=x=>x==null?0:Math.pow(10,x),val=(h,k,KK)=>{const v=KK[0]*e(h.z[0][k])+KK[2]*e(h.z[1][k])+KK[1]*e(h.z[2][k]);return v>0?Math.log10(v):null};
  if(!w._lohi){const a=[];w.h.forEach(h=>{if(h)Z.forEach((_,k)=>{const v=val(h,k,l.K);if(v!=null&&Z[k]<=4000)a.push(v)})});a.sort((x,y)=>x-y);w._lohi=[a[Math.floor(a.length*.05)],a[Math.floor(a.length*.995)]]}
- const [lo,hi]=w._lohi,ZC=CZ[SV]||1,W=900*ZC,H=380,L=56,R=84,T=30,B=46,pw=W-L-R,ph=H-T-B,X=i=>L+(i-i0)/n*pw,Yz=z=>T+ph-(Math.min(Math.max(z,za),zb)-za)/(zb-za)*ph;
+ const [lo,hi]=w._lohi,ZC=CZ[SV]||1,W=900*ZC,H=400,L=68,R=32,T=46,B=56,pw=W-L-R,ph=H-T-B,X=i=>L+(i-i0)/n*pw,Yz=z=>T+ph-(Math.min(Math.max(z,za),zb)-za)/(zb-za)*ph;
  let g=`<defs><pattern id="hwb${SV}" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="#fff" stroke-width="1.5"/><line x1="3.5" y1="0" x2="3.5" y2="7" stroke="#000" stroke-width="1.5"/></pattern></defs>`;
  g+=`<rect x="${L}" y="${T}" width="${pw}" height="${ph}" fill="#262c3b"/>`;
  {const NR=Math.max(120,Math.round(ph*1.5)),cv=document.createElement("canvas");cv.width=n;cv.height=NR;const cx=cv.getContext("2d"),im=cx.createImageData(n,NR),D=im.data;
@@ -818,36 +917,40 @@ function lxCn2(l,SV="lxcn2",TT="lxcn2t",OB=true,KR=null){const sv=$(SV),w=l.cn2w
  const hcs=[];let sg=[];for(let i=i0;i<i1;i++){const h=w.h[i];if(h&&h.hc!=null)sg.push([X(i+0.5),Yz(h.hc)]);else{if(sg.length>1)hcs.push(sg);sg=[]}}if(sg.length>1)hcs.push(sg);
  hcs.forEach(s=>g+=pl(s,'stroke="#000" stroke-width="3.6"')+pl(s,'stroke="#ff3cf0" stroke-width="1.8"'));
  {const lab=hcs.flat().find(p=>p[1]>T+14&&p[1]<T+ph-6&&p[0]>L+40&&p[0]<L+pw-140);if(lab)g+=`<text x="${lab[0]+4}" y="${lab[1]-6}" font-size="12" font-weight="500" fill="#ff3cf0" stroke="#000" stroke-width="3" paint-order="stroke">boundary layer</text>`}
- const step=zb-za>8000?2000:zb-za>2000?500:100;for(let z=Math.ceil(za/step)*step;z<=zb;z+=step)g+=`<line x1="${L-4}" x2="${L}" y1="${Yz(z)}" y2="${Yz(z)}" stroke="${C_TXT}"/><text x="${L-7}" y="${Yz(z)+4}" text-anchor="end" font-size="10" fill="${C_TXT}">${z>=1000?(z/1000)+" km":z+" m"}</text>`;
- g+=`<text x="14" y="${T+ph/2}" text-anchor="middle" font-size="11" fill="${C_TXT}" transform="rotate(-90 14 ${T+ph/2})">altitude au-dessus du sol</text>`;
- const tstep=n>96?3:1,lstep=n>96?12:2;for(let i=i0;i<=i1;i++){const d=tt(i),hh=d.getUTCHours();if(hh%tstep)continue;g+=`<line x1="${X(i)}" x2="${X(i)}" y1="${T+ph}" y2="${T+ph+(hh%lstep?3:5)}" stroke="${C_TXT}"/>`;if(hh%lstep==0&&i<i1)g+=`<text x="${X(i)}" y="${T+ph+17}" text-anchor="middle" font-size="10" fill="${hh==0?"#e6ebf6":C_TXT}" ${hh==0?'font-weight="500"':''}>${hh==0?fr(d):hh+"h"}</text>`}
+ const step=zb-za>8000?2000:zb-za>2000?500:100;for(let z=Math.ceil(za/step)*step;z<=zb;z+=step)g+=`<line x1="${L-4}" x2="${L}" y1="${Yz(z)}" y2="${Yz(z)}" stroke="${C_TXT}"/><text x="${L-7}" y="${Yz(z)+5}" text-anchor="end" font-size="13" fill="${C_TXT}">${z>=1000?z/1000:z}<tspan font-weight="700"> ${z>=1000?"km":"m"}</tspan></text>`;
+ g+=`<text x="13" y="${T+ph/2}" text-anchor="middle" font-size="13" fill="${C_TXT}" transform="rotate(-90 13 ${T+ph/2})" font-weight="700">Altitude au-dessus du sol</text>`;
+ const tstep=n>96?3:1,lstep=n>96?12:2;for(let i=i0;i<=i1;i++){const d=tt(i),hh=d.getUTCHours();if(hh%tstep)continue;g+=`<line x1="${X(i)}" x2="${X(i)}" y1="${T+ph}" y2="${T+ph+(hh%lstep?3:5)}" stroke="${C_TXT}"/>`;if(hh%lstep==0&&i<i1)g+=`<text x="${X(i)}" y="${T+ph+20}" text-anchor="middle" font-size="13" fill="${hh==0?"#e6ebf6":C_TXT}" ${hh==0?'font-weight="500"':''}>${hh==0?fr(d):hh+"h"}</text>`;if((hh==0||hh==12)&&i<i1)g+=`<text x="${X(i)}" y="${T+ph+37}" text-anchor="middle" font-size="12" font-weight="600" fill="${hh==12?"#f2c14e":"#9cc7ff"}">${hh==12?"Jour":"Nuit"}</text>`}
  const SEE=[];for(let i=i0;i<i1;i++){const h=w.h[i];if(h&&isNd(tt(i))){const s=seeJ(K[0]*h.J[0]+K[2]*h.J[1]+K[1]*h.J[2]);if(s>0)SEE.push([i,s])}}
  const inW=s=>{const v=pd(s).getTime();return v>=T0+i0*3600000&&v<=T0+i1*3600000&&isNd(pd(s))};
  const mv=OB&&MESF.horaire?w.mesures.filter(p=>p[1]!=null&&inW(p[0])):[],raw=OB&&MESF.brut?w.brut.filter(p=>p[1]!=null&&inW(p[0])):[];
  const smax=Math.max(2,Math.max(...SEE.map(p=>p[1]),...mv.map(p=>p[1]),0)*1.2),YS=v=>T+ph-Math.min(v,smax)/smax*ph,xs=s=>X((pd(s).getTime()-T0)/3600000+0.5);
  raw.forEach(p=>g+=`<circle cx="${xs(p[0])}" cy="${YS(p[1])}" r="1.4" fill="#fff" stroke="#000" stroke-width="0.3" opacity=".8"/>`);
  let seg=[],prev=null;const fl=()=>{if(seg.length>1)g+=pl(seg,'stroke="#000" stroke-width="5"')+pl(seg,'stroke="#fff" stroke-width="3"')+pl(seg,`stroke="${C_AR}" stroke-width="3" stroke-dasharray="7 7"`);seg=[]};SEE.forEach(([i,s])=>{if(prev!=null&&i!=prev+1)fl();seg.push([X(i+0.5),YS(s)]);prev=i});fl();
- {const mm=mv.map(p=>[(pd(p[0]).getTime()-T0)/3600000,p[1]]);let s=[],pr=null;const fm=()=>{if(s.length>1){const q=s.map(([i,v])=>[X(i+0.5),YS(v)]);g+=pl(q,'stroke="#000" stroke-width="3"')+pl(q,'stroke="#fff" stroke-width="1.4"')}s=[]};
+ {const RMS=SV=="p2c"?CALRM:null,mm=mv.map(p=>[(pd(p[0]).getTime()-T0)/3600000,p[1],p[0].slice(0,16)]);let s=[],pr=null;const fm=()=>{if(s.length>1){const q=s.map(([i,v])=>[X(i+0.5),YS(v)]);g+=pl(q,'stroke="#000" stroke-width="3"')+pl(q,'stroke="#fff" stroke-width="1.4"')}s=[]};
   mm.forEach(p=>{if(pr!=null&&p[0]-pr>1.01)fm();s.push(p);pr=p[0]});fm();
-  mm.forEach(([i,v])=>g+=`<rect x="${X(i+0.5)-2.5}" y="${YS(v)-2.5}" width="5" height="5" fill="#fff" stroke="#000" stroke-width="0.8"/>`)}
- const sst=smax>8?2:smax>3?1:0.5;for(let v=0;v<=smax;v+=sst)g+=`<text x="${L+pw+5}" y="${YS(v)+4}" font-size="10" fill="${C_TXT}">${+v.toFixed(1)}"</text>`;
- const xl=X((tLast-T0)/3600000);if(xl>=L&&xl<=L+pw)g+=`<line x1="${xl}" x2="${xl}" y1="${T-6}" y2="${T+ph}" stroke="#f2c14e" stroke-width="1.6" stroke-dasharray="5 3"/><text x="${xl+4}" y="${T-10}" font-size="11" fill="#f2c14e">dernier run ${fr(new Date(tLast))} ${String(new Date(tLast).getUTCHours()).padStart(2,"0")}Z</text>`;
- const cx=L+pw+34;for(let k=0;k<60;k++)g+=`<rect x="${cx}" y="${T+ph-(k+1)*ph/60}" width="10" height="${ph/60+0.6}" fill="rgb(${turbo((k+0.5)/60)})"/>`;
- for(let q=Math.ceil(lo);q<=Math.floor(hi);q++){const y=T+ph-(q-lo)/(hi-lo)*ph;g+=`<text x="${cx+13}" y="${y+4}" font-size="9" fill="${C_TXT}">1e${q}</text>`}
- g+=`<text x="${cx+5}" y="${T-8}" text-anchor="middle" font-size="9" fill="${C_TXT}">Cn²</text><line id="${SV}cur" x1="-10" x2="-10" y1="${T}" y2="${T+ph}" stroke="#fff" stroke-width="1"/>`;
+  mm.forEach(([i,v,k])=>{const rd=RMS&&RMS.has(k);g+=`<rect x="${X(i+0.5)-(rd?3.5:2.5)}" y="${YS(v)-(rd?3.5:2.5)}" width="${rd?7:5}" height="${rd?7:5}" fill="${rd?"#ff6b6b":"#fff"}" stroke="#000" stroke-width="0.8"/>`});
+  if(RMS&&RMS.size)RMS.forEach(k=>{const i=(pd(k).getTime()-T0)/3600000;if(i<i0||i>=i1)return;g+=`<rect x="${X(i)}" y="${T}" width="${pw/n+0.4}" height="9" fill="#ff6b6b"/><rect x="${X(i)}" y="${T}" width="${pw/n+0.4}" height="${ph}" fill="#ff6b6b" opacity=".16"/>`})}
+ const sst=smax>8?2:smax>3?1:0.5;for(let v=0;v<=smax;v+=sst)g+=`<text x="${L+pw+3}" y="${YS(v)+5}" font-size="13" fill="${C_TXT}">${+v.toFixed(1)}<tspan font-weight="700">″</tspan></text>`;
+ g+=`<text x="${W-1}" y="${T-7}" text-anchor="end" font-size="13" font-weight="700" fill="${C_TXT}">Seeing (″)</text>`;   /* titre au-dessus de l'axe droit : marge droite minimale */
+ const xl=X((tLast-T0)/3600000);if(xl>=L&&xl<=L+pw)g+=`<line x1="${xl}" x2="${xl}" y1="${T}" y2="${T+ph}" stroke="#f2c14e" stroke-width="1.6" stroke-dasharray="5 3"/><text x="${xl+5}" y="${T+15}" font-size="12" fill="#f2c14e" stroke="#000" stroke-width="3" paint-order="stroke">dernier run ${fr(new Date(tLast))} ${String(new Date(tLast).getUTCHours()).padStart(2,"0")}Z</text>`;
+ const bw=Math.min(300,pw*0.45),bx=L+pw-bw-80,by=4,bh=9;for(let k=0;k<60;k++)g+=`<rect x="${bx+k*bw/60}" y="${by}" width="${bw/60+0.6}" height="${bh}" fill="rgb(${turbo((k+0.5)/60)})"/>`;
+ for(let q=Math.ceil(lo);q<=Math.floor(hi);q++){const x=bx+(q-lo)/(hi-lo)*bw;g+=`<line x1="${x}" x2="${x}" y1="${by+bh}" y2="${by+bh+3}" stroke="${C_TXT}"/><text x="${x}" y="${by+bh+14}" text-anchor="middle" font-size="11" fill="${C_TXT}">1e${q}</text>`}
+ g+=`<text x="${bx-8}" y="${by+bh}" text-anchor="end" font-size="12" fill="${C_TXT}">Cn² (m⁻²ᐟ³)</text><line id="${SV}cur" x1="-10" x2="-10" y1="${T}" y2="${T+ph}" stroke="#fff" stroke-width="1"/>`;
  sv.setAttribute("viewBox",`0 0 ${W} ${H}`);{const scw=($(SV+"sc")||{}).clientWidth||900;sv.style.width=ZC>1?`${scw*ZC}px`:"100%";sv.style.minWidth=ZC>1?"0":"520px";sv.style.maxWidth=ZC>1?"none":"100%"}sv.innerHTML=g;if($(SV+"zl"))$(SV+"zl").textContent=ZC>1?`× ${ZC} · glisse le panneau ou fais défiler`:"";
  CN2CTX[SV]={l,w,K,i0,i1,n,L,pw,T,ph,za,zb,lev,lo,hi,val,tt,X,W};
  const d0=tt(i0),d1=tt(i1-1),nan=w.h.slice(i0,i1).filter(h=>!h).length;
- $(TT).textContent=`${CN2V.vue=="dernier"?"dernières prévisions":"jusqu'à 7 jours de runs principaux collés"} · du ${fr(d0)} ${String(d0.getUTCHours()).padStart(2,"0")}h au ${fr(d1)} ${String(d1.getUTCHours()).padStart(2,"0")}h TU · dernier run ${w.runs[last]} · K_TKE = ${fmt(K[0])}  K_CIS = ${fmt(K[1])}  K_conv = ${fmt(K[2])} · seeing de nuit seulement · ${nan} h sans Cn² (H+0 ou trou)`;
+ $(TT).textContent=`${CN2V.vue=="dernier"?"dernières prévisions":"jusqu'à 7 jours de runs principaux collés"} · du ${fr(d0)} ${String(d0.getUTCHours()).padStart(2,"0")}h au ${fr(d1)} ${String(d1.getUTCHours()).padStart(2,"0")}h TU · dernier run ${w.runs[last]} · ${kTxt(K,kHidL(l),fmt)} · seeing de nuit seulement · ${nan} h sans Cn² (H+0 ou trou)`;
  cn2Profile(SV,Math.min(i1-1,Math.max(i0,Math.round((tLast-T0)/3600000)+6)))}
 function lxShow(){if(!LX.length){$("lxcards").innerHTML='<p class="muted">Données des lieux absentes (lieux_data.js).</p>';return}
- const l=LX[lxSel];lxCards();$("lxtitle").textContent="Historique · "+l.nom;$("lxmod").textContent=l.modele;
- $("lxsub").textContent=`K_TKE = ${l.K[0]}  K_CIS = ${l.K[1]}  K_conv = ${l.K[2]} · mesures du ${l.mesures_de?fr(pd(l.mesures_de)):"–"} au ${l.mesures_a?fr(pd(l.mesures_a)):"–"}`;
+ if(MON_LIEU>=0)lxSel=MON_LIEU;const l=LX[lxSel];lxCards();$("lxtitle").textContent="Historique · "+l.nom;$("lxmod").textContent=l.modele;
+ $("lxsub").textContent=`${kTxt(l.K,kHidL(l))} · mesures du ${l.mesures_de?fr(pd(l.mesures_de)):"–"} au ${l.mesures_a?fr(pd(l.mesures_a)):"–"}`;
  lxHist(l);lxCorr(l);lxCn2(l)}
-document.querySelectorAll('.chip[data-m]').forEach(el=>{el.onclick=()=>{const k=el.dataset.m;MESF[k]=!MESF[k];document.querySelectorAll(`.chip[data-m="${k}"]`).forEach(c=>{c.classList.toggle("on",MESF[k]);c.setAttribute("aria-checked",MESF[k])});const v=(views.find(s=>!s.hidden)||{}).id;if(v=="v-prevision")drawPrev();if(v=="v-lieux")lxShow()};el.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();el.click()}}});
-document.querySelectorAll(".chip[data-c]").forEach(el=>{el.onclick=()=>{const k=el.dataset.c;CORRF[k]=!CORRF[k];document.querySelectorAll(`.chip[data-c="${k}"]`).forEach(c=>{c.classList.toggle("on",CORRF[k]);c.setAttribute("aria-checked",CORRF[k])});const v=(views.find(s=>!s.hidden)||{}).id;if(v=="v-prevision")drawPrev();if(v=="v-lieux")lxShow();if(v=="v-calibrer")drawCal()};el.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();el.click()}}});
+document.querySelectorAll('.chip[data-m]').forEach(el=>{el.onclick=()=>{const k=el.dataset.m;MESF[k]=!MESF[k];syncChips();document.querySelectorAll(`.chip[data-m="${k}"]`).forEach(c=>{c.classList.toggle("on",MESF[k]);c.setAttribute("aria-checked",MESF[k])});const v=(views.find(s=>!s.hidden)||{}).id;if(v=="v-prevision")drawPrev();if(v=="v-lieux")lxShow()};el.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();el.click()}}});
+function syncChips(){document.querySelectorAll(".chip[data-m]").forEach(c=>{const v=MESF[c.dataset.m];c.classList.toggle("on",v);c.setAttribute("aria-checked",v)});document.querySelectorAll(".chip[data-c]").forEach(c=>{const v=CORRF[c.dataset.c];c.classList.toggle("on",v);c.setAttribute("aria-checked",v)});document.querySelectorAll(".chip[data-p]").forEach(c=>{const k=c.dataset.p,v=k=="nuit"?CORRF.nuit:k=="courbe"?MESF.courbe:MESF[k]&&CORRF[k];c.classList.toggle("on",v);c.setAttribute("aria-checked",v)})}
+document.querySelectorAll(".chip[data-p]").forEach(el=>{el.onclick=()=>{const k=el.dataset.p,v=!el.classList.contains("on");if(k!="courbe")CORRF[k]=v;if(k!="nuit")MESF[k]=v;syncChips();redrawView()};el.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();el.click()}}});
+document.querySelectorAll(".chip[data-c]").forEach(el=>{el.onclick=()=>{const k=el.dataset.c;CORRF[k]=!CORRF[k];syncChips();document.querySelectorAll(`.chip[data-c="${k}"]`).forEach(c=>{c.classList.toggle("on",CORRF[k]);c.setAttribute("aria-checked",CORRF[k])});const v=(views.find(s=>!s.hidden)||{}).id;if(v=="v-prevision")drawPrev();if(v=="v-lieux")lxShow();if(v=="v-calibrer")drawCal()};el.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();el.click()}}});
 document.querySelectorAll("button[data-z]").forEach(b=>b.onclick=()=>{const k=b.dataset.z,f=+b.dataset.f;HZ[k]=f?Math.min(16,Math.max(1,HZ[k]*f)):1;const v=(views.find(s=>!s.hidden)||{}).id;if(v=="v-prevision")drawPrev();else if(v=="v-calibrer")drawCal();else lxShow()});
-$("chstr").onclick=()=>{HSTR.chist=!HSTR.chist;$("chstr").classList.toggle("on",HSTR.chist);$("chstr").setAttribute("aria-checked",HSTR.chist);if(HCTX.chist)lxHist(...HCTX.chist)};
+document.querySelectorAll(".chip[data-h]").forEach(el=>{const k=el.dataset.h;el.onclick=()=>{HSTR[k]=!HSTR[k];el.classList.toggle("on",HSTR[k]);el.setAttribute("aria-checked",HSTR[k]);if(HCTX[k])lxHist(...HCTX[k])};el.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();el.click()}}});
 $("lxcards").onclick=e=>{const b=e.target.closest("[data-i]");if(b){lxSel=+b.dataset.i;lxShow()}};
 
 function prevReal(l,OB){const w=l.cn2w,sv=$("p1");sv.setAttribute("viewBox","0 0 900 220");
@@ -867,8 +970,9 @@ function prevReal(l,OB){const w=l.cn2w,sv=$("p1");sv.setAttribute("viewBox","0 0
  let seg=[],prev=-2;const fl=()=>{if(seg.length>1)g+=pl(seg,`stroke="${C_AR}" stroke-width="2.2"`);seg=[]};sv2.forEach(([i,v])=>{if(i!=prev+1)fl();seg.push([X(i+0.5),Y(v)]);prev=i});fl();
  const xs=s=>X((pd(s).getTime()-t0.getTime())/3600000+0.5);
  raw.forEach(p=>g+=`<circle cx="${xs(p[0])}" cy="${Y(p[1])}" r="1.7" fill="${C_OBS}"/>`);
+ if(OB&&MESF.courbe)g+=medCurve(w.mesures.filter(p=>p[1]!=null&&inR(p[0])).map(p=>[xs(p[0]),Y(p[1]),pd(p[0]).getTime()/3600000]));
  mv.forEach(p=>g+=`<rect x="${xs(p[0])-5.5}" y="${Y(p[1])-5.5}" width="11" height="11" fill="${C_OBSD}" stroke="#0a0f1d" stroke-width="1"/>`);
- g+=`<line x1="${X(0)}" x2="${X(0)}" y1="${T}" y2="${T+ph}" stroke="#f2c14e" stroke-width="1.6" stroke-dasharray="5 3"/><text x="${X(0)+4}" y="${T+ph-6}" font-size="11" fill="#f2c14e">run ${w.runs[last]} · K_TKE = ${K[0]}  K_CIS = ${K[1]}  K_conv = ${K[2]}</text>`;
+ g+=`<line x1="${X(0)}" x2="${X(0)}" y1="${T}" y2="${T+ph}" stroke="#f2c14e" stroke-width="1.6" stroke-dasharray="5 3"/><text x="${X(0)+4}" y="${T+ph-6}" font-size="11" fill="#f2c14e">run ${w.runs[last]} · ${kTxt(K,kHidL(l))}</text>`;
  sv.innerHTML=g}
 const MON_LIEU=LX.findIndex(l=>l.nom=="OHP");   /* lieu de l'utilisateur : OHP (donnees reelles) */
 function lieuxSelect(){const s=$("lieu"),v=s.value;s.innerHTML='<optgroup label="Lieux publics">'+LX.map((l,i)=>`<option value="pub:${i}">${l.nom}</option>`).join("")+'</optgroup><optgroup label="Mes lieux">'+(MON_LIEU>=0?`<option value="mine:${MON_LIEU}">${LX[MON_LIEU].nom} (mon lieu)</option>`:"")+'<option value="0">Jardin</option><option value="1">Col de la Croix</option><option value="2">Star party</option></optgroup>';s.value=MON_LIEU>=0?`mine:${MON_LIEU}`:(v||"0")}
@@ -879,16 +983,16 @@ const CN2V={vue:"semaine",alt:"4"},CN2CTX={},CZ={};
 const CN2ALT={bl:[0,1000],"4":[0,4000],jet:[8000,16000],tout:[0,16000]};
 function ensureCn2UI(SV){if($(SV+"ui"))return;const sv=$(SV),ui=document.createElement("div");ui.id=SV+"ui";ui.style.cssText="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 6px";
  ui.innerHTML=`<div class="seg" role="group" aria-label="Période du panneau Cn2"><button data-cv="semaine">Semaine (7 j max)</button><button data-cv="dernier">Dernières prévisions</button></div><label class="small muted" for="${SV}alt">Altitude</label><select id="${SV}alt" data-ca="1"><option value="bl">0–1 km (couche limite)</option><option value="4">0–4 km</option><option value="jet">jet stream (8–16 km)</option><option value="tout">jusqu'en haut (16 km)</option></select><span class="small muted" style="margin-left:6px">Zoom :</span><button data-cz="0.5">−</button><button data-cz="2">+</button><button data-cz="0">tout voir</button><span class="small muted" id="${SV}zl"></span><span class="small muted">survole le panneau : profil à l'heure choisie</span>`;
- sv.parentNode.insertBefore(ui,sv);const wrap=document.createElement("div");wrap.style.cssText="display:flex;gap:10px;align-items:stretch;flex-wrap:wrap";sv.parentNode.insertBefore(wrap,sv);const sc=document.createElement("div");sc.id=SV+"sc";sc.style.cssText="flex:1 1 520px;min-width:0;overflow-x:auto;cursor:grab";wrap.appendChild(sc);sc.appendChild(sv);sv.style.display="block";
+ sv.parentNode.insertBefore(ui,sv);const wrap=document.createElement("div");wrap.style.cssText="display:flex;gap:2px;align-items:flex-start;flex-wrap:wrap";sv.parentNode.insertBefore(wrap,sv);const sc=document.createElement("div");sc.id=SV+"sc";sc.style.cssText="flex:1 1 520px;min-width:0;overflow-x:auto;cursor:grab";wrap.appendChild(sc);sc.appendChild(sv);sv.style.display="block";
  let dr=null;sc.addEventListener("mousedown",e=>{if((CZ[SV]||1)>1){dr={x:e.clientX,s:sc.scrollLeft};sc.style.cursor="grabbing";e.preventDefault()}});window.addEventListener("mousemove",e=>{if(dr)sc.scrollLeft=dr.s-(e.clientX-dr.x)});window.addEventListener("mouseup",()=>{if(dr){dr=null;sc.style.cursor="grab"}});
  ui.onclick=e=>{const z=e.target.closest("[data-cz]");if(z){const f=+z.dataset.cz,c=CN2CTX[SV],frac=c?(sc.scrollLeft+sc.clientWidth/2)/sc.scrollWidth:0.5;CZ[SV]=f?Math.min(16,Math.max(1,(CZ[SV]||1)*f)):1;cn2Redraw();sc.scrollLeft=frac*sc.scrollWidth-sc.clientWidth/2;return}const b=e.target.closest("[data-cv]");if(!b)return;CN2V.vue=b.dataset.cv;cn2Redraw()};ui.querySelector("select").onchange=e=>{CN2V.alt=e.target.value;cn2Redraw()};
  if(SV!="p2"){ui.lastElementChild.remove();return}   /* pas de profil hors Prevision */
- const pf=document.createElementNS("http://www.w3.org/2000/svg","svg");pf.id=SV+"pf";pf.setAttribute("viewBox","0 0 150 380");pf.setAttribute("role","img");pf.setAttribute("aria-label","Profil de Cn2 à l'heure survolée");pf.style.cssText="flex:0 0 130px;max-width:100%";wrap.appendChild(pf);
+ const pf=document.createElementNS("http://www.w3.org/2000/svg","svg");pf.id=SV+"pf";pf.setAttribute("viewBox","0 0 150 380");pf.setAttribute("role","img");pf.setAttribute("aria-label","Profil de Cn2 à l'heure survolée");pf.style.cssText="flex:0 0 130px;max-width:100%;display:block";wrap.appendChild(pf);
  sv.addEventListener("mousemove",e=>{const c=CN2CTX[SV];if(!c)return;const r=sv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*c.W;const i=Math.floor(c.i0+(x-c.L)/c.pw*c.n);if(i>=c.i0&&i<c.i1)cn2Profile(SV,i)});}
 function cn2Redraw(){document.querySelectorAll("[data-cv]").forEach(b=>b.classList.toggle("on",b.dataset.cv==CN2V.vue));document.querySelectorAll("select[data-ca]").forEach(s=>s.value=CN2V.alt);
  const v=(views.find(s=>!s.hidden)||{}).id;if(v=="v-prevision")drawPrev();if(v=="v-lieux")lxShow();if(v=="v-calibrer")drawCal()}
 function cn2Profile(SV,i){const c=CN2CTX[SV],pf=$(SV+"pf");if(!c||!pf)return;const h=c.w.h[i],cur=$(SV+"cur");if(cur){const x=c.X(i+0.5);cur.setAttribute("x1",x);cur.setAttribute("x2",x)}
- const W=150,H=380,L=34,R=6,T=30,B=46,pw=W-L-R,ph=H-T-B,d=c.tt(i),Yz=z=>T+ph-(Math.min(Math.max(z,c.za),c.zb)-c.za)/(c.zb-c.za)*ph,x0=c.lo-1,x1=c.hi+0.5,X=v=>L+(Math.min(Math.max(v,x0),x1)-x0)/(x1-x0)*pw;
+ const hp=($(SV).getBoundingClientRect().height)||400,H=400,W=Math.max(90,Math.round(130*H/hp)),L=6,R=6,T=46,B=56,pw=W-L-R,ph=H-T-B;pf.setAttribute("viewBox",`0 0 ${W} ${H}`);pf.style.height=hp+"px";pf.style.width="130px";const d=c.tt(i),Yz=z=>T+ph-(Math.min(Math.max(z,c.za),c.zb)-c.za)/(c.zb-c.za)*ph,x0=c.lo-1,x1=c.hi+0.5,X=v=>L+(Math.min(Math.max(v,x0),x1)-x0)/(x1-x0)*pw;
  let g=`<rect x="${L}" y="${T}" width="${pw}" height="${ph}" fill="#262c3b"/>`;
  g+=`<text x="${L}" y="12" font-size="10" fill="#e6ebf6" font-weight="500">${fr(d)} ${String(d.getUTCHours()).padStart(2,"0")}h TU</text>`;
  if(!h){pf.innerHTML=g+`<text x="${L+pw/2}" y="${T+ph/2}" text-anchor="middle" font-size="11" fill="${C_TXT}">pas de Cn² (H+0 ou trou)</text>`;return}
@@ -897,9 +1001,16 @@ function cn2Profile(SV,i){const c=CN2CTX[SV],pf=$(SV+"pf");if(!c||!pf)return;con
  for(let q=Math.ceil(x0);q<=Math.floor(x1);q++)g+=`<line x1="${X(q)}" x2="${X(q)}" y1="${T}" y2="${T+ph}" stroke="#3a4258"/>${(q-Math.ceil(x0))%2?"":`<text x="${X(q)}" y="${T+ph+14}" text-anchor="middle" font-size="8" fill="${C_TXT}">1e${q}</text>`}`;
  const pts=[];c.w.z.forEach((z,k)=>{if(z<c.za||z>c.zb)return;const v=c.val(h,k,c.K);if(v!=null)pts.push([X(v),Yz(z)])});
  if(pts.length>1)g+=pl(pts,'stroke="#5eead4" stroke-width="2"');pts.forEach(([x,y])=>g+=`<circle cx="${x}" cy="${y}" r="2" fill="#5eead4"/>`);
+ /* jet stream : pic de Cn2 entre 8 et 16 km (maximum local nettement au-dessus du creux de 4-8 km) */
+ {const P2=[];c.w.z.forEach((z,k)=>{const v=c.val(h,k,c.K);if(v!=null)P2.push([z,v])});const J=P2.filter(([z])=>z>=8000&&z<=16000);
+  if(J.length>2){const [zj,vj]=J.reduce((m,q)=>q[1]>m[1]?q:m),ki=P2.findIndex(q=>q[0]==zj),low=P2.filter(([z])=>z>=4000&&z<zj).map(q=>q[1]);
+   const loc=ki>0&&ki<P2.length-1&&vj>=P2[ki-1][1]&&vj>=P2[ki+1][1];
+   const up=P2.filter(([z])=>z>zj&&z<=zj+3000).map(q=>q[1]);   /* vrai pic : le Cn2 retombe aussi au-dessus */
+   if(loc&&low.length&&up.length&&vj-Math.min(...low)>=0.3&&vj-Math.min(...up)>=0.3&&zj>=c.za&&zj<=c.zb){const y=Yz(zj),x=X(vj);
+    g+=`<line x1="${L}" x2="${L+pw}" y1="${y}" y2="${y}" stroke="#f2c14e" stroke-width="1" stroke-dasharray="3 2"/><circle cx="${x}" cy="${y}" r="3.2" fill="#f2c14e" stroke="#000" stroke-width="0.8"/><text x="${L+3}" y="${y-4}" font-size="11" font-weight="600" fill="#f2c14e" stroke="#000" stroke-width="3" paint-order="stroke">Jet stream</text><text x="${L+pw-2}" y="${y+12}" text-anchor="end" font-size="9" fill="#f2c14e" stroke="#000" stroke-width="2.5" paint-order="stroke">${(zj/1000).toFixed(1)} km</text>`}}}
  if(h.hc!=null&&h.hc>=c.za&&h.hc<=c.zb)g+=`<line x1="${L}" x2="${L+pw}" y1="${Yz(h.hc)}" y2="${Yz(h.hc)}" stroke="#ff3cf0" stroke-width="1.6"/><text x="${L+4}" y="${Math.min(T+ph-4,Yz(h.hc)+(Yz(0)-Yz(h.hc)>26?Math.min(16,(Yz(0)-Yz(h.hc))/2):-4))}" font-size="12" font-weight="500" fill="#ff3cf0" stroke="#000" stroke-width="3" paint-order="stroke">BL</text><text x="${L+pw-2}" y="${Yz(h.hc)-3}" text-anchor="end" font-size="9" fill="#ff3cf0">${Math.round(h.hc)} m</text>`;
  {let k=0;const Zc=c.w.z;while(k<Zc.length){if(h.c[k]=="1"){let k2=k;while(k2+1<Zc.length&&h.c[k2+1]=="1")k2++;const a=c.lev[k][0],b=c.lev[k2][1];if(b>c.za&&a<c.zb){const ym=(Yz(Math.max(a,c.za))+Yz(Math.min(b,c.zb)))/2;g+=`<text x="${L+pw-4}" y="${ym+4}" text-anchor="end" font-size="11" font-weight="500" fill="#fff" stroke="#000" stroke-width="3" paint-order="stroke">Conv</text>`}k=k2+1}else k++}}
- const step=c.zb-c.za>8000?2000:c.zb-c.za>2000?500:100;for(let z=Math.ceil(c.za/step)*step;z<=c.zb;z+=step)g+=`<text x="${L-4}" y="${Yz(z)+4}" text-anchor="end" font-size="8" fill="${C_TXT}">${z>=1000?(z/1000)+" km":z+" m"}</text>`;
+ const step=c.zb-c.za>8000?2000:c.zb-c.za>2000?500:100;for(let z=Math.ceil(c.za/step)*step;z<=c.zb;z+=step)g+=`<line x1="${L}" x2="${L+pw}" y1="${Yz(z)}" y2="${Yz(z)}" stroke="#3a4258" stroke-width="0.6"/>`;   /* reperes d'altitude sans etiquettes (memes niveaux que le Cn2) */
  g+=`<text x="${L+pw/2}" y="${H-6}" text-anchor="middle" font-size="9" fill="${C_TXT}">Cn²</text><text x="${L}" y="${T-7}" font-size="9" fill="${C_TXT}">seeing ${s>0?s.toFixed(2)+'"':"–"}${isNd(d)?"":" (jour)"}</text>`;
  pf.innerHTML=g}
 
@@ -913,33 +1024,54 @@ let cselR={};
 function realNights(l){const N=new Map(),add=(k,f,v)=>{if(!N.has(k))N.set(k,{brut:[],med:[],integ:[]});N.get(k)[f].push(v)};
  l.episodes.forEach(e=>{e.brut.forEach(p=>p[1]!=null&&add(nightKey(p[0]),"brut",p));e.mediane.forEach(p=>p[1]!=null&&add(nightKey(p[0]),"med",p))});
  (l.integ||[]).forEach(r=>{const k=nightKey(r[0]);if(N.has(k))N.get(k).integ.push(r)});return N}
-function calibReal(l){const IM=integMap(l),K0=l.K;
- const P=l.paires.filter(p=>p[3]&&p[2]!=null).map(p=>({r:IM.get(p[0]),m:p[2]})).filter(x=>x.r&&seeR(K0,x.r)>0);
+/* filtres du calage (Calibrer) : heures peu fournies, nuits courtes, nuits les plus au-dessus du modele */
+const CALF={pics:false,courtes:false,top:0},CNTC=new Map();let CALRM=new Set();   /* heures retirees du calage (Calibrer) */
+function hourCounts(l){if(CNTC.has(l.nom))return CNTC.get(l.nom);const M=new Map();   /* mesures brutes par heure, rapportees a la mediane de la periode */
+ l.episodes.forEach(e=>{const c=new Map();e.brut.forEach(p=>{if(p[1]==null)return;const r=new Date(pd(p[0]).getTime()+1800000);r.setUTCMinutes(0,0,0);const k=r.toISOString().slice(0,16);c.set(k,(c.get(k)||0)+1)});
+  const md=med([...c.values()]);c.forEach((n,k)=>M.set(k,n/md))});CNTC.set(l.nom,M);return M}
+function longestRun(ts){const h=ts.map(s=>Math.round(pd(s).getTime()/3600000)).sort((a,b)=>a-b);let b=h.length?1:0,c=1;for(let i=1;i<h.length;i++){c=h[i]-h[i-1]==1?c+1:1;b=Math.max(b,c)}return b}
+function calFiltre(l){const night=l.paires.filter(p=>p[3]&&p[2]!=null),out={pics:0,courtes:0,top:[]};let keep=night;
+ if(CALF.pics){const C=hourCounts(l);keep=keep.filter(p=>{const f=C.get(p[0]);if(f!=null&&f<0.5){out.pics++;return false}return true})}
+ if(CALF.courtes){const G={};keep.forEach(p=>(G[nightKey(p[0])]=G[nightKey(p[0])]||[]).push(p[0]));const bad=new Set(Object.keys(G).filter(k=>longestRun(G[k])<3));out.courtes=bad.size;keep=keep.filter(p=>!bad.has(nightKey(p[0])))}
+ out.keep=keep;return out}
+function calibCore(l,pairs){const IM=integMap(l),K0=l.K;
+ const P=pairs.map(p=>({r:IM.get(p[0]),m:p[2],t:p[0]})).filter(x=>x.r&&seeR(K0,x.r)>0);
  if(!P.length)return{P,K:[...K0],mode:"aucune heure de nuit comparée"};
  const err=K=>P.reduce((s,p)=>s+Math.abs(Math.log(seeR(K,p.r)/p.m)),0)/P.length;
  if(P.length<60){const f=Math.exp(P.reduce((s,p)=>s+Math.log(p.m/seeR(K0,p.r)),0)/P.length),a=Math.pow(f,5/3);return{P,K:[clip(K0[0]*a),clip(K0[1]*a),K0[2]],mode:"facteur unique (niveau seul)"}}
  let best=1e9,K=[...K0];for(let i=0;i<=48;i++)for(let j=0;j<=48;j++){const k=[0.01*Math.pow(15000,i/48),0.01*Math.pow(15000,j/48),K0[2]],e=err(k);if(e<best){best=e;K=k}}
  return{P,K,mode:"K_TKE et K_CIS indépendants"}}
-function statsReal(P,K){if(!P.length)return{r:NaN,b:NaN,e:NaN};const o=P.map(p=>p.m),pr=P.map(p=>seeR(K,p.r));return{r:corr(o,pr),b:pr.reduce((s,v,i)=>s+v-o[i],0)/o.length,e:(Math.exp(pr.reduce((s,v,i)=>s+Math.abs(Math.log(v/o[i])),0)/o.length)-1)*100}}
+/* calage : filtres, 1er calage, retrait des nuits les plus au-dessus du modele (mediane mesure - prevu), recalage */
+function calibReal(l){const F=calFiltre(l),hk=s=>s.slice(0,16),fin=c=>{const kept=new Set(F.keep.map(p=>hk(p[0])));F.top.forEach(k=>kept.delete(k));
+  F.rm=new Set(l.paires.filter(p=>p[3]&&p[2]!=null&&!kept.has(hk(p[0]))).map(p=>hk(p[0])));c.F=F;return c};F.top=[];
+ let c=calibCore(l,F.keep);if(!CALF.top||!c.P.length)return fin(c);
+ const hr=c.P.map(p=>[hk(p.t),p.m-seeR(c.K,p.r)]).sort((a,b)=>b[1]-a[1]),nd=Math.min(hr.length-1,Math.max(1,Math.round(hr.length*CALF.top/100)));
+ F.top=hr.slice(0,nd).map(q=>q[0]);const drop=new Set(F.top);return fin(calibCore(l,F.keep.filter(p=>!drop.has(hk(p[0])))))}
+
+function statsReal(P,K){if(!P.length)return{r:NaN,b:NaN,e:NaN,q:NaN};const o=P.map(p=>p.m),pr=P.map(p=>seeR(K,p.r));return{r:corr(o,pr),b:pr.reduce((s,v,i)=>s+v-o[i],0)/o.length,e:(Math.exp(pr.reduce((s,v,i)=>s+Math.abs(Math.log(v/o[i])),0)/o.length)-1)*100,q:Math.sqrt(pr.reduce((s,v,i)=>s+(v-o[i])**2,0)/o.length)}}
 function drawCalReal(l){const IM=integMap(l),N=realNights(l),keys=[...N.keys()].sort();
  $("ex1").hidden=true;$("ex6").hidden=true;$("cerr").textContent="";
  if(!cselR[l.nom]||!N.has(cselR[l.nom]))cselR[l.nom]=keys[keys.length-1];const cs=cselR[l.nom];
  $("chips").innerHTML=`<span class="small muted" style="margin-right:6px">${l.nom} : ${keys.length} nuit(s) mesurée(s), données réelles</span>`+keys.map(k=>`<span class="chip${k==cs?" on":""}" tabindex="0" data-k="${k}">${k.slice(8)}/${k.slice(5,7)} · ${N.get(k).brut.length} pts</span>`).join("");
- const {P,K,mode}=calibReal(l);lastAuto=K;const s=statsReal(P,S.K);
+ const {P,K,mode,F:CALF_F}=calibReal(l);CALRM=CALF_F.rm;lastAuto=K;const s=statsReal(P,S.K);
  $("cmode").textContent="Mode : "+mode+" (nuits, 17h30–06h TU)";$("chours").textContent=P.length+" / 60 h de nuit";$("cbar").style.width=Math.min(100,P.length/60*100)+"%";
- $("cr").textContent=isNaN(s.r)?"–":s.r.toFixed(2);$("cb2").textContent=isNaN(s.b)?"–":(s.b>=0?"+":"")+s.b.toFixed(2)+'"';$("ce").textContent=isNaN(s.e)?"–":Math.round(s.e)+" %";
- $("cdl").textContent="K calés enregistrés";$("cd1").textContent=fmt(l.K[0]);$("cd2").textContent=fmt(l.K[1]);$("cd3").textContent=fmt(l.K[2]);
- $("ck1").textContent=fmt(K[0]);$("ck2").textContent=fmt(K[1]);
- lxCn2(l,"p2c","p2cnote",true,S.K);$("p2cnote").textContent=$("p2cnote").textContent.replace(/K_TKE = [^·]+·/,`K_TKE = ${fmt(S.K[0])}  K_CIS = ${fmt(S.K[1])}  K_conv = ${fmt(S.K[2])} (en service) ·`)+" · couleurs à échelle fixe";
- const l2={...l,paires:l.paires.map(p=>[p[0],IM.has(p[0])?seeR(S.K,IM.get(p[0])):p[1],p[2],p[3]])};lxCorr(l2,"p3","ct",false,s=>IM.has(s)?seeR(S.K,IM.get(s)):undefined);
- lxHist({...l,episodes:l.episodes.map(e=>({...e,prevu:e.prevu.map(p=>[p[0],IM.has(p[0])?seeR(S.K,IM.get(p[0])):p[1]])}))},"chist","chistnote",true);
+ $("cr").textContent=isNaN(s.r)?"–":s.r.toFixed(2);$("cb2").textContent=isNaN(s.b)?"–":(s.b>=0?"+":"")+s.b.toFixed(2)+'"';$("ce").textContent=isNaN(s.q)?"–":"± "+s.q.toFixed(2)+'"';
+ 
+ $("ck1").textContent=kHid()?"•••":fmt(K[0]);$("ck2").textContent=kHid()?"•••":fmt(K[1]);
+ lxCn2(l,"p2c","p2cnote",S.showObs,S.K);$("p2cnote").textContent=$("p2cnote").textContent.replace(/K_TKE = [^·]+·|K confidentiels[^·]*·/,`${kTxt(S.K,kHid(),fmt)} (en service) ·`)+" · couleurs à échelle fixe";
+ const F=CALF_F,KP=new Set(F.keep.map(p=>p[0])),TOPN=new Set(F.top),pv=p=>IM.has(p[0])?seeR(S.K,IM.get(p[0])):p[1];
+ const l2={...l,paires:l.paires.filter(p=>!p[3]||(KP.has(p[0])&&!TOPN.has(p[0].slice(0,16)))).map(p=>[p[0],pv(p),p[2],p[3]])};
+ const RM=l.paires.filter(p=>p[3]&&p[2]!=null&&KP.has(p[0])&&TOPN.has(p[0].slice(0,16))).map(p=>[p[0],pv(p),p[2],p[3]]);
+ lxCorr(l2,"p3","ct",false,s=>IM.has(s)?seeR(S.K,IM.get(s)):undefined,CALF.top?{rm:RM,pct:CALF.top}:null);
+ $("fnote").textContent=[CALF.pics?`${F.pics} h peu fournie(s) retirée(s)`:"",CALF.courtes?`${F.courtes} nuit(s) courte(s) retirée(s)`:"",CALF.top?`${F.top.length} h au-dessus du modèle retirée(s), puis recalage`:""].filter(Boolean).join(" · ");
+ lxHist({...l,episodes:l.episodes.map(e=>({...e,prevu:e.prevu.map(p=>[p[0],IM.has(p[0])?seeR(S.K,IM.get(p[0])):p[1]])}))},"chist","chistnote",S.showObs);
  const pn=l2.paires.filter(p=>p[3]&&p[1]!=null&&p[2]!=null),rn=pn,cr=a=>a.length>2?corr(a.map(p=>p[2]),a.map(p=>p[1])).toFixed(2):"–",bb=pn.length?pn.reduce((s,p)=>s+p[1]-p[2],0)/pn.length:NaN;
  $("s1").textContent=cr(rn);$("s2").textContent=isNaN(bb)?"–":(bb>=0?"+":"")+bb.toFixed(2)+'"';
  $("kmA").classList.toggle("on",S.mode=="A");$("kmM").classList.toggle("on",S.mode=="M");
  const n=N.get(cs);if(!n){$("cch").innerHTML="";return}
  const W=700,Hh=220,L=36,R=10,T=8,B=30,pw=W-L-R,ph=Hh-T-B,t12=pd(cs+"T12:00").getTime(),xh=s0=>(pd(s0).getTime()-t12)/3600000;
  const fc=n.integ.filter(r=>isNd(pd(r[0]))).map(r=>[xh(r[0]),seeR(S.K,r),seeR(l.K,r)]).filter(q=>q[0]>=0&&q[0]<=24).sort((a,b)=>a[0]-b[0]);
- const br=MESF.brut?n.brut.filter(p=>isNd(pd(p[0]))):[],md=MESF.horaire?n.med.filter(p=>isNd(pd(p[0]))):[];
+ const br=S.showObs&&MESF.brut?n.brut.filter(p=>isNd(pd(p[0]))):[],md=S.showObs&&MESF.horaire?n.med.filter(p=>isNd(pd(p[0]))):[];
  const ymax=Math.max(3,Math.ceil(Math.max(...fc.map(q=>Math.max(q[1]||0,q[2]||0)),...md.map(p=>p[1]))*1.2));
  const X=x=>L+x*pw/24,Y=v=>T+ph-Math.min(v,ymax)/ymax*ph;
  let g=`<rect x="${X(0)}" y="${T}" width="${X(5.5)-X(0)}" height="${ph}" fill="${C_DAY}"/><rect x="${X(18)}" y="${T}" width="${X(24)-X(18)}" height="${ph}" fill="${C_DAY}"/>`;
@@ -948,7 +1080,7 @@ function drawCalReal(l){const IM=integMap(l),N=realNights(l),keys=[...N.keys()].
  for(let i=0;i<=24;i++){const hh=(12+i)%24;g+=`<line x1="${X(i)}" x2="${X(i)}" y1="${T+ph}" y2="${T+ph+4}" stroke="${C_LINE}"/>`;if(hh%2==0)g+=`<text x="${X(i)}" y="${T+ph+16}" text-anchor="middle" font-size="11" fill="${hh==0?"#e6ebf6":C_TXT}" ${hh==0?'font-weight="500"':''}>${hh==0?lb:hh}</text>`}
  const seg=(idx,st)=>{let s=[],out="",prev=null;fc.forEach(q=>{if(!(q[idx]>0)||(prev!=null&&q[0]-prev>1.01)){if(s.length>1)out+=pl(s,st);s=[]}if(q[idx]>0)s.push([X(q[0]),Y(q[idx])]);prev=q[0]});if(s.length>1)out+=pl(s,st);return out};
  g+=seg(2,`stroke="${C_AR}" stroke-width="1.5" stroke-dasharray="5 4"`)+seg(1,`stroke="${C_AR}" stroke-width="2.2"`);
- br.forEach(p=>g+=`<circle cx="${X(xh(p[0]))}" cy="${Y(p[1])}" r="1.7" fill="${C_OBS}"/>`);md.forEach(p=>g+=`<rect x="${X(xh(p[0]))-5.5}" y="${Y(p[1])-5.5}" width="11" height="11" fill="${C_OBSD}" stroke="#0a0f1d" stroke-width="1"/>`);
+ br.forEach(p=>g+=`<circle cx="${X(xh(p[0]))}" cy="${Y(p[1])}" r="1.7" fill="${C_OBS}"/>`);if(S.showObs&&MESF.courbe)g+=medCurve(n.med.filter(p=>isNd(pd(p[0]))).map(p=>[X(xh(p[0])),Y(p[1]),pd(p[0]).getTime()/3600000]));md.forEach(p=>g+=`<rect x="${X(xh(p[0]))-3}" y="${Y(p[1])-3}" width="6" height="6" fill="${C_OBSD}" stroke="#0a0f1d" stroke-width="0.8"/>`);
  g+=`<text x="${W-R}" y="${Hh-2}" text-anchor="end" font-size="11" fill="${C_TXT}">heure TU · tirets : K calés enregistrés</text>`;
  $("cch").innerHTML=g}
 function applyLieuK(){const l=realLieu();if(l){S.KCAL=[...l.K];setK(l.K,"A")}else{S.KCAL=[11.6,20.8,0.1];setK(S.KCAL,"A")}}
@@ -957,7 +1089,12 @@ applyLieuK();
 /* ---------- COMPTE / LIEUX ---------- */
 $("login").onsubmit=e=>{e.preventDefault();const em=$("em").value.trim();if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){$("lerr").textContent="Entre une adresse e-mail valide.";return}if(!$("pw").value){$("lerr").textContent="Entre ton mot de passe.";return}$("lerr").className="okmsg";$("lerr").textContent="Connecté (démo).";};
 ["em","pw"].forEach(i=>$(i).oninput=()=>{$("lerr").className="err";$("lerr").textContent=""});
-$("addlieu").onclick=()=>show("carte");
+$("addlieu").onclick=()=>{show("carte");S.newPt=null;$("nllat").value="";$("nllon").value="";$("nlpos").textContent="";$("nlmsg").textContent="";$("newlieu").hidden=false;drawMap();$("newlieu").scrollIntoView({block:"center"});$("nllat").focus()};
+const calFUpd=()=>{document.querySelectorAll("#calfilt .chip[data-f]").forEach(c=>{const v=CALF[c.dataset.f];c.classList.toggle("on",v);c.setAttribute("aria-checked",v)});document.querySelectorAll("#ftop button").forEach(b=>b.classList.toggle("on",+b.dataset.p==CALF.top));
+ drawCal();if(S.mode=="A"&&lastAuto&&!kHid()){S.KCAL=[...lastAuto];setK(lastAuto,"A")}};
+document.querySelectorAll("#calfilt .chip[data-f]").forEach(el=>{el.onclick=()=>{CALF[el.dataset.f]=!CALF[el.dataset.f];calFUpd()};el.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();el.click()}}});
+$("ftop").onclick=e=>{const b=e.target.closest("button");if(!b)return;CALF.top=+b.dataset.p;calFUpd()};
+$("calmine").onclick=()=>{const o=[...$("lieu").options].find(o=>o.value.startsWith("mine:"));if(o){$("lieu").value=o.value;$("lieu").onchange()}};
 $("lieu").onchange=()=>{applyLieuK();const v=(views.find(s=>!s.hidden)||{}).id;if(v=="v-prevision")drawPrev();if(v=="v-calibrer")drawCal()};
 
 /* ---------- démarrage ---------- */
