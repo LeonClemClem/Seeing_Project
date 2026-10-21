@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Seeing AROME</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -109,6 +110,7 @@ svg{max-width:100%;height:auto;display:block}
   </nav>
   <div class="who">
    <select id="lieu" aria-label="Lieu affiché"><option value="0">Jardin</option></select>
+   <button id="langb" aria-label="Switch to English" style="padding:4px 9px;font-weight:600">EN</button>
    <div class="av" title="Compte de démonstration">CB</div>
   </div>
  </div>
@@ -1140,4 +1142,129 @@ kBox("kbox2");kstrip();
 $("gocal").onclick=e=>{e.preventDefault();show("calibrer")};
 example();example();
 show((location.hash||"#carte").slice(1));
+/* ---------- langue : français / anglais (« Seeing » reste « Seeing ») ---------- */
+const EN_EXACT={
+"Carte":"Map","Prévision":"Forecast","Calibrer":"Calibrate","Mes lieux":"My places","Compte":"Account","Fisheye":"Fisheye",
+"Lieu":"Place","Zone":"Zone","Zone…":"Zone…","Nuit":"Night","Jour":"Day","Heure":"Hour","Lune":"Moon","Soleil":"Sun","Nuages":"Clouds","Objet":"Object","Nom":"Name",
+"Mars":"Mars","Vénus":"Venus","Mercure":"Mercury","Jupiter":"Jupiter","Saturne":"Saturn","Uranus":"Uranus","Neptune":"Neptune","Pages":"Pages",
+"Biais":"Bias","brutes":"raw","Zoom :":"Zoom:","Locale":"Local","R nuit":"Night R","R brut":"Raw R","r nuit":"night r","R horaire":"Hourly R","r (nuits)":"r (nights)",
+"Manuel":"Manual","privé":"private","aucune":"none","E-mail":"E-mail","Zoomer":"Zoom in","Dézoomer":"Zoom out","Modèle":"Model","Mesures":"Measurements","Mesures :":"Measurements:",
+"Horizon":"Horizon","mesuré":"measured","mesures":"measurements","de nuit":"at night","facteur":"factor","voisins":"neighbours","Mon lieu":"My place","Réglage":"Settings",
+"Latitude":"Latitude","Longitude":"Longitude","Afficher":"Show","Afficher :":"Show:","Altitude":"Altitude","K calés":"Calibrated K","mon lieu":"my place","Recalcul":"Recalculation",
+"Étendue":"Extent","tout voir":"show all","Planètes":"Planets","Connexion":"Sign in","Catalogue":"Catalogue","Cette nuit":"Tonight","Données :":"Data:","Historique":"History",
+"biais nuit":"night bias","1 en cours":"1 in progress","Convection":"Convection","dernier run":"latest run","Élévation":"Elevation","Visibilité":"Visibility","Utilisateur":"User",
+"Calibration":"Calibration","Calibration :":"Calibration:","Panneau Cn2":"Cn2 panel","Vent à 10 m":"10 m wind","Carte du run":"Map from run","Nouveau lieu":"New place",
+"K_conv figé":"K_conv fixed","Mot de passe":"Password","Se connecter":"Sign in","Corrélation":"Correlation","Domaine AROME":"AROME domain","Seeing prévu":"Forecast seeing",
+"K (TKE / CIS)":"K (TKE / CIS)","indépendants":"independent","Lieu affiché":"Displayed place","Créer le lieu":"Create the place","Seeing mesuré":"Measured seeing",
+"K en service :":"K in use:","Constellations":"Constellations","Soleil et Lune":"Sun and Moon","boundary layer":"boundary layer","file d'attente":"queue","Administrateur":"Administrator",
+"Animer la nuit":"Animate the night","Fuseau horaire":"Time zone","Format de date":"Date format","Format de date :":"Date format:","nom@exemple.fr":"name@example.com",
+"Heure par heure":"Hour by hour","Meilleur moment":"Best time","Détection auto":"Auto-detect","données brutes":"raw data","Ajouter un lieu":"Add a place",
+"Sans calibration":"Without calibration","Avec calibration":"With calibration","Meilleure maille":"Best grid cell","Médiane horaire":"Hourly median","médiane horaire":"hourly median",
+"Étoiles doubles":"Double stars","pics peu fournis":"sparse peaks","+ Nuit d'exemple":"+ Example night","+ 6 nuits":"+ 6 nights","Prévu = mesuré":"Forecast = measured",
+"Calibration auto":"Auto calibration","Couche convective":"Convective layer","Seeing au zénith":"Seeing at zenith","Course des objets":"Object tracks","Mes objets cibles":"My target objects",
+"Passer à mon lieu":"Switch to my place","Semaine (7 j max)":"Week (7 days max)","Niveau (les deux)":"Level (both)","Données réelles":"Real data","données réelles":"real data",
+"Chercher un objet":"Search for an object","Moyenne de la nuit":"Night mean","médianes horaires":"hourly medians","Heure du fichier :":"File time:","précision horaire":"hourly precision",
+"Précision horaire":"Hourly precision","Affichage":"Display","Affichage du temps":"Time display","Historique du lieu":"Place history","Cisaillement (CIS)":"Shear (CIS)","Vent au jet stream":"Jet-stream wind",
+"Médiane de la zone":"Zone median","Tous les catalogues":"All catalogues","Filtres du calage :":"Calibration filters:","Résultat du calage":"Calibration result","Supprimer le compte":"Delete the account",
+"Nuit sélectionnée":"Selected night","Panneau Cn2 du lieu":"Cn2 panel of the place","Couche limite (TKE)":"Boundary layer (TKE)","Seeing total (nuit)":"Total seeing (night)",
+"Nébulosité totale":"Total cloud cover","prévu (dernier run)":"forecast (latest run)","date ; seeing_arcsec":"date ; seeing_arcsec","Mes lieux personnels":"My personal places",
+"chaque run principal":"every main run","Vue de la maquette :":"Mock-up view:","Corrélation du lieu":"Place correlation","Galaxie d'Andromède":"Andromeda Galaxy",
+"MM/JJ/AAAA hh:mm (US)":"MM/DD/YYYY hh:mm (US)","JJ/MM/AA hh:mm":"DD/MM/YY hh:mm","JJ/MM/AAAA hh:mm":"DD/MM/YYYY hh:mm","AAAA/MM/JJ hh:mm":"YYYY/MM/DD hh:mm","JJ.MM.AAAA hh:mm":"DD.MM.YYYY hh:mm",
+"JJ-MM-AAAA hh:mm":"DD-MM-YYYY hh:mm","AAAA-MM-JJ hh:mm (ISO 8601)":"YYYY-MM-DD hh:mm (ISO 8601)","Horodatage Unix (secondes)":"Unix timestamp (seconds)","Date Excel (nombre de jours)":"Excel date (days)",
+"jusqu'en haut (16 km)":"up to the top (16 km)","0–1 km (couche limite)":"0–1 km (boundary layer)","jet stream (8–16 km)":"jet stream (8–16 km)",
+"Biais · écart moyen":"Bias · mean difference","Cisaillement · K_CIS":"Shear · K_CIS","Couche limite · K_TKE":"Boundary layer · K_TKE","Exporter mes données":"Export my data",
+"Épaisseur convective":"Convective thickness","Nébuleuse de la Lyre":"Ring Nebula","Prochain run principal":"Next main run","Ce que montre la carte":"What the map shows",
+"V2bd avec les K calés":"V2bd with calibrated K","Ajouter un fichier CSV":"Add a CSV file","Dernières prévisions":"Latest forecasts","1 par jour · utilisé":"1 per day · used",
+"Calibration du fisheye":"Fisheye calibration","Carte globale du seeing":"Global seeing map","courbe médiane horaire":"hourly median curve","☾ médianes nocturnes":"☾ nightly medians",
+"Seeing V2bd (axe droit)":"Seeing V2bd (right axis)","coupure entre épisodes":"break between periods","Calibration de mon lieu":"My place's calibration","nuits < 3 h successives":"nights < 3 consecutive h",
+"K par défaut (voisins)":"Default K (neighbours)","médiane horaire (nuit)":"hourly median (night)","☾ médiane d'une nuit":"☾ median of a night","remise à zéro à 00h TU":"reset at 00:00 UTC",
+"Vie privée et données":"Privacy and data","Période du panneau Cn2":"Cn2 panel period","Cn² (altitude × temps)":"Cn² (altitude × time)","étirement vertical auto":"auto vertical stretch",
+"Enregistrer pour ce lieu":"Save for this place","Compte de démonstration":"Demo account","Hauteur de couche limite":"Boundary-layer height","(autres modèles à venir)":"(other models to come)",
+"Calibrer avec tes mesures":"Calibrate with your measurements","Altitude au-dessus du sol":"Altitude above ground","Réglage des coefficients":"Coefficient settings","Seeing prévu (axe droit)":"Forecast seeing (right axis)",
+"Date et heure de la carte":"Map date and time","lieu public (observatoire)":"public place (observatory)","Panneau Cn2 de calibration":"Calibration Cn2 panel","régler les K dans Calibrer":"set K in Calibrate",
+"Demandes hors domaine AROME":"Requests outside the AROME domain","Couche limite et convection":"Boundary layer and convection","Maquette : données fictives":"Mock-up: fictitious data",
+"Partager avec la communauté":"Share with the community","Fisheye du seeing cette nuit":"Seeing fisheye tonight","Corrélation prévu / mesuré":"Forecast / measured correlation",
+"Corrélation prévu / mesuré (nuit)":"Forecast / measured correlation (night)","Nuit seulement (17h30–06h TU)":"Night only (17:30–06:00 UTC)","partagé · position approchée":"shared · approximate position",
+"passé (runs principaux collés)":"past (glued main runs)","Sans calibration (K par défaut)":"Without calibration (default K)","Pas de compte ? Créer un compte":"No account? Create one",
+"Météo (fictif dans la maquette)":"Weather (fictitious in the mock-up)","Profil de Cn2 à l'heure survolée":"Cn2 profile at the hovered hour","Jour 06h–17h30 TU (nuit en sombre)":"Day 06:00–17:30 UTC (night shaded)",
+"Fisheye du seeing avec objets du ciel":"Seeing fisheye with sky objects","Afficher les mesures du seeing monitor":"Show the seeing monitor measurements","Animer la carte sur les heures de nuit":"Animate the map over night hours",
+"Seeing monitor public (position exacte)":"Public seeing monitor (exact position)","Mer, hors bande côtière : non calculée":"Sea, outside the coastal strip: not computed",
+"Europe/Paris (UTC+1, UTC+2 l'été, auto)":"Europe/Paris (UTC+1, UTC+2 in summer, auto)","Turbulence (contribution au seeing, nuit)":"Turbulence (contribution to seeing, night)",
+"Variables du modèle (passées et prévues)":"Model variables (past and forecast)","Historique (prévisions et mesures du lieu)":"History (forecasts and measurements of the place)",
+"Historique des prévisions du lieu":"Forecast history of the place","Historique (prévisions avec les K en service et mesures, nuit)":"History (forecasts with the K in use and measurements, night)",
+"Dépose tes fichiers CSV de seeing (colonnes":"Drop your seeing CSV files (columns","survole le panneau : profil à l'heure choisie":"hover the panel: profile at the chosen hour",
+"nuits sans au moins 3 heures comparées successives":"nights without at least 3 consecutive compared hours","Site public : résultats de la calibration seulement.":"Public site: calibration results only.",
+"Relief AROME, isolignes tous les 1000 m (500 m en zoom)":"AROME terrain, contours every 1000 m (500 m when zoomed)","Carte globale du seeing de la nuit, déplaçable et zoomable":"Global night seeing map, draggable and zoomable",
+"Les mesures partagées aident à caler les K des lieux voisins.":"Shared measurements help calibrate the K of nearby places.","Tu peux exporter toutes tes données ou supprimer ton compte à tout moment.":"You can export all your data or delete your account at any time.",
+"heures dont la médiane repose sur beaucoup moins de mesures que d'habitude":"hours whose median rests on far fewer measurements than usual",
+"La position exacte sert seulement au calcul de la maille AROME et des K par défaut des voisins.":"The exact position is only used to compute the AROME grid cell and the neighbours' default K.",
+"Étoiles et objets placés avec leurs vraies coordonnées pour cette nuit ; planètes et Lune à des positions fictives dans la maquette.":"Stars and objects placed at their true coordinates for tonight; planets and Moon at fictitious positions in the mock-up.",
+"Les K des sites publics ne sont visibles que par l'administrateur ; chacun voit les K de ses propres lieux.":"The K of public sites are visible to the administrator only; everyone sees the K of their own places.",
+"Clique sur la carte ou saisis les coordonnées GPS (degrés décimaux : 44.1234 et 5.6789, ou degrés minutes secondes : 44°07'24\" N et 5°40'44\" E).":"Click on the map or enter GPS coordinates (decimal degrees: 44.1234 and 5.6789, or degrees minutes seconds: 44°07'24\" N and 5°40'44\" E).",
+"44.1234 ou 44°07'24\" N":"44.1234 or 44°07'24\" N","5.6789 ou 5°40'44\" E":"5.6789 or 5°40'44\" E","M31, Andromède, Albireo…":"M31, Andromeda, Albireo…",
+"Tes lieux personnels : historique des prévisions et des mesures, corrélation et panneau Cn². Les lieux publics des autres se consultent dans Prévision.":"Your personal places: forecast and measurement history, correlation and Cn² panel. Other people's public places are in Forecast.",
+"pour l'OHP (calcul AROME V2bd et mesures du monitor), contrairement au reste de la maquette.":"for the OHP (AROME V2bd computation and monitor measurements), unlike the rest of the mock-up.",
+"Seeing V2bd au lieu, panneau Cn², historique et corrélation avec tes mesures, avec les K en service pour ce lieu. Les K se règlent dans l'onglet Calibrer.":"Seeing V2bd at the place, Cn² panel, history and correlation with your measurements, with the K in use for this place. K are set in the Calibrate tab.",
+"ou dépose-le ici · date et heure dans la 1re colonne (ou date ; heure dans deux colonnes), seeing dans la dernière · séparateur ; , ou tabulation · secondes facultatives":"or drop it here · date and time in the 1st column (or date ; time in two columns), seeing in the last · separator ; , or tab · seconds optional",
+"Un compte est nécessaire pour enregistrer des lieux, importer des mesures, régler les K et calculer un fisheye. Sans compte, on peut consulter la carte et les lieux partagés.":"An account is needed to save places, import measurements, set K and compute a fisheye. Without an account you can view the map and shared places.",
+"Molette ou boutons + et − pour zoomer, glisser pour se déplacer, clic pour créer un lieu. Le zoom affiche la carte déjà calculée, sans calcul supplémentaire, jusqu'à 100 km de côté.":"Mouse wheel or + and − buttons to zoom, drag to move, click to create a place. Zooming shows the already computed map, with no extra computation, down to 100 km across.",
+", en TU ou en heure locale). Ils s'ajoutent les uns aux autres, sans pondération. Le calage se fait sur la nuit (17h30–06h TU) : un facteur unique sous 60 h, K_TKE et K_CIS indépendants au-delà. K_conv reste à 0,1.":", in UTC or local time). They add up, without weighting. Calibration uses the night (17:30–06:00 UTC): a single factor below 60 h, independent K_TKE and K_CIS above. K_conv stays at 0.1.",
+"Seeing V2bd dans chaque direction, de 19h à 05h TU, jusqu'à 5° d'élévation. Calculé à partir du run global, avec par défaut la calibration de ton lieu : changer la calibration ou l'heure est instantané et ne consomme pas de quota.":"Seeing V2bd in every direction, from 19:00 to 05:00 UTC, down to 5° elevation. Computed from the global run, by default with your place's calibration: changing the calibration or the time is instant and uses no quota.",
+"Ce site est calibré par l'administrateur : tu vois les résultats (courbes, Cn², historique, corrélation, qualité du calage), mais les outils de calibration (import CSV, réglage des K, calibration auto) ne fonctionnent que sur tes lieux personnels.":"This site is calibrated by the administrator: you see the results (curves, Cn², history, correlation, calibration quality), but the calibration tools (CSV import, K settings, auto calibration) only work on your personal places.",
+"Seeing V2bd sur tout le domaine AROME (France, îles Britanniques, péninsule Ibérique, Benelux, Allemagne, Alpes, Italie), recalculé toutes les 6 heures, à chaque run principal d'AROME (00Z, 06Z, 12Z, 18Z). Sur la vue du domaine, clique n'importe où dans une zone (France, Royaume-Uni…) pour zoomer dessus ; une fois zoomé, survole la carte pour lire une maille et clique pour créer un lieu.":"Seeing V2bd over the whole AROME domain (France, British Isles, Iberian Peninsula, Benelux, Germany, Alps, Italy), recomputed every 6 hours, at each AROME main run (00Z, 06Z, 12Z, 18Z). On the domain view, click anywhere in a zone (France, United Kingdom…) to zoom on it; once zoomed, hover the map to read a grid cell and click to create a place.",
+"Calcul global sur tout le domaine AROME (terres et bande côtière de 106 km) toutes les 6 heures, à chaque run principal : 00Z, 06Z, 12Z, 18Z ; les runs secondaires ne sont pas utilisés. La carte est calibrée une fois pour toutes par l'administrateur : elle ne change pas avec la calibration des lieux. Hors du domaine, ou en mer au-delà de la bande côtière, un lieu passe par la file d'attente.":"Global computation over the whole AROME domain (land and a 106 km coastal strip) every 6 hours, at each main run: 00Z, 06Z, 12Z, 18Z; secondary runs are not used. The map is calibrated once and for all by the administrator: it does not change with the calibration of places. Outside the domain, or at sea beyond the coastal strip, a place goes through the queue.",
+"Un lieu partagé apparaît aux autres par un symbole à":"A shared place appears to others as a symbol","de sa vraie position (2 à 4 cellules AROME), toujours au même endroit, sans nom ni position exacte.":"from its true position (2 to 4 AROME cells), always in the same spot, with no name or exact position.",
+"Lieu partagé (":"Shared place (","position floutée à 5–11 km":"position blurred by 5–11 km","Position floutée à 5–11 km":"Position blurred by 5–11 km",
+"(résultats disponibles environ":"(results available about","après l'arrivée du run)":"after the run arrives)","· prochaine mise à jour avec le run":"· next update with run",", dans 6 h":", in 6 h",
+"· run principal":"· main run","Seeing monitor 5":"Seeing monitor 5","3 lieux sur 5":"3 places out of 5","run global 12Z":"global run 12Z","Fisheye du jour : 1 / 1":"Today's fisheye: 1 / 1",
+"seeing monitor Miratlas ·":"Miratlas seeing monitor ·","hors France · en file, 2e":"outside France · queued, 2nd","Retirer M31":"Remove M31","Retirer M57":"Remove M57",
+"Italie":"Italy","Suisse & Alpes":"Switzerland & Alps","Corse & Sardaigne":"Corsica & Sardinia","Espagne & Portugal":"Spain & Portugal","Benelux & Allemagne":"Benelux & Germany","Royaume-Uni & Irlande":"United Kingdom & Ireland",
+"Jardin":"Garden","Col de la Croix":"Col de la Croix","Star party":"Star party","OHP (mon lieu)":"OHP (my place)","heures au-dessus du modèle :":"hours above the model:",
+"heure TU · tirets : K calés enregistrés":"UTC hour · dashes: saved calibrated K","heure TU":"UTC hour","H+0 sans TKE":"H+0 without TKE","Pas de prévision enregistrée pour ce lieu.":"No forecast saved for this place.",
+"Pas de période avec prévision et mesures pour ce lieu.":"No period with forecast and measurements for this place.","Pas d'heure de nuit comparée.":"No compared night hour.","pas de donnée":"no data",
+"Pas de panneau Cn² enregistré pour ce lieu.":"No Cn² panel saved for this place.","Pas de variables enregistrées pour ce lieu.":"No variables saved for this place.","Coordonnées non reconnues.":"Coordinates not recognised.",
+"Clique sur la carte ou saisis des coordonnées GPS valides.":"Click on the map or enter valid GPS coordinates.","Donne un nom au lieu.":"Give the place a name.","Enregistré.":"Saved.",
+"Coche Jour, Nuit ou les deux.":"Tick Day, Night or both.","Historique : choisis un lieu avec seeing monitor.":"History: choose a place with a seeing monitor.","Corrélation : choisis un lieu avec seeing monitor.":"Correlation: choose a place with a seeing monitor.",
+"Calibration globale (administrateur)":"Global calibration (administrator)","K par défaut":"Default K","K des voisins":"Neighbours' K","nuit astronomique":"astronomical night","crépuscule astronomique":"astronomical twilight","crépuscule":"twilight","couchée":"set",
+"Lieux publics":"Public places","Nébuleuse d'Orion":"Orion Nebula","Nébuleuse de l'Iris":"Iris Nebula","Nébuleuse de l'Hélice":"Helix Nebula","Nébuleuse de l'Haltère":"Dumbbell Nebula","Nébuleuse de la Grotte":"Cave Nebula",
+"Nébuleuse North America":"North America Nebula","Double amas de Persée":"Perseus Double Cluster","Amas de Pégase":"Pegasus Cluster","Pléiades":"Pleiades","Cassiopée":"Cassiopeia","Pégase":"Pegasus","Grande Ourse":"Big Dipper","Cygne":"Cygnus",
+"Retirer cette nuit":"Remove this night","Animer la carte":"Animate the map","Heure de la carte":"Map hour","Étendue":"Extent","Calibration du fisheye":"Fisheye calibration","Nuit":"Night","K du lieu":"K of the place"};
+const EN_FRAG=[
+[/^(dim|lun|mar|mer|jeu|ven|sam)\. /,m=>({dim:"Sun",lun:"Mon",mar:"Tue",mer:"Wed",jeu:"Thu",ven:"Fri",sam:"Sat"}[m.slice(0,3)]+" ")],
+[/moyenne nuit du (\d+) au (\d+\/\d+)/g,"night mean $1–$2"],[/Nuit du (\d+) au (\d+\/\d+)/g,"Night of $1–$2"],[/Nuit du (\d+\/\d+)/g,"Night of $1"],
+[/(\d+) période\(s\) avec prévision et mesures, du ([\d\/]+) au ([\d\/]+) ; axe compressé \(seules ces périodes sont montrées\)\./,"$1 period(s) with forecast and measurements, from $2 to $3; compressed axis (only these periods are shown)."],
+[/jusqu'à 7 jours de runs principaux collés/g,"up to 7 days of glued main runs"],[/dernières prévisions/g,"latest forecasts"],[/du ([\d\/]+ \d+h) au ([\d\/]+ \d+h)/g,"from $1 to $2"],
+[/mesures du ([\d\/]+) au ([\d\/]+)/g,"measurements from $1 to $2"],[/même fenêtre que le panneau Cn²/g,"same window as the Cn² panel"],
+[/les contributions au seeing sont calculées avec les K du lieu/g,"contributions to seeing are computed with the place's K"],[/seeing de nuit seulement/g,"night seeing only"],
+[/h sans Cn² \(H\+0 ou trou\)/g,"h without Cn² (H+0 or gap)"],[/pas de Cn² \(H\+0 ou trou\)/g,"no Cn² (H+0 or gap)"],[/couleurs à échelle fixe/g,"fixed colour scale"],[/\(en service\)/g,"(in use)"],
+[/\(calés pour ce lieu, données réelles\)/g,"(calibrated for this place, real data)"],[/K confidentiels/g,"K confidential"],[/\bconfidentiels\b/g,"confidential"],[/\bcalés\b/g,"calibrated"],[/\bmanuels\b/g,"manual"],
+[/nuit : r =/g,"night: r ="],[/· biais /g,"· bias "],[/précision horaire/g,"hourly precision"],[/nuits \(r des médianes nocturnes/g,"nights (nightly-median r"],[/\((\d+) mesures\)/g,"($1 measurements)"],
+[/R médianes horaires/g,"Hourly R"],[/nuit\(s\) mesurée\(s\), données réelles/g,"night(s) measured, real data"],[/(\d[\d\s\u202f\u00a0]*) mesures\b/g,"$1 measurements"],[/h de nuit\b/g,"night h"],
+[/Mode : /g,"Mode: "],[/facteur unique \(niveau seul\)/g,"single factor (level only)"],[/K_TKE et K_CIS indépendants/g,"K_TKE and K_CIS independent"],[/aucune heure de nuit comparée/g,"no compared night hour"],
+[/\(nuits, 17h30–06h TU\)/g,"(nights, 17:30–06:00 UTC)"],[/\/ 60 night h/g,"/ 60 night h"],[/h peu fournie\(s\) retirée\(s\)/g,"sparse h removed"],[/nuit\(s\) courte\(s\) retirée\(s\)/g,"short night(s) removed"],
+[/h au-dessus du modèle retirée\(s\), puis recalage/g,"h above the model removed, then recalibrated"],[/% des heures \(au-dessus\)/g,"% of hours (above)"],[/Clique pour zoomer sur/g,"Click to zoom on"],
+[/hors de la zone du calcul global/g,"outside the global computation area"],[/relief AROME/g,"AROME terrain"],[/dans le domaine AROME : prévision dès le prochain run principal/g,"inside the AROME domain: forecast from the next main run"],
+[/hors du domaine AROME : prévision via la file d'attente/g,"outside the AROME domain: forecast via the queue"],[/zoom maximal/g,"max zoom"],[/isolignes/g,"contours"],[/\(jour\)/g,"(day)"],
+[/Premier quartier/g,"First quarter"],[/dernier run/g,"latest run"],[/run principal/g,"main run"],[/crépuscule astronomique/g,"astronomical twilight"],[/nuit astronomique/g,"astronomical night"],[/crépuscule/g,"twilight"],[/couchée/g,"set"],[/calculé en/g,"computed in"],[/^Jardin /,"Garden "],[/^r nuit /,"night r "],[/élévation /g,"elevation "],[/K calés de /g,"Calibrated K of "],[/Historique · /g,"History · "],[/Prévision · /g,"Forecast · "],[/\(mon lieu\)/g,"(my place)"],
+[/nuits seulement/g,"nights only"],[/prévision jusqu'à/g,"forecast up to"],[/: moins de 3 mesures lisibles\. Vérifie le séparateur, le format de date et l'heure \(TU ou locale\)\./g,": fewer than 3 readable measurements. Check the separator, date format and time (UTC or local)."],
+[/« (.+) » créé/g,"“$1” created"],[/, partagé \(position approchée\)/g,", shared (approximate position)"],[/, privé/g,", private"],[/K de départ : ceux des voisins\./g,"Starting K: the neighbours'."],
+[/Enregistré : /g,"Saved: "],[/fais défiler horizontalement/g,"scroll horizontally"],[/glisse le panneau ou fais défiler/g,"drag the panel or scroll"],[/prévu /g,"forecast "],
+[/\bpts\b/g,"pts"],[/\bTU\b/g,"UTC"],[/ nuits\b/g," nights"],[/\bnuits\b/g,"nights"]];
+let LANG="fr";try{LANG=localStorage.getItem("seeing-lang")||"fr"}catch(e){}
+const TRM=new Map();   /* noeud texte -> texte francais d'origine */
+function TR(s,force){if((LANG!="en"&&!force)||!s)return s;const k=s.replace(/\s+/g," ").trim();if(!k)return s;const W=o=>s.match(/^\s*/)[0]+o+s.match(/\s*$/)[0];if(EN_EXACT[k]!=null)return W(EN_EXACT[k]);
+ let o=k;EN_FRAG.forEach(([a,b])=>{o=o.replace(a,b)});return o==k?s:W(o)}
+let TRBUSY=false;
+function trNode(n){if(n.nodeType==3){const p=n.parentElement;if(!p||p.closest("script,style"))return;const cur=n.nodeValue;let fr=TRM.get(n);if(fr==null||(cur!==fr&&cur!==TR(fr,1))){fr=cur;TRM.set(n,fr)}const v=LANG=="en"?TR(fr):fr;if(v!==cur)n.nodeValue=v;return}
+ if(n.nodeType!=1||n.matches("script,style"))return;["placeholder","aria-label","title"].forEach(a=>{if(!n.hasAttribute(a))return;const k="data-fr-"+a;if(!n.hasAttribute(k)||(n.getAttribute(a)!==n.getAttribute(k)&&n.getAttribute(a)!==TR(n.getAttribute(k),1)))n.setAttribute(k,n.getAttribute(a));const v=LANG=="en"?TR(n.getAttribute(k)):n.getAttribute(k);if(n.getAttribute(a)!==v)n.setAttribute(a,v)});
+ n.childNodes.forEach(trNode)}
+function trAll(){TRBUSY=true;trNode(document.body);document.title=LANG=="en"?"Seeing AROME":"Seeing AROME";document.documentElement.lang=LANG;TRBUSY=false}
+new MutationObserver(ms=>{if(TRBUSY)return;TRBUSY=true;ms.forEach(m=>{if(m.type=="characterData")trNode(m.target);else m.addedNodes.forEach(trNode)});TRBUSY=false}).observe(document.body,{subtree:true,childList:true,characterData:true});
+/* textes dessines sur canevas (carte, fisheye) */
+["fillText","strokeText","measureText"].forEach(f=>{const o=CanvasRenderingContext2D.prototype[f];CanvasRenderingContext2D.prototype[f]=function(t,...a){return o.call(this,TR(String(t)),...a)}});
+function setLang(l){LANG=l;try{localStorage.setItem("seeing-lang",l)}catch(e){}$("langb").textContent=l=="en"?"FR":"EN";$("langb").setAttribute("aria-label",l=="en"?"Passer en français":"Switch to English");
+ trAll();try{redrawView();drawMap();drawSky()}catch(e){}}
+$("langb").onclick=()=>setLang(LANG=="en"?"fr":"en");
+setLang(LANG);
+
 </script>
