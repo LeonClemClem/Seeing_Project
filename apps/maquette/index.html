@@ -67,7 +67,7 @@ h2{font-family:var(--f-display);font-weight:500;font-size:17px;margin:0 0 6px}
 #popts{position:sticky;top:calc(env(safe-area-inset-top,0px) + 104px);z-index:4;display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:fit-content;max-width:100%;margin:0 0 14px auto;background:var(--panel);border:1px solid #3a4a72;border-radius:12px;padding:8px 12px;box-shadow:0 8px 20px rgba(0,0,0,.45)}
 #popts .chip{margin:0}
 #calgrid{grid-template-columns:minmax(0,1fr) 230px}
-#kpanel{padding:12px}
+#kpanel{padding:10px 12px}#kpanel .chip{font-size:11px;padding:2px 8px;margin:0}#kpanel .krows .kr>span:first-child{font-size:12px}#kpanel .res h2{margin:0 0 2px}#kpanel .res{margin-top:8px!important;padding-top:8px!important}
 #kpanel h2{font-size:15px}
 #kbox2 .krows{grid-template-columns:1fr;gap:8px}
 #kbox2 .kb button{padding:3px 7px;font-size:12px}
@@ -265,7 +265,7 @@ svg{max-width:100%;height:auto;display:block}
    </div>
    <div class="panel">
     <h2>Historique (prévisions avec les K en service et mesures, nuit)</h2>
-    <div style="display:flex;gap:6px;align-items:center;margin:4px 0"><span class="small muted">Zoom :</span><button data-z="chist" data-f="0.5">−</button><button data-z="chist" data-f="2">+</button><button data-z="chist" data-f="0">tout voir</button><span class="small muted" id="chistzl"></span></div>
+    <div style="display:flex;gap:6px;align-items:center;margin:4px 0"><span class="small muted">Zoom :</span><button data-z="chist" data-f="0.5">−</button><button data-z="chist" data-f="2">+</button><button data-z="chist" data-f="0">tout voir</button><span class="chip on" id="chstr" role="switch" aria-checked="true" tabindex="0" style="margin:0 0 0 6px">étirement vertical auto</span><span class="small muted" id="chistzl"></span></div>
     <div style="overflow-x:auto"><svg id="chist" viewBox="0 0 1100 240" role="img" aria-label="Historique du lieu"></svg></div>
     <p class="small muted" id="chistnote" style="margin:4px 0 0"></p>
    </div>
@@ -273,10 +273,10 @@ svg{max-width:100%;height:auto;display:block}
    <div>
     <h2>Corrélation prévu / mesuré</h2>
     <p class="small muted mono" id="ct"></p>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px 0 6px"><span class="small muted">Afficher :</span><span class="chip on" data-c="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span class="chip on" data-c="nuit" role="switch" aria-checked="true" tabindex="0">☾ médianes nocturnes</span><span class="chip" data-c="brut" role="switch" aria-checked="false" tabindex="0">données brutes</span></div><svg id="p3" viewBox="0 0 340 300" role="img" aria-label="Corrélation"></svg>
+    <svg id="p3" viewBox="0 0 340 300" role="img" aria-label="Corrélation"></svg>
    </div>
    <div class="stack" style="align-content:start;padding-top:26px">
-    <div class="legend" style="flex-direction:column;gap:5px"><span><span class="sw" style="width:8px;height:8px;border-radius:50%;background:var(--night)"></span>Heure de nuit</span><span><span class="sw" style="width:12px;height:12px;border-radius:50%;border:2px solid var(--night)"></span>☾ médiane d'une nuit</span><span><span class="sw" style="width:16px;border-top:1px dashed var(--muted)"></span>Prévu = mesuré</span></div>
+    <div class="legend" style="flex-direction:column;gap:5px"><span><span class="sw" style="width:8px;height:8px;border-radius:50%;background:var(--night);border:1px solid #fff"></span>médiane horaire (nuit)</span><span><span class="sw" style="width:12px;height:12px;border-radius:50%;border:2px solid var(--night)"></span>☾ médiane d'une nuit</span><span><span class="sw" style="width:16px;border-top:1px dashed var(--muted)"></span>Prévu = mesuré</span></div>
     <div class="tiles"><div class="tile"><div class="l">r nuit</div><div class="v" id="s1"></div></div><div class="tile"><div class="l">Biais · écart moyen</div><div class="v" id="s2" style="font-size:16px"></div></div></div>
    </div>
   </div>
@@ -291,6 +291,7 @@ svg{max-width:100%;height:auto;display:block}
     <p class="okmsg" id="cok" style="margin:0 0 8px"></p>
     <div class="seg" style="margin-bottom:8px"><button id="kmA" class="on">K calés</button><button id="kmM">Manuel</button></div>
     <div id="kbox2"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0 0;border-top:1px solid var(--line);padding-top:10px"><span class="small muted" style="width:100%">Corrélation :</span><span class="chip on" data-c="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span class="chip on" data-c="nuit" role="switch" aria-checked="true" tabindex="0">☾ médianes nocturnes</span><span class="chip" data-c="brut" role="switch" aria-checked="false" tabindex="0">données brutes</span></div>
     <div class="res" style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
     <h2>Résultat du calage</h2>
     <div class="tiles"><div class="tile"><div class="l">r (nuits)</div><div class="v" id="cr"></div></div><div class="tile"><div class="l">Biais</div><div class="v" id="cb2"></div></div><div class="tile"><div class="l">Erreur relative</div><div class="v" id="ce"></div></div></div>
@@ -329,7 +330,7 @@ svg{max-width:100%;height:auto;display:block}
     <h2>Corrélation prévu / mesuré</h2>
     <p class="small muted mono" id="lxct" style="margin:0 0 2px"></p>
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px 0 6px"><span class="small muted">Afficher :</span><span class="chip on" data-c="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span class="chip on" data-c="nuit" role="switch" aria-checked="true" tabindex="0">☾ médianes nocturnes</span><span class="chip" data-c="brut" role="switch" aria-checked="false" tabindex="0">données brutes</span></div><svg id="lxcorr" viewBox="0 0 340 320" role="img" aria-label="Corrélation du lieu"></svg>
-    <div class="legend"><span><span class="sw" style="width:8px;height:8px;border-radius:50%;background:var(--night)"></span>Nuit</span><span><span class="sw" style="width:12px;height:12px;border-radius:50%;border:2px solid var(--night)"></span>☾ médiane d'une nuit</span></div>
+    <div class="legend"><span><span class="sw" style="width:8px;height:8px;border-radius:50%;background:var(--night);border:1px solid #fff"></span>médiane horaire (nuit)</span><span><span class="sw" style="width:12px;height:12px;border-radius:50%;border:2px solid var(--night)"></span>☾ médiane d'une nuit</span></div>
     <div class="tiles" style="margin-top:8px"><div class="tile"><div class="l">r nuit</div><div class="v" id="lxrn"></div><div class="small muted" id="lxnn"></div></div><div class="tile"><div class="l">biais nuit</div><div class="v" id="lxrj"></div><div class="small muted" id="lxnj"></div></div></div>
    </div>
    <div class="panel">
@@ -739,7 +740,7 @@ const MESF={brut:true,horaire:true};   /* mesures brutes et/ou medianes horaires
 function rawIn(l,t0,n){const a=t0.getTime(),b=a+n*3600000,o=[];l.episodes.forEach(e=>e.brut.forEach(p=>{const v=pd(p[0]).getTime();if(p[1]!=null&&v>=a&&v<=b)o.push(p)}));return o}
 const LX=(window.LIEUX_DATA&&window.LIEUX_DATA.lieux)||[];let lxSel=0;const LXF={jour:false,nuit:true};   /* seeing de jour retire : nuit seulement */
 const CORRF={horaire:true,nuit:true,brut:false};   /* correlation : medianes horaires, medianes nocturnes (lunes), brutes */
-const HZ={p4:1,lxhist:1,chist:1};   /* zoom horizontal de l'historique */
+const HZ={p4:1,lxhist:1,chist:1},HSTR={chist:true},HCTX={};   /* etirement vertical auto (par defaut dans Calibrer) */   /* zoom horizontal de l'historique */
 const keepT=d=>isNd(d)?LXF.nuit:LXF.jour;
 const lxNone=()=>!LXF.jour&&!LXF.nuit;
 const pd=s=>new Date(s+":00Z");
@@ -754,13 +755,19 @@ function lxParts(eps){if(LXF.jour&&LXF.nuit)return eps;const out=[];const ms=s=>
   const push=(x,y)=>{if(y-x<15*60000)return;const sl=arr=>arr.filter(p=>{const v=ms(p[0]);return v>=x&&v<=y});out.push({a:iso(x),b:iso(y),prevu:sl(e.prevu),mediane:sl(e.mediane),brut:sl(e.brut)})};
   while(t<b){const n=Math.min(step(t),b),k=keepT(new Date(t));if(k&&s==null)s=t;if(!k&&s!=null){push(s,t);s=null}t=n}if(s!=null)push(s,b)});
  return out}
-function lxHist(l,SV="lxhist",NT="lxhistnote",OB=true){const ZM=HZ[SV]||1,W=1100*ZM;$(SV).setAttribute("viewBox",`0 0 ${W} 240`);$(SV).style.width=`${100*ZM}%`;$(SV).style.minWidth=`${700*ZM}px`;if($(SV+"zl"))$(SV+"zl").textContent=ZM>1?`× ${ZM} (fais défiler horizontalement)`:"";const H=240,L=36,R=10,T=12,B=34,pw=W-L-R,ph=H-T-B,gap=14,E=lxParts(l.episodes);
+function lxHist(l,SV="lxhist",NT="lxhistnote",OB=true){HCTX[SV]=[l,SV,NT,OB];const ZM=HZ[SV]||1,W=1100*ZM;$(SV).setAttribute("viewBox",`0 0 ${W} 240`);$(SV).style.width=`${100*ZM}%`;$(SV).style.minWidth=`${700*ZM}px`;if($(SV+"zl"))$(SV+"zl").textContent=ZM>1?`× ${ZM} (fais défiler horizontalement)`:"";const H=240,L=36,R=10,T=12,B=34,pw=W-L-R,ph=H-T-B,gap=14,E=lxParts(l.episodes);
  if(lxNone()){$(SV).innerHTML=`<text x="550" y="120" text-anchor="middle" font-size="14" fill="${C_TXT}">Coche Jour, Nuit ou les deux.</text>`;$(NT).textContent="";return}
  if(!E.length){$(SV).innerHTML=`<text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="14" fill="${C_TXT}">Pas de période avec prévision et mesures pour ce lieu.</text>`;$(NT).textContent="";return}
  const span=e=>(pd(e.b)-pd(e.a))/3600000,tot=E.reduce((s,e)=>s+span(e),0),u=(pw-gap*(E.length-1))/tot;
- let ys=[];E.forEach(e=>{e.prevu.forEach(p=>p[1]!=null&&ys.push(p[1]));e.mediane.forEach(p=>p[1]!=null&&ys.push(p[1]))});
- const ymax=Math.max(2,Math.ceil(Math.max(...ys)*1.15)),Y=v=>T+ph-Math.min(v,ymax)/ymax*ph;
- let g=yaxis(Y,L,W-R,ymax,ymax>8?2:1),off=L,lastDay="";
+ /* etirement vertical auto : l'echelle Y suit les donnees de la partie visible quand on a zoome */
+ const sc=$(SV).parentElement,str=!!(HSTR[SV]&&ZM>1&&sc&&sc.scrollWidth>sc.clientWidth+2);let xa=-1e9,xb=1e9,ys=[];
+ if(str){xa=sc.scrollLeft/sc.scrollWidth*W;xb=(sc.scrollLeft+sc.clientWidth)/sc.scrollWidth*W}
+ {let o=L;E.forEach(e=>{const a=pd(e.a),Xp=d=>o+(d-a)/3600000*u,add=p=>{if(p[1]!=null&&keepT(pd(p[0]))){const x=Xp(pd(p[0]));if(x>=xa&&x<=xb)ys.push(p[1])}};e.prevu.forEach(add);e.mediane.forEach(add);o+=span(e)*u+gap})}
+ if(!ys.length)ys=[2];
+ const ymax=str?Math.max(1,Math.ceil(Math.max(...ys)*1.12*2)/2):Math.max(2,Math.ceil(Math.max(...ys)*1.15)),Y=v=>T+ph-Math.min(v,ymax)/ymax*ph,yst=ymax>8?2:ymax>3?1:0.5;
+ let g=yaxis(Y,L,W-R,ymax,yst),off=L,lastDay="";
+ if(str)for(let v=yst;v<=ymax;v+=yst)g+=`<text x="${xa+6}" y="${Y(v)-3}" font-size="10" fill="#e6ebf6" stroke="#0a0f1d" stroke-width="3" paint-order="stroke">${+v.toFixed(1)}"</text>`;
+ if(sc&&!sc._hl){sc._hl=1;let tm;sc.addEventListener("scroll",()=>{if(!HSTR[SV]||(HZ[SV]||1)<=1||!HCTX[SV])return;clearTimeout(tm);tm=setTimeout(()=>lxHist(...HCTX[SV]),120)})}
  E.forEach((e,n)=>{const a=pd(e.a),o=off,X=d=>o+(d-a)/3600000*u,w=span(e)*u;
   for(let t=new Date(a);t<pd(e.b);t=new Date(t.getTime()+1800000))if(!isNd(t))g+=`<rect x="${X(t)}" y="${T}" width="${u/2+0.4}" height="${ph}" fill="${C_DAY}"/>`;
   const d0=fr(a);if(d0!=lastDay&&w>18){g+=`<text x="${o+2}" y="${T+ph+14}" font-size="10" fill="#e6ebf6" font-weight="500">${d0}</text>`;lastDay=d0}
@@ -784,7 +791,7 @@ function lxCorr(l,SV="lxcorr",CT="lxct",TILES=true,PF=null){
  let g="";for(let v=0;v<=m;v+=st)g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${C_LINE}" stroke-width="0.6"/><line y1="${T}" y2="${T+ph}" x1="${X(v)}" x2="${X(v)}" stroke="${C_LINE}" stroke-width="0.6"/><text x="${L-5}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="${C_TXT}">${v}"</text><text x="${X(v)}" y="${T+ph+14}" text-anchor="middle" font-size="11" fill="${C_TXT}">${v}"</text>`;
  g+=`<line x1="${X(0)}" y1="${Y(0)}" x2="${X(m)}" y2="${Y(m)}" stroke="${C_TXT}" stroke-dasharray="4 3"/>`;
  RAW.forEach(q=>g+=`<circle cx="${X(q[0])}" cy="${Y(q[1])}" r="1.6" fill="#2a78d6" opacity=".35"/>`);
- if(CORRF.horaire)P.forEach(p=>g+=`<circle cx="${X(p[2])}" cy="${Y(p[1])}" r="3.2" fill="#2a78d6"/>`);
+ if(CORRF.horaire)P.forEach(p=>g+=`<circle cx="${X(p[2])}" cy="${Y(p[1])}" r="3.6" fill="#2a78d6" stroke="#fff" stroke-width="1.1"/>`);
  if(CORRF.nuit)MOON.forEach(([x,y])=>{const cx=X(x),cy=Y(y);g+=`<path d="M${cx+2},${cy-9} A9,9 0 1,0 ${cx+2},${cy+9} A12,12 0 0,1 ${cx+2},${cy-9} Z" fill="#f1efe8" stroke="#0a0f1d" stroke-width="1"/>`});
  g+=`<text x="${L+pw/2}" y="${H-2}" text-anchor="middle" font-size="11" fill="${C_TXT}">mesuré</text><text x="10" y="${T+ph/2}" text-anchor="middle" font-size="11" fill="${C_TXT}" transform="rotate(-90 10 ${T+ph/2})">prévu ${l.modele}</text>`;
  $(SV).innerHTML=g;
@@ -841,6 +848,7 @@ function lxShow(){if(!LX.length){$("lxcards").innerHTML='<p class="muted">Donné
 document.querySelectorAll('.chip[data-m]').forEach(el=>{el.onclick=()=>{const k=el.dataset.m;MESF[k]=!MESF[k];document.querySelectorAll(`.chip[data-m="${k}"]`).forEach(c=>{c.classList.toggle("on",MESF[k]);c.setAttribute("aria-checked",MESF[k])});const v=(views.find(s=>!s.hidden)||{}).id;if(v=="v-prevision")drawPrev();if(v=="v-lieux")lxShow()};el.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();el.click()}}});
 document.querySelectorAll(".chip[data-c]").forEach(el=>{el.onclick=()=>{const k=el.dataset.c;CORRF[k]=!CORRF[k];document.querySelectorAll(`.chip[data-c="${k}"]`).forEach(c=>{c.classList.toggle("on",CORRF[k]);c.setAttribute("aria-checked",CORRF[k])});const v=(views.find(s=>!s.hidden)||{}).id;if(v=="v-prevision")drawPrev();if(v=="v-lieux")lxShow();if(v=="v-calibrer")drawCal()};el.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();el.click()}}});
 document.querySelectorAll("button[data-z]").forEach(b=>b.onclick=()=>{const k=b.dataset.z,f=+b.dataset.f;HZ[k]=f?Math.min(16,Math.max(1,HZ[k]*f)):1;const v=(views.find(s=>!s.hidden)||{}).id;if(v=="v-prevision")drawPrev();else if(v=="v-calibrer")drawCal();else lxShow()});
+$("chstr").onclick=()=>{HSTR.chist=!HSTR.chist;$("chstr").classList.toggle("on",HSTR.chist);$("chstr").setAttribute("aria-checked",HSTR.chist);if(HCTX.chist)lxHist(...HCTX.chist)};
 $("lxcards").onclick=e=>{const b=e.target.closest("[data-i]");if(b){lxSel=+b.dataset.i;lxShow()}};
 
 function prevReal(l,OB){const w=l.cn2w,sv=$("p1");sv.setAttribute("viewBox","0 0 900 220");
