@@ -177,7 +177,7 @@ svg{max-width:100%;height:auto;display:block}
 <section id="v-prevision" data-view hidden>
  <h1 id="ptitle">Prévision</h1>
  <p class="lead">Seeing V2bd au lieu, panneau Cn², historique et corrélation avec tes mesures, avec les K en service pour ce lieu. Les K se règlent dans l'onglet Calibrer.</p>
- <div id="popts"><span class="chip on" id="obsT" role="switch" aria-checked="true" tabindex="0">Afficher les mesures du seeing monitor</span><span class="small muted">Mesures :</span><span class="chip on" data-m="brut" role="switch" aria-checked="true" tabindex="0">brutes</span><span class="chip on" data-m="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span style="width:12px"></span><span class="small muted">Corrélation :</span><span class="chip on" data-c="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span class="chip on" data-c="nuit" role="switch" aria-checked="true" tabindex="0">☾ médianes nocturnes</span><span class="chip" data-c="brut" role="switch" aria-checked="false" tabindex="0">brutes</span><span style="width:12px"></span><span class="small muted">Nuit seulement (17h30–06h TU)</span></div>
+ <div id="popts"><span class="chip on" id="obsT" role="switch" aria-checked="true" tabindex="0">Afficher les mesures du seeing monitor</span><span class="small muted">Mesures :</span><span class="chip on" data-m="brut" role="switch" aria-checked="true" tabindex="0">brutes</span><span class="chip on" data-m="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span style="width:12px"></span><span class="small muted">Nuit seulement (17h30–06h TU)</span></div>
  <div class="stack">
   <div class="panel">
    <h2>Seeing prévu</h2>
@@ -286,19 +286,17 @@ svg{max-width:100%;height:auto;display:block}
    <div class="panel" id="kpanel">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">
      <h2 style="margin:0">Réglage des coefficients</h2>
-     <div class="seg"><button id="kmA" class="on">K calés</button><button id="kmM">Manuel</button></div>
     </div>
+    <button class="primary" id="cuse" style="width:100%;justify-content:center;flex-direction:column;gap:2px;margin-bottom:4px">Calibration auto<span class="small mono" style="font-weight:400">K_TKE <span id="ck1"></span> · K_CIS <span id="ck2"></span></span></button>
+    <p class="okmsg" id="cok" style="margin:0 0 8px"></p>
+    <div class="seg" style="margin-bottom:8px"><button id="kmA" class="on">K calés</button><button id="kmM">Manuel</button></div>
     <div id="kbox2"></div>
     <div class="res" style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
     <h2>Résultat du calage</h2>
     <div class="tiles"><div class="tile"><div class="l">r (nuits)</div><div class="v" id="cr"></div></div><div class="tile"><div class="l">Biais</div><div class="v" id="cb2"></div></div><div class="tile"><div class="l">Erreur relative</div><div class="v" id="ce"></div></div></div>
     <div class="tablewrap" style="margin-top:10px"><table class="list mono"><thead><tr><th></th><th>K_TKE</th><th>K_CIS</th><th>K_conv</th></tr></thead><tbody>
      <tr><td class="muted" style="font-family:var(--f-body)" id="cdl">Défaut (voisins)</td><td id="cd1">9.6</td><td id="cd2">17.2</td><td id="cd3">0.1</td></tr>
-     <tr><td style="font-family:var(--f-body)">Calage auto</td><td id="ck1"></td><td id="ck2"></td><td>0.1</td></tr>
     </tbody></table></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="primary" id="cuse">Utiliser le calage auto</button></div>
-    <p class="okmsg" id="cok"></p>
-    <p class="note">Bornes 0,01 ≤ K ≤ 150. Calage de K_conv sur les heures de jour : prévu plus tard.</p>
        </div>
    </div>
 
@@ -315,7 +313,7 @@ svg{max-width:100%;height:auto;display:block}
  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px">
   <span class="small muted">Nuit seulement (17h30–06h TU)</span>
   <span style="width:12px"></span>
-  <span class="small muted">Mesures :</span><span class="chip on" data-m="brut" role="switch" aria-checked="true" tabindex="0">brutes</span><span class="chip on" data-m="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span style="width:12px"></span><span class="small muted">Corrélation :</span><span class="chip on" data-c="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span class="chip on" data-c="nuit" role="switch" aria-checked="true" tabindex="0">☾ médianes nocturnes</span><span class="chip" data-c="brut" role="switch" aria-checked="false" tabindex="0">brutes</span>
+  <span class="small muted">Mesures :</span><span class="chip on" data-m="brut" role="switch" aria-checked="true" tabindex="0">brutes</span><span class="chip on" data-m="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span>
  </div>
  <div class="stack" style="margin-top:16px">
   <div class="panel">
