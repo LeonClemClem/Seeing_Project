@@ -186,7 +186,7 @@ svg{max-width:100%;height:auto;display:block}
   </div>
   <div class="panel">
    <h2>Cn² (altitude × temps)</h2>
-   <div class="legend"><span><span class="sw" style="width:16px;height:4px;background:var(--arome);outline:1px solid #000"></span>Seeing V2bd (axe droit)</span><span class="obs-leg"><span class="sw" style="width:6px;height:6px;border-radius:50%;background:var(--obs)"></span>Seeing mesuré <span class="sw" style="width:8px;height:8px;background:var(--obs-d);border:1px solid #000;margin-left:4px"></span>médiane horaire</span><span><svg width="16" height="10" class="sw" style="display:inline-block"><rect width="16" height="10" fill="url(#hh)" stroke="#000"/></svg>Couche convective</span></div>
+   <div class="legend"><span><span class="sw" style="width:16px;height:4px;background:var(--arome);outline:1.5px solid #fff"></span>Seeing V2bd (axe droit)</span><span class="obs-leg"><span class="sw" style="width:5px;height:5px;border-radius:50%;background:#fff;border:1px solid #000"></span>Seeing mesuré <span class="sw" style="width:14px;height:2px;background:#fff;outline:1px solid #000;margin-left:4px"></span>médiane horaire</span><span><svg width="16" height="10" class="sw" style="display:inline-block"><rect width="16" height="10" fill="url(#hh)" stroke="#000"/></svg>Couche convective</span></div>
    <svg id="p2" viewBox="0 0 900 270" role="img" aria-label="Panneau Cn2"></svg>
    <p class="small muted" id="nan"></p>
    <p class="small muted" style="margin:0">K en service : <span class="mono" id="kread"></span> · <a href="#calibrer" id="gocal" style="color:#9cc7ff">régler les K dans Calibrer</a></p>
@@ -260,7 +260,7 @@ svg{max-width:100%;height:auto;display:block}
     <svg id="cch" viewBox="0 0 700 220" role="img" aria-label="Nuit sélectionnée"></svg>
    </div>   <div class="panel">
     <h2>Cn² (altitude × temps)</h2>
-    <div class="legend"><span><span class="sw" style="width:16px;height:4px;background:var(--arome);outline:1px solid #000"></span>Seeing V2bd (axe droit)</span><span><span class="sw" style="width:6px;height:6px;border-radius:50%;background:var(--obs)"></span>Seeing mesuré <span class="sw" style="width:8px;height:8px;background:var(--obs-d);border:1px solid #000;margin-left:4px"></span>médiane horaire</span><span><svg width="16" height="10" class="sw" style="display:inline-block"><rect width="16" height="10" fill="url(#hh)" stroke="#000"/></svg>Couche convective</span></div>
+    <div class="legend"><span><span class="sw" style="width:16px;height:4px;background:var(--arome);outline:1.5px solid #fff"></span>Seeing V2bd (axe droit)</span><span><span class="sw" style="width:5px;height:5px;border-radius:50%;background:#fff;border:1px solid #000"></span>Seeing mesuré <span class="sw" style="width:14px;height:2px;background:#fff;outline:1px solid #000;margin-left:4px"></span>médiane horaire</span><span><svg width="16" height="10" class="sw" style="display:inline-block"><rect width="16" height="10" fill="url(#hh)" stroke="#000"/></svg>Couche convective</span></div>
     <svg id="p2c" viewBox="0 0 900 270" role="img" aria-label="Panneau Cn2 de calibration"></svg><p class="small muted mono" id="p2cnote" style="margin:4px 0 0"></p>
    </div>
    <div class="panel">
@@ -337,7 +337,7 @@ svg{max-width:100%;height:auto;display:block}
    <div class="panel">
     <h2>Cn² (altitude × temps)</h2>
     <p class="small muted mono" id="lxcn2t" style="margin:0 0 2px"></p>
-    <div class="legend"><span><span class="sw" style="width:16px;height:4px;background:var(--arome);outline:1px solid #000"></span>Seeing prévu (axe droit)</span><span><span class="sw" style="width:6px;height:6px;border-radius:50%;background:var(--obs)"></span>Seeing mesuré <span class="sw" style="width:8px;height:8px;background:var(--obs-d);border:1px solid #000;margin-left:4px"></span>médiane horaire</span><span><svg width="16" height="10" class="sw" style="display:inline-block"><rect width="16" height="10" fill="url(#hh)" stroke="#000"/></svg>Couche convective</span><span><span class="sw" style="width:16px;border-top:1.5px dashed #fff"></span>H_COULIM</span></div>
+    <div class="legend"><span><span class="sw" style="width:16px;height:4px;background:var(--arome);outline:1.5px solid #fff"></span>Seeing prévu (axe droit)</span><span><span class="sw" style="width:5px;height:5px;border-radius:50%;background:#fff;border:1px solid #000"></span>Seeing mesuré <span class="sw" style="width:14px;height:2px;background:#fff;outline:1px solid #000;margin-left:4px"></span>médiane horaire</span><span><svg width="16" height="10" class="sw" style="display:inline-block"><rect width="16" height="10" fill="url(#hh)" stroke="#000"/></svg>Couche convective</span><span><span class="sw" style="width:16px;border-top:1.5px dashed #fff"></span>H_COULIM</span></div>
     <svg id="lxcn2" viewBox="0 0 760 300" role="img" aria-label="Panneau Cn2 du lieu"></svg>
    </div>
   </div>
@@ -818,9 +818,11 @@ function lxCn2(l,SV="lxcn2",TT="lxcn2t",OB=true,KR=null){const sv=$(SV),w=l.cn2w
  const inW=s=>{const v=pd(s).getTime();return v>=T0+i0*3600000&&v<=T0+i1*3600000&&isNd(pd(s))};
  const mv=OB&&MESF.horaire?w.mesures.filter(p=>p[1]!=null&&inW(p[0])):[],raw=OB&&MESF.brut?w.brut.filter(p=>p[1]!=null&&inW(p[0])):[];
  const smax=Math.max(2,Math.max(...SEE.map(p=>p[1]),...mv.map(p=>p[1]),0)*1.2),YS=v=>T+ph-Math.min(v,smax)/smax*ph,xs=s=>X((pd(s).getTime()-T0)/3600000+0.5);
- raw.forEach(p=>g+=`<circle cx="${xs(p[0])}" cy="${YS(p[1])}" r="1.6" fill="${C_OBS}" stroke="#000" stroke-width="0.3" opacity=".85"/>`);
- let seg=[],prev=null;const fl=()=>{if(seg.length>1)g+=pl(seg,'stroke="#000" stroke-width="4.4"')+pl(seg,`stroke="${C_AR}" stroke-width="2.4"`);seg=[]};SEE.forEach(([i,s])=>{if(prev!=null&&i!=prev+1)fl();seg.push([X(i+0.5),YS(s)]);prev=i});fl();
- mv.forEach(p=>g+=`<rect x="${xs(p[0])-4.5}" y="${YS(p[1])-4.5}" width="9" height="9" fill="${C_OBSD}" stroke="#000" stroke-width="1.2"/>`);
+ raw.forEach(p=>g+=`<circle cx="${xs(p[0])}" cy="${YS(p[1])}" r="1.4" fill="#fff" stroke="#000" stroke-width="0.3" opacity=".8"/>`);
+ let seg=[],prev=null;const fl=()=>{if(seg.length>1)g+=pl(seg,'stroke="#fff" stroke-width="4.6"')+pl(seg,`stroke="${C_AR}" stroke-width="2.4"`);seg=[]};SEE.forEach(([i,s])=>{if(prev!=null&&i!=prev+1)fl();seg.push([X(i+0.5),YS(s)]);prev=i});fl();
+ {const mm=mv.map(p=>[(pd(p[0]).getTime()-T0)/3600000,p[1]]);let s=[],pr=null;const fm=()=>{if(s.length>1){const q=s.map(([i,v])=>[X(i+0.5),YS(v)]);g+=pl(q,'stroke="#000" stroke-width="3"')+pl(q,'stroke="#fff" stroke-width="1.4"')}s=[]};
+  mm.forEach(p=>{if(pr!=null&&p[0]-pr>1.01)fm();s.push(p);pr=p[0]});fm();
+  mm.forEach(([i,v])=>g+=`<rect x="${X(i+0.5)-2.5}" y="${YS(v)-2.5}" width="5" height="5" fill="#fff" stroke="#000" stroke-width="0.8"/>`)}
  const sst=smax>8?2:smax>3?1:0.5;for(let v=0;v<=smax;v+=sst)g+=`<text x="${L+pw+5}" y="${YS(v)+4}" font-size="10" fill="${C_TXT}">${+v.toFixed(1)}"</text>`;
  const xl=X((tLast-T0)/3600000);if(xl>=L&&xl<=L+pw)g+=`<line x1="${xl}" x2="${xl}" y1="${T-6}" y2="${T+ph}" stroke="#f2c14e" stroke-width="1.6" stroke-dasharray="5 3"/><text x="${xl+4}" y="${T-10}" font-size="11" fill="#f2c14e">dernier run ${fr(new Date(tLast))} ${String(new Date(tLast).getUTCHours()).padStart(2,"0")}Z</text>`;
  const cx=L+pw+34;for(let k=0;k<60;k++)g+=`<rect x="${cx}" y="${T+ph-(k+1)*ph/60}" width="10" height="${ph/60+0.6}" fill="rgb(${turbo((k+0.5)/60)})"/>`;
