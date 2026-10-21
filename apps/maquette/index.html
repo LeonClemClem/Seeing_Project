@@ -797,7 +797,7 @@ function lxCn2(l,SV="lxcn2",TT="lxcn2t",OB=true,KR=null){const sv=$(SV),w=l.cn2w
  const [za,zb]=CN2ALT[CN2V.alt],Z=w.z,lev=Z.map((z,k)=>[k?(Z[k-1]+z)/2:0,k<Z.length-1?(z+Z[k+1])/2:z+125]);
  const e=x=>x==null?0:Math.pow(10,x),val=(h,k,KK)=>{const v=KK[0]*e(h.z[0][k])+KK[2]*e(h.z[1][k])+KK[1]*e(h.z[2][k]);return v>0?Math.log10(v):null};
  if(!w._lohi){const a=[];w.h.forEach(h=>{if(h)Z.forEach((_,k)=>{const v=val(h,k,l.K);if(v!=null&&Z[k]<=4000)a.push(v)})});a.sort((x,y)=>x-y);w._lohi=[a[Math.floor(a.length*.05)],a[Math.floor(a.length*.995)]]}
- const [lo,hi]=w._lohi,ZC=CZ[SV]||1,W=900*ZC,H=380,L=56,R=110,T=30,B=46,pw=W-L-R,ph=H-T-B,X=i=>L+(i-i0)/n*pw,Yz=z=>T+ph-(Math.min(Math.max(z,za),zb)-za)/(zb-za)*ph;
+ const [lo,hi]=w._lohi,ZC=CZ[SV]||1,W=900*ZC,H=380,L=56,R=84,T=30,B=46,pw=W-L-R,ph=H-T-B,X=i=>L+(i-i0)/n*pw,Yz=z=>T+ph-(Math.min(Math.max(z,za),zb)-za)/(zb-za)*ph;
  let g=`<defs><pattern id="hwb${SV}" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="#fff" stroke-width="1.5"/><line x1="3.5" y1="0" x2="3.5" y2="7" stroke="#000" stroke-width="1.5"/></pattern></defs>`;
  g+=`<rect x="${L}" y="${T}" width="${pw}" height="${ph}" fill="#262c3b"/>`;
  {const NR=Math.max(120,Math.round(ph*1.5)),cv=document.createElement("canvas");cv.width=n;cv.height=NR;const cx=cv.getContext("2d"),im=cx.createImageData(n,NR),D=im.data;
@@ -823,9 +823,9 @@ function lxCn2(l,SV="lxcn2",TT="lxcn2t",OB=true,KR=null){const sv=$(SV),w=l.cn2w
  mv.forEach(p=>g+=`<circle cx="${xs(p[0])}" cy="${YS(p[1])}" r="4" fill="#fff" stroke="#000" stroke-width="1.2"/>`);
  const sst=smax>8?2:smax>3?1:0.5;for(let v=0;v<=smax;v+=sst)g+=`<text x="${L+pw+5}" y="${YS(v)+4}" font-size="10" fill="${C_TXT}">${+v.toFixed(1)}"</text>`;
  const xl=X((tLast-T0)/3600000);if(xl>=L&&xl<=L+pw)g+=`<line x1="${xl}" x2="${xl}" y1="${T-6}" y2="${T+ph}" stroke="#f2c14e" stroke-width="1.6" stroke-dasharray="5 3"/><text x="${xl+4}" y="${T-10}" font-size="11" fill="#f2c14e">dernier run ${fr(new Date(tLast))} ${String(new Date(tLast).getUTCHours()).padStart(2,"0")}Z</text>`;
- const cx=W-36;for(let k=0;k<60;k++)g+=`<rect x="${cx}" y="${T+ph-(k+1)*ph/60}" width="11" height="${ph/60+0.6}" fill="rgb(${turbo((k+0.5)/60)})"/>`;
- for(let q=Math.ceil(lo);q<=Math.floor(hi);q++){const y=T+ph-(q-lo)/(hi-lo)*ph;g+=`<text x="${cx-3}" y="${y+4}" text-anchor="end" font-size="9" fill="${C_TXT}">1e${q}</text>`}
- g+=`<text x="${cx+5}" y="${H-6}" text-anchor="middle" font-size="9" fill="${C_TXT}">Cn² m⁻²ᐟ³</text><line id="${SV}cur" x1="-10" x2="-10" y1="${T}" y2="${T+ph}" stroke="#fff" stroke-width="1"/>`;
+ const cx=L+pw+34;for(let k=0;k<60;k++)g+=`<rect x="${cx}" y="${T+ph-(k+1)*ph/60}" width="10" height="${ph/60+0.6}" fill="rgb(${turbo((k+0.5)/60)})"/>`;
+ for(let q=Math.ceil(lo);q<=Math.floor(hi);q++){const y=T+ph-(q-lo)/(hi-lo)*ph;g+=`<text x="${cx+13}" y="${y+4}" font-size="9" fill="${C_TXT}">1e${q}</text>`}
+ g+=`<text x="${cx+5}" y="${T-8}" text-anchor="middle" font-size="9" fill="${C_TXT}">Cn²</text><line id="${SV}cur" x1="-10" x2="-10" y1="${T}" y2="${T+ph}" stroke="#fff" stroke-width="1"/>`;
  sv.setAttribute("viewBox",`0 0 ${W} ${H}`);{const scw=($(SV+"sc")||{}).clientWidth||900;sv.style.width=ZC>1?`${scw*ZC}px`:"100%";sv.style.minWidth=ZC>1?"0":"520px";sv.style.maxWidth=ZC>1?"none":"100%"}sv.innerHTML=g;if($(SV+"zl"))$(SV+"zl").textContent=ZC>1?`× ${ZC} · glisse le panneau ou fais défiler`:"";
  CN2CTX[SV]={l,w,K,i0,i1,n,L,pw,T,ph,za,zb,lev,lo,hi,val,tt,X,W};
  const d0=tt(i0),d1=tt(i1-1),nan=w.h.slice(i0,i1).filter(h=>!h).length;
@@ -873,24 +873,24 @@ function ensureCn2UI(SV){if($(SV+"ui"))return;const sv=$(SV),ui=document.createE
  let dr=null;sc.addEventListener("mousedown",e=>{if((CZ[SV]||1)>1){dr={x:e.clientX,s:sc.scrollLeft};sc.style.cursor="grabbing";e.preventDefault()}});window.addEventListener("mousemove",e=>{if(dr)sc.scrollLeft=dr.s-(e.clientX-dr.x)});window.addEventListener("mouseup",()=>{if(dr){dr=null;sc.style.cursor="grab"}});
  ui.onclick=e=>{const z=e.target.closest("[data-cz]");if(z){const f=+z.dataset.cz,c=CN2CTX[SV],frac=c?(sc.scrollLeft+sc.clientWidth/2)/sc.scrollWidth:0.5;CZ[SV]=f?Math.min(16,Math.max(1,(CZ[SV]||1)*f)):1;cn2Redraw();sc.scrollLeft=frac*sc.scrollWidth-sc.clientWidth/2;return}const b=e.target.closest("[data-cv]");if(!b)return;CN2V.vue=b.dataset.cv;cn2Redraw()};ui.querySelector("select").onchange=e=>{CN2V.alt=e.target.value;cn2Redraw()};
  if(SV!="p2"){ui.lastElementChild.remove();return}   /* pas de profil hors Prevision */
- const pf=document.createElementNS("http://www.w3.org/2000/svg","svg");pf.id=SV+"pf";pf.setAttribute("viewBox","0 0 260 380");pf.setAttribute("role","img");pf.setAttribute("aria-label","Profil de Cn2 à l'heure survolée");pf.style.cssText="flex:0 1 260px;max-width:100%";wrap.appendChild(pf);
+ const pf=document.createElementNS("http://www.w3.org/2000/svg","svg");pf.id=SV+"pf";pf.setAttribute("viewBox","0 0 150 380");pf.setAttribute("role","img");pf.setAttribute("aria-label","Profil de Cn2 à l'heure survolée");pf.style.cssText="flex:0 0 130px;max-width:100%";wrap.appendChild(pf);
  sv.addEventListener("mousemove",e=>{const c=CN2CTX[SV];if(!c)return;const r=sv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*c.W;const i=Math.floor(c.i0+(x-c.L)/c.pw*c.n);if(i>=c.i0&&i<c.i1)cn2Profile(SV,i)});}
 function cn2Redraw(){document.querySelectorAll("[data-cv]").forEach(b=>b.classList.toggle("on",b.dataset.cv==CN2V.vue));document.querySelectorAll("select[data-ca]").forEach(s=>s.value=CN2V.alt);
  const v=(views.find(s=>!s.hidden)||{}).id;if(v=="v-prevision")drawPrev();if(v=="v-lieux")lxShow();if(v=="v-calibrer")drawCal()}
 function cn2Profile(SV,i){const c=CN2CTX[SV],pf=$(SV+"pf");if(!c||!pf)return;const h=c.w.h[i],cur=$(SV+"cur");if(cur){const x=c.X(i+0.5);cur.setAttribute("x1",x);cur.setAttribute("x2",x)}
- const W=260,H=380,L=44,R=10,T=30,B=46,pw=W-L-R,ph=H-T-B,d=c.tt(i),Yz=z=>T+ph-(Math.min(Math.max(z,c.za),c.zb)-c.za)/(c.zb-c.za)*ph,x0=c.lo-1,x1=c.hi+0.5,X=v=>L+(Math.min(Math.max(v,x0),x1)-x0)/(x1-x0)*pw;
+ const W=150,H=380,L=34,R=6,T=30,B=46,pw=W-L-R,ph=H-T-B,d=c.tt(i),Yz=z=>T+ph-(Math.min(Math.max(z,c.za),c.zb)-c.za)/(c.zb-c.za)*ph,x0=c.lo-1,x1=c.hi+0.5,X=v=>L+(Math.min(Math.max(v,x0),x1)-x0)/(x1-x0)*pw;
  let g=`<rect x="${L}" y="${T}" width="${pw}" height="${ph}" fill="#262c3b"/>`;
- g+=`<text x="${L}" y="16" font-size="11" fill="#e6ebf6" font-weight="500">Profil ${fr(d)} ${String(d.getUTCHours()).padStart(2,"0")}h TU</text>`;
+ g+=`<text x="${L}" y="12" font-size="10" fill="#e6ebf6" font-weight="500">${fr(d)} ${String(d.getUTCHours()).padStart(2,"0")}h TU</text>`;
  if(!h){pf.innerHTML=g+`<text x="${L+pw/2}" y="${T+ph/2}" text-anchor="middle" font-size="11" fill="${C_TXT}">pas de Cn² (H+0 ou trou)</text>`;return}
  const s=seeJ(c.K[0]*h.J[0]+c.K[2]*h.J[1]+c.K[1]*h.J[2]);
  c.w.z.forEach((z,k)=>{if(h.c[k]=="1"){const [a,b]=c.lev[k];if(b>c.za&&a<c.zb)g+=`<rect x="${L}" y="${Yz(Math.min(b,c.zb))}" width="${pw}" height="${Yz(Math.max(a,c.za))-Yz(Math.min(b,c.zb))}" fill="#fff" opacity=".14"/>`}});
- for(let q=Math.ceil(x0);q<=Math.floor(x1);q++)g+=`<line x1="${X(q)}" x2="${X(q)}" y1="${T}" y2="${T+ph}" stroke="#3a4258"/><text x="${X(q)}" y="${T+ph+14}" text-anchor="middle" font-size="9" fill="${C_TXT}">1e${q}</text>`;
+ for(let q=Math.ceil(x0);q<=Math.floor(x1);q++)g+=`<line x1="${X(q)}" x2="${X(q)}" y1="${T}" y2="${T+ph}" stroke="#3a4258"/>${(q-Math.ceil(x0))%2?"":`<text x="${X(q)}" y="${T+ph+14}" text-anchor="middle" font-size="8" fill="${C_TXT}">1e${q}</text>`}`;
  const pts=[];c.w.z.forEach((z,k)=>{if(z<c.za||z>c.zb)return;const v=c.val(h,k,c.K);if(v!=null)pts.push([X(v),Yz(z)])});
  if(pts.length>1)g+=pl(pts,'stroke="#5eead4" stroke-width="2"');pts.forEach(([x,y])=>g+=`<circle cx="${x}" cy="${y}" r="2" fill="#5eead4"/>`);
  if(h.hc!=null&&h.hc>=c.za&&h.hc<=c.zb)g+=`<line x1="${L}" x2="${L+pw}" y1="${Yz(h.hc)}" y2="${Yz(h.hc)}" stroke="#ff3cf0" stroke-width="1.6"/><text x="${L+4}" y="${Math.min(T+ph-4,Yz(h.hc)+(Yz(0)-Yz(h.hc)>26?Math.min(16,(Yz(0)-Yz(h.hc))/2):-4))}" font-size="12" font-weight="500" fill="#ff3cf0" stroke="#000" stroke-width="3" paint-order="stroke">BL</text><text x="${L+pw-2}" y="${Yz(h.hc)-3}" text-anchor="end" font-size="9" fill="#ff3cf0">${Math.round(h.hc)} m</text>`;
  {let k=0;const Zc=c.w.z;while(k<Zc.length){if(h.c[k]=="1"){let k2=k;while(k2+1<Zc.length&&h.c[k2+1]=="1")k2++;const a=c.lev[k][0],b=c.lev[k2][1];if(b>c.za&&a<c.zb){const ym=(Yz(Math.max(a,c.za))+Yz(Math.min(b,c.zb)))/2;g+=`<text x="${L+pw-4}" y="${ym+4}" text-anchor="end" font-size="11" font-weight="500" fill="#fff" stroke="#000" stroke-width="3" paint-order="stroke">Conv</text>`}k=k2+1}else k++}}
- const step=c.zb-c.za>8000?2000:c.zb-c.za>2000?500:100;for(let z=Math.ceil(c.za/step)*step;z<=c.zb;z+=step)g+=`<text x="${L-4}" y="${Yz(z)+4}" text-anchor="end" font-size="9" fill="${C_TXT}">${z>=1000?(z/1000)+" km":z+" m"}</text>`;
- g+=`<text x="${L+pw/2}" y="${H-6}" text-anchor="middle" font-size="10" fill="${C_TXT}">Cn² [m⁻²ᐟ³]</text><text x="${L}" y="${T-6}" font-size="10" fill="${C_TXT}">seeing ${s>0?s.toFixed(2)+'"':"–"}${isNd(d)?"":" (jour, non affiché)"}</text>`;
+ const step=c.zb-c.za>8000?2000:c.zb-c.za>2000?500:100;for(let z=Math.ceil(c.za/step)*step;z<=c.zb;z+=step)g+=`<text x="${L-4}" y="${Yz(z)+4}" text-anchor="end" font-size="8" fill="${C_TXT}">${z>=1000?(z/1000)+" km":z+" m"}</text>`;
+ g+=`<text x="${L+pw/2}" y="${H-6}" text-anchor="middle" font-size="9" fill="${C_TXT}">Cn²</text><text x="${L}" y="${T-7}" font-size="9" fill="${C_TXT}">seeing ${s>0?s.toFixed(2)+'"':"–"}${isNd(d)?"":" (jour)"}</text>`;
  pf.innerHTML=g}
 
 /* ---------- CALIBRER AVEC LES DONNEES REELLES D'UN LIEU (integrales AROME a K = 1 + mesures) ---------- */
