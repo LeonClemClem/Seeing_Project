@@ -288,7 +288,6 @@ svg{max-width:100%;height:auto;display:block}
      <h2 style="margin:0">Réglage des coefficients</h2>
     </div>
     <button class="primary" id="cuse" style="width:100%;justify-content:center;flex-direction:column;gap:2px;margin-bottom:4px">Calibration auto<span class="small mono" style="font-weight:400">K_TKE <span id="ck1"></span> · K_CIS <span id="ck2"></span></span></button>
-    <p class="okmsg" id="cok" style="margin:0 0 8px"></p>
     <div class="seg" style="margin-bottom:8px"><button id="kmA" class="on">K calés</button><button id="kmM">Manuel</button></div>
     <div id="kbox2"></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0 0;border-top:1px solid var(--line);padding-top:10px"><span class="small muted" style="width:100%">Corrélation :</span><span class="chip on" data-c="horaire" role="switch" aria-checked="true" tabindex="0">médianes horaires</span><span class="chip on" data-c="nuit" role="switch" aria-checked="true" tabindex="0">☾ médianes nocturnes</span><span class="chip" data-c="brut" role="switch" aria-checked="false" tabindex="0">données brutes</span></div>
@@ -730,7 +729,7 @@ function drawCal(){
  $("cch").innerHTML=g}
 $("chips").onclick=e=>{const rl=realLieu();if(rl){const c=e.target.closest(".chip");if(c){cselR[rl.nom]=c.dataset.k;drawCal()}return}const x=e.target.dataset.x;if(x){nights.delete(x);csel=[...nights.keys()].sort().pop()||null;drawCal();return}const c=e.target.closest(".chip");if(c){csel=c.dataset.k;drawCal()}};
 $("ex1").onclick=example;$("ex6").onclick=()=>{for(let i=0;i<6;i++)example()};
-$("cuse").onclick=()=>{if(!lastAuto)return;S.KCAL=[...lastAuto];setK(lastAuto,"A");$("cok").textContent=`K en service : K_TKE = ${fmt(lastAuto[0])}, K_CIS = ${fmt(lastAuto[1])}, K_conv = ${fmt(S.K[2])}. Carte, prévision et ciel suivent.`};
+$("cuse").onclick=()=>{if(!lastAuto)return;S.KCAL=[...lastAuto];setK(lastAuto,"A")};
 const dz=$("dz"),fi=$("fi");dz.onclick=()=>fi.click();dz.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();fi.click()}};
 const readF=fs=>[...fs].forEach(f=>{const r=new FileReader();r.onload=()=>addCSV(r.result,f.name);r.readAsText(f)});
 fi.onchange=()=>readF(fi.files);dz.ondragover=e=>{e.preventDefault();dz.classList.add("on")};dz.ondragleave=()=>dz.classList.remove("on");dz.ondrop=e=>{e.preventDefault();dz.classList.remove("on");readF(e.dataTransfer.files)};
