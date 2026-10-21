@@ -800,8 +800,13 @@ function lxCn2(l,SV="lxcn2",TT="lxcn2t",OB=true,KR=null){const sv=$(SV),w=l.cn2w
  const [lo,hi]=w._lohi,ZC=CZ[SV]||1,W=900*ZC,H=380,L=56,R=110,T=30,B=46,pw=W-L-R,ph=H-T-B,X=i=>L+(i-i0)/n*pw,Yz=z=>T+ph-(Math.min(Math.max(z,za),zb)-za)/(zb-za)*ph;
  let g=`<defs><pattern id="hwb${SV}" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="#fff" stroke-width="1.5"/><line x1="3.5" y1="0" x2="3.5" y2="7" stroke="#000" stroke-width="1.5"/></pattern></defs>`;
  g+=`<rect x="${L}" y="${T}" width="${pw}" height="${ph}" fill="#262c3b"/>`;
+ {const NR=Math.max(120,Math.round(ph*1.5)),cv=document.createElement("canvas");cv.width=n;cv.height=NR;const cx=cv.getContext("2d"),im=cx.createImageData(n,NR),D=im.data;
+  for(let i=i0;i<i1;i++){const h=w.h[i];if(!h)continue;const lg=Z.map((_,k)=>val(h,k,K));let k=0;
+   for(let r=NR-1;r>=0;r--){const z=za+(zb-za)*(NR-1-r+0.5)/NR;if(z<Z[0])continue;while(k<Z.length-2&&Z[k+1]<z)k++;
+    const a=lg[k],b=lg[k+1];if(a==null||b==null||z>Z[Z.length-1])continue;const v=a+(b-a)*(z-Z[k])/(Z[k+1]-Z[k]),q=turbo((v-lo)/(hi-lo)),p=(r*n+(i-i0))*4;D[p]=q[0];D[p+1]=q[1];D[p+2]=q[2];D[p+3]=255}}
+  cx.putImageData(im,0,0);g+=`<image href="${cv.toDataURL()}" x="${L}" y="${T}" width="${pw}" height="${ph}" preserveAspectRatio="none" style="image-rendering:pixelated"/>`}   /* log10 interpole verticalement, comme le code */
  for(let i=i0;i<i1;i++){const h=w.h[i];if(!h)continue;const x=X(i),cw=pw/n+0.4;
-  lev.forEach(([a,b],k)=>{if(b<=za||a>=zb)return;const v=val(h,k,K);if(v==null)return;const y0=Yz(b),y1=Yz(a);g+=`<rect x="${x}" y="${y0}" width="${cw}" height="${y1-y0+0.4}" fill="rgb(${turbo((v-lo)/(hi-lo))})"/>`});
+  
   let k=0;while(k<Z.length){if(h.c[k]=="1"){let k2=k;while(k2+1<Z.length&&h.c[k2+1]=="1")k2++;const a=lev[k][0],b=lev[k2][1];if(b>za&&a<zb){const y0=Yz(b),y1=Yz(a);g+=`<rect x="${x}" y="${y0}" width="${cw}" height="${y1-y0}" fill="url(#hwb${SV})" opacity=".85"/><line x1="${x}" x2="${x+cw}" y1="${y0}" y2="${y0}" stroke="#000" stroke-width="0.9"/>`}k=k2+1}else k++}}
  const hcs=[];let sg=[];for(let i=i0;i<i1;i++){const h=w.h[i];if(h&&h.hc!=null)sg.push([X(i+0.5),Yz(h.hc)]);else{if(sg.length>1)hcs.push(sg);sg=[]}}if(sg.length>1)hcs.push(sg);
  hcs.forEach(s=>g+=pl(s,'stroke="#000" stroke-width="3.6"')+pl(s,'stroke="#ff3cf0" stroke-width="1.8"'));
