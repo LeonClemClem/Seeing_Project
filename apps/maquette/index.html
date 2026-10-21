@@ -775,20 +775,23 @@ function lxHist(l,SV="lxhist",NT="lxhistnote",OB=true){const ZM=HZ[SV]||1,W=1100
 function lxCorr(l,SV="lxcorr",CT="lxct",TILES=true,PF=null){
  const prevAt=PF||(()=>{const m=new Map();l.episodes.forEach(e=>e.prevu.forEach(p=>p[1]!=null&&m.set(p[0],p[1])));return s=>m.get(s)})();
  const P=l.paires.filter(p=>p[3]&&p[1]!=null&&p[2]!=null);
- const RAW=[];if(CORRF.brut)l.episodes.forEach(e=>e.brut.forEach(p=>{if(p[1]==null||!isNd(pd(p[0])))return;const d=pd(p[0]);d.setUTCMinutes(d.getUTCMinutes()+30,0,0);d.setUTCMinutes(0);const v=prevAt(d.toISOString().slice(0,16));if(v!=null)RAW.push([p[1],v])}));
+ const PH=new Set(P.map(p=>p[0])),hs=d=>d.toISOString().slice(0,16),RAW=[];   /* comme historique_sites.mesures_brutes */
+ if(CORRF.brut)l.episodes.forEach(e=>e.brut.forEach(p=>{if(p[1]==null)return;const d=pd(p[0]),r=new Date(d.getTime()+1800000);r.setUTCMinutes(0,0,0);if(!PH.has(hs(r)))return;
+  const a=new Date(d);a.setUTCMinutes(0,0,0);const va=prevAt(hs(a)),vb=prevAt(hs(new Date(a.getTime()+3600000)));let v=null;
+  if(d.getTime()==a.getTime())v=va??null;else if(va!=null&&vb!=null)v=va+(vb-va)*(d-a)/3600000;if(v!=null&&isFinite(v))RAW.push([p[1],v])}));
  if(!P.length&&!RAW.length){$(SV).innerHTML=`<text x="170" y="160" text-anchor="middle" font-size="13" fill="${C_TXT}">Pas d'heure de nuit comparée.</text>`;$(CT).textContent="–";if(TILES)["lxrn","lxrj","lxnn","lxnj"].forEach(i=>$(i).textContent="–");return}
  const G={};P.forEach(p=>{const k=nightKey(p[0]);(G[k]=G[k]||[]).push(p)});const MOON=Object.values(G).filter(a=>a.length>=2).map(a=>[med(a.map(p=>p[2])),med(a.map(p=>p[1]))]);
  const all=[...(CORRF.horaire?P.map(p=>[p[2],p[1]]):[]),...(CORRF.nuit?MOON:[]),...RAW];
  const W=340,H=320,L=34,T=8,B=32,R=10,pw=W-L-R,ph=H-T-B,m=Math.max(2,Math.ceil(Math.max(...(all.length?all:P.map(p=>[p[2],p[1]])).map(q=>Math.max(q[0],q[1])))*1.08)),X=v=>L+Math.min(v,m)/m*pw,Y=v=>T+ph-Math.min(v,m)/m*ph,st=m>8?2:1;
  let g="";for(let v=0;v<=m;v+=st)g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${C_LINE}" stroke-width="0.6"/><line y1="${T}" y2="${T+ph}" x1="${X(v)}" x2="${X(v)}" stroke="${C_LINE}" stroke-width="0.6"/><text x="${L-5}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="${C_TXT}">${v}"</text><text x="${X(v)}" y="${T+ph+14}" text-anchor="middle" font-size="11" fill="${C_TXT}">${v}"</text>`;
  g+=`<line x1="${X(0)}" y1="${Y(0)}" x2="${X(m)}" y2="${Y(m)}" stroke="${C_TXT}" stroke-dasharray="4 3"/>`;
- RAW.forEach(q=>g+=`<circle cx="${X(q[0])}" cy="${Y(q[1])}" r="1.5" fill="${C_OBS}" opacity=".45"/>`);
+ RAW.forEach(q=>g+=`<circle cx="${X(q[0])}" cy="${Y(q[1])}" r="1.6" fill="#2a78d6" opacity=".35"/>`);
  if(CORRF.horaire)P.forEach(p=>g+=`<circle cx="${X(p[2])}" cy="${Y(p[1])}" r="3.2" fill="#2a78d6"/>`);
  if(CORRF.nuit)MOON.forEach(([x,y])=>{const cx=X(x),cy=Y(y);g+=`<path d="M${cx+2},${cy-9} A9,9 0 1,0 ${cx+2},${cy+9} A12,12 0 0,1 ${cx+2},${cy-9} Z" fill="#f1efe8" stroke="#0a0f1d" stroke-width="1"/>`});
  g+=`<text x="${L+pw/2}" y="${H-2}" text-anchor="middle" font-size="11" fill="${C_TXT}">mesuré</text><text x="10" y="${T+ph/2}" text-anchor="middle" font-size="11" fill="${C_TXT}" transform="rotate(-90 10 ${T+ph/2})">prévu ${l.modele}</text>`;
  $(SV).innerHTML=g;
  const rr=corr(P.map(p=>p[2]),P.map(p=>p[1])),bb=P.length?P.reduce((s,p)=>s+p[1]-p[2],0)/P.length:NaN,rm=MOON.length>2?corr(MOON.map(q=>q[0]),MOON.map(q=>q[1])):NaN;
- $(CT).textContent=`nuit : r = ${isNaN(rr)?"–":rr.toFixed(2)} · n = ${P.length} h · biais ${fr2(bb)}" · ${MOON.length} nuits (r des médianes nocturnes ${isNaN(rm)?"–":rm.toFixed(2)})${RAW.length?` · ${RAW.length} mesures brutes`:""}`;
+ $(CT).textContent=`nuit : r = ${isNaN(rr)?"–":rr.toFixed(2)} · n = ${P.length} h · biais ${fr2(bb)}" · ${MOON.length} nuits (r des médianes nocturnes ${isNaN(rm)?"–":rm.toFixed(2)})${RAW.length?` · R brut ${(()=>{const v=corr(RAW.map(q=>q[0]),RAW.map(q=>q[1]));return isNaN(v)?"–":v.toFixed(2)})()} (${RAW.length} mesures)`:""}`;
  if(!TILES)return;$("lxrn").textContent=isNaN(rr)?"–":rr.toFixed(2);$("lxnn").textContent=`${P.length} h de nuit`;$("lxrj").textContent=isNaN(bb)?"–":fr2(bb)+'"';$("lxnj").textContent=`${MOON.length} nuits`}
 function lxCn2(l,SV="lxcn2",TT="lxcn2t",OB=true,KR=null){const sv=$(SV),w=l.cn2w;ensureCn2UI(SV);
  if(!w){sv.innerHTML=`<text x="450" y="190" text-anchor="middle" font-size="13" fill="${C_TXT}">Pas de panneau Cn² enregistré pour ce lieu.</text>`;$(SV+"pf").innerHTML="";$(TT).textContent="";return}
