@@ -1,0 +1,460 @@
+/** Charts over real API data: forecast seeing, Cn² panel, Cn² profile and model variables (mockup's prevReal / lxCn2 / cn2Profile / prevVars). */
+import type { Cn2, Forecast } from "../api";
+import { tr } from "../i18n";
+import {
+  C_AR,
+  C_DAY,
+  C_LINE,
+  C_TXT,
+  ddmm,
+  dnText,
+  hash,
+  HOUR,
+  isNightDate,
+  pad2,
+  pl,
+  runLabel,
+  turbo,
+  yaxis,
+} from "../lib/util";
+
+const ms = (s: string) => Date.parse(s);
+
+/** Forecast seeing of the latest run (night only, daytime drawn at half width). viewBox 0 0 900 220. */
+export function prevRealSvg(fc: Forecast, kLabel: string) {
+  const pts = fc.points.filter((p) => p.lead_hour > 0).sort((a, b) => a.lead_hour - b.lead_hour);
+  if (!pts.length)
+    return `<text x="450" y="110" text-anchor="middle" font-size="13" fill="${C_TXT}">${tr("Pas de prévision enregistrée pour ce lieu.")}</text>`;
+  const t0 = ms(pts[0]!.valid_time),
+    n = Math.round((ms(pts[pts.length - 1]!.valid_time) - t0) / HOUR) + 1;
+  const W = 900,
+    H = 220,
+    L = 36,
+    R = 10,
+    T = 12,
+    B = 30,
+    pw = W - L - R,
+    ph = H - T - B,
+    tt = (i: number) => new Date(t0 + i * HOUR);
+  const wt = (i: number) => (isNightDate(tt(i)) ? 1 : 0.5),
+    cum = [0];
+  for (let i = 0; i < n; i++) cum.push(cum[i]! + wt(i));
+  const X = (x: number) => {
+    const k = Math.max(0, Math.min(n - 1, Math.floor(x)));
+    return L + ((x <= 0 ? 0 : x >= n ? cum[n]! : cum[k]! + (x - k) * wt(k)) / cum[n]!) * pw;
+  };
+  const sv: [number, number][] = [];
+  pts.forEach((p) => {
+    const i = Math.round((ms(p.valid_time) - t0) / HOUR);
+    if (p.seeing_arcsec != null && p.seeing_arcsec > 0 && isNightDate(tt(i))) sv.push([i, p.seeing_arcsec]);
+  });
+  const ymax = Math.max(3, Math.ceil(Math.max(...sv.map((p) => p[1]), 0) * 1.15)),
+    Y = (v: number) => T + ph - (Math.min(v, ymax) / ymax) * ph;
+  let g = "",
+    s0 = 0,
+    cur: boolean | null = null;
+  for (let i = 0; i <= n; i++) {
+    const nn: boolean = i < n ? isNightDate(tt(i)) : !cur;
+    if (i < n && !nn) g += `<rect x="${X(i)}" y="${T}" width="${X(i + 1) - X(i) + 0.5}" height="${ph}" fill="${C_DAY}"/>`;
+    if (cur === null) {
+      cur = nn;
+      s0 = i;
+    } else if (nn !== cur || i === n) {
+      if (i - s0 >= 3) g += dnText((X(s0) + X(i)) / 2, T + 13, cur);
+      cur = nn;
+      s0 = i;
+    }
+  }
+  g += yaxis(Y, L, W - R, ymax, ymax > 8 ? 2 : 1);
+  for (let i = 0; i <= n; i++) {
+    const d = tt(i),
+      hh = d.getUTCHours();
+    g += `<line x1="${X(i)}" x2="${X(i)}" y1="${T + ph}" y2="${T + ph + 4}" stroke="${C_LINE}"/>`;
+    if (hh % (isNightDate(d) ? 2 : 4) === 0 && i < n)
+      g += `<text x="${X(i)}" y="${T + ph + 16}" text-anchor="middle" font-size="11" fill="${hh === 0 ? "#e6ebf6" : C_TXT}" ${hh === 0 ? 'font-weight="500"' : ""}>${hh === 0 ? ddmm(d) : hh}</text>`;
+  }
+  let seg: number[][] = [],
+    prev = -2;
+  const fl = () => {
+    if (seg.length > 1) g += pl(seg, `stroke="${C_AR}" stroke-width="2.2"`);
+    seg = [];
+  };
+  sv.forEach(([i, v]) => {
+    if (i !== prev + 1) fl();
+    seg.push([X(i + 0.5), Y(v)]);
+    prev = i;
+  });
+  fl();
+  if (sv.length) {
+    const [li, lv] = sv.reduce((m, q) => (q[1] > m[1] ? q : m));
+    g += `<text x="${X(li + 0.5)}" y="${Y(lv) - 9}" text-anchor="middle" font-size="13" font-weight="700" fill="${C_AR}" stroke="#0a0f1d" stroke-width="3.5" paint-order="stroke">Seeing AROME</text>`;
+  }
+  g += `<line x1="${X(0)}" x2="${X(0)}" y1="${T}" y2="${T + ph}" stroke="#f2c14e" stroke-width="1.6" stroke-dasharray="5 3"/><text x="${X(0) + 4}" y="${T + ph - 6}" font-size="11" fill="#f2c14e">run ${runLabel(ms(fc.run_time))} · ${tr(kLabel)}</text>`;
+  return g;
+}
+
+export const CN2ALT: Record<string, [number, number]> = { bl: [0, 1000], "4": [0, 4000], jet: [8000, 16000], tout: [0, 16000] };
+
+export interface Cn2Ctx {
+  W: number;
+  H: number;
+  L: number;
+  T: number;
+  pw: number;
+  ph: number;
+  n: number;
+  za: number;
+  zb: number;
+  lo: number;
+  hi: number;
+  times: number[];
+  heights: number[];
+  /** log10 Cn², [time][height], null when missing */
+  lg: (number | null)[][];
+  hc: (number | null)[];
+  see: (number | null)[];
+}
+
+/** Prepare the Cn² matrix once per (data, altitude range). */
+export function cn2Ctx(cn: Cn2, fc: Forecast | undefined, alt: string): Cn2Ctx {
+  const [za, zb0] = CN2ALT[alt] ?? CN2ALT["4"]!;
+  const heights = cn.heights_m,
+    zb = Math.min(zb0, Math.max(...heights));
+  const lg = cn.cn2.map((row) => row.map((v) => (v != null && v > 0 ? Math.log10(v) : null)));
+  const a: number[] = [];
+  lg.forEach((row) => row.forEach((v, k) => v != null && heights[k]! <= 4000 && a.push(v)));
+  a.sort((x, y) => x - y);
+  const lo = a.length ? a[Math.floor(a.length * 0.05)]! : -18,
+    hi = a.length ? a[Math.floor(a.length * 0.995)]! : -13;
+  const times = cn.valid_times.map(ms);
+  const byT = new Map((fc?.points ?? []).map((p) => [ms(p.valid_time), p]));
+  return {
+    W: 900,
+    H: 400,
+    L: 68,
+    T: 46,
+    pw: 900 - 68 - 32,
+    ph: 400 - 46 - 56,
+    n: times.length,
+    za,
+    zb,
+    lo,
+    hi: hi > lo ? hi : lo + 1,
+    times,
+    heights,
+    lg,
+    hc: times.map((t) => byT.get(t)?.h_coulim_m ?? null),
+    see: times.map((t) => {
+      const s = byT.get(t)?.seeing_arcsec;
+      return s != null && s > 0 && isNightDate(new Date(t)) ? s : null;
+    }),
+  };
+}
+
+/** Cn² panel: turbo heatmap (log10, interpolated vertically), boundary layer, night seeing on the right axis. */
+export function cn2RealSvg(c: Cn2Ctx, runMs: number) {
+  const { W, L, T, pw, ph, n, za, zb, lo, hi, times, heights: Zh } = c;
+  if (!n) return `<text x="450" y="190" text-anchor="middle" font-size="13" fill="${C_TXT}">${tr("Pas de panneau Cn² enregistré pour ce lieu.")}</text>`;
+  const X = (i: number) => L + (i / n) * pw,
+    Yz = (z: number) => T + ph - ((Math.min(Math.max(z, za), zb) - za) / (zb - za)) * ph;
+  let g = `<rect x="${L}" y="${T}" width="${pw}" height="${ph}" fill="#262c3b"/>`;
+  {
+    const NR = Math.max(120, Math.round(ph * 1.5)),
+      cv = document.createElement("canvas");
+    cv.width = n;
+    cv.height = NR;
+    const cx = cv.getContext("2d");
+    if (cx) {
+      const im = cx.createImageData(n, NR),
+        D = im.data;
+      for (let i = 0; i < n; i++) {
+        const row = c.lg[i]!;
+        let k = 0;
+        for (let r = NR - 1; r >= 0; r--) {
+          const z = za + ((zb - za) * (NR - 1 - r + 0.5)) / NR;
+          if (z < Zh[0]!) continue;
+          while (k < Zh.length - 2 && Zh[k + 1]! < z) k++;
+          const a = row[k],
+            b = row[k + 1];
+          if (a == null || b == null || z > Zh[Zh.length - 1]!) continue;
+          const v = a + ((b - a) * (z - Zh[k]!)) / (Zh[k + 1]! - Zh[k]!),
+            q = turbo((v - lo) / (hi - lo)),
+            p = (r * n + i) * 4;
+          D[p] = q[0];
+          D[p + 1] = q[1];
+          D[p + 2] = q[2];
+          D[p + 3] = 255;
+        }
+      }
+      cx.putImageData(im, 0, 0);
+      g += `<image href="${cv.toDataURL()}" x="${L}" y="${T}" width="${pw}" height="${ph}" preserveAspectRatio="none" style="image-rendering:pixelated"/>`;
+    }
+  }
+  const hcs: number[][][] = [];
+  let sg: number[][] = [];
+  for (let i = 0; i < n; i++) {
+    const h = c.hc[i];
+    if (h != null) sg.push([X(i + 0.5), Yz(h)]);
+    else {
+      if (sg.length > 1) hcs.push(sg);
+      sg = [];
+    }
+  }
+  if (sg.length > 1) hcs.push(sg);
+  hcs.forEach((s) => (g += pl(s, 'stroke="#000" stroke-width="5"') + pl(s, 'stroke="#ff2bd6" stroke-width="2.8"')));
+  {
+    const lab = hcs.flat().find((p) => p[1]! > T + 14 && p[1]! < T + ph - 6 && p[0]! > L + 40 && p[0]! < L + pw - 140);
+    if (lab)
+      g += `<text x="${lab[0]! + 4}" y="${lab[1]! - 6}" font-size="12" font-weight="500" fill="#ff2bd6" stroke="#000" stroke-width="3" paint-order="stroke">boundary layer</text>`;
+  }
+  const step = zb - za > 8000 ? 2000 : zb - za > 2000 ? 500 : 100;
+  for (let z = Math.ceil(za / step) * step; z <= zb; z += step)
+    g += `<line x1="${L - 4}" x2="${L}" y1="${Yz(z)}" y2="${Yz(z)}" stroke="${C_TXT}"/><text x="${L - 7}" y="${Yz(z) + 5}" text-anchor="end" font-size="13" fill="${C_TXT}">${z >= 1000 ? z / 1000 : z}<tspan font-weight="700"> ${z >= 1000 ? "km" : "m"}</tspan></text>`;
+  g += `<text x="13" y="${T + ph / 2}" text-anchor="middle" font-size="13" fill="${C_TXT}" transform="rotate(-90 13 ${T + ph / 2})" font-weight="700">${tr("Altitude au-dessus du sol")}</text>`;
+  const tstep = n > 96 ? 3 : 1,
+    lstep = n > 96 ? 12 : n > 36 ? 3 : 2;
+  for (let i = 0; i <= n; i++) {
+    const d = new Date((times[0] ?? 0) + i * HOUR),
+      hh = d.getUTCHours();
+    if (hh % tstep) continue;
+    g += `<line x1="${X(i)}" x2="${X(i)}" y1="${T + ph}" y2="${T + ph + (hh % lstep ? 3 : 5)}" stroke="${C_TXT}"/>`;
+    if (hh % lstep === 0 && i < n)
+      g += `<text x="${X(i)}" y="${T + ph + 20}" text-anchor="middle" font-size="13" fill="${hh === 0 ? "#e6ebf6" : C_TXT}" ${hh === 0 ? 'font-weight="500"' : ""}>${hh === 0 ? ddmm(d) : hh + "h"}</text>`;
+    if ((hh === 0 || hh === 12) && i < n)
+      g += `<text x="${X(i)}" y="${T + ph + 37}" text-anchor="middle" font-size="12" font-weight="600" fill="${hh === 12 ? "#f2c14e" : "#9cc7ff"}">${tr(hh === 12 ? "Jour" : "Nuit")}</text>`;
+  }
+  const SEE = c.see.map((s, i) => [i, s] as const).filter((q): q is readonly [number, number] => q[1] != null);
+  const smax = Math.max(2, Math.max(...SEE.map((p) => p[1]), 0) * 1.2),
+    YS = (v: number) => T + ph - (Math.min(v, smax) / smax) * ph;
+  let seg: number[][] = [],
+    prev: number | null = null;
+  const fl = () => {
+    if (seg.length > 1) g += pl(seg, 'stroke="#fff" stroke-width="5.6"') + pl(seg, 'stroke="#1f6bff" stroke-width="3"');
+    seg = [];
+  };
+  SEE.forEach(([i, s]) => {
+    if (prev != null && i !== prev + 1) fl();
+    seg.push([X(i + 0.5), YS(s)]);
+    prev = i;
+  });
+  fl();
+  {
+    const cand = SEE.map(([i, s]) => [X(i + 0.5), YS(s)] as const).filter(([x, y]) => x > L + 20 && x < L + pw - 120 && y > T + 22),
+      p = cand.length ? cand.reduce((m, q) => (q[1] < m[1] ? q : m)) : null;
+    if (p)
+      g += `<text x="${p[0] + 6}" y="${p[1] - 10}" font-size="13" font-weight="700" fill="#1f6bff" stroke="#fff" stroke-width="3.5" paint-order="stroke">Seeing AROME</text>`;
+  }
+  const sst = smax > 8 ? 2 : smax > 3 ? 1 : 0.5;
+  for (let v = 0; v <= smax; v += sst)
+    g += `<text x="${L + pw + 3}" y="${YS(v) + 5}" font-size="13" fill="${C_TXT}">${+v.toFixed(1)}<tspan font-weight="700">″</tspan></text>`;
+  g += `<text x="${W - 1}" y="${T - 7}" text-anchor="end" font-size="13" font-weight="700" fill="${C_TXT}">Seeing (″)</text>`;
+  const xl = X((runMs - (times[0] ?? 0)) / HOUR);
+  if (xl >= L && xl <= L + pw)
+    g += `<line x1="${xl}" x2="${xl}" y1="${T}" y2="${T + ph}" stroke="#f2c14e" stroke-width="1.6" stroke-dasharray="5 3"/><text x="${xl + 5}" y="${T + 15}" font-size="12" fill="#f2c14e" stroke="#000" stroke-width="3" paint-order="stroke">${tr("dernier run")} ${runLabel(runMs)}</text>`;
+  const bw = Math.min(300, pw * 0.45),
+    bx = L + pw - bw - 80,
+    by = 4,
+    bh = 9;
+  for (let k = 0; k < 60; k++)
+    g += `<rect x="${bx + (k * bw) / 60}" y="${by}" width="${bw / 60 + 0.6}" height="${bh}" fill="rgb(${turbo((k + 0.5) / 60)})"/>`;
+  for (let q = Math.ceil(lo); q <= Math.floor(hi); q++) {
+    const x = bx + ((q - lo) / (hi - lo)) * bw;
+    g += `<line x1="${x}" x2="${x}" y1="${by + bh}" y2="${by + bh + 3}" stroke="${C_TXT}"/><text x="${x}" y="${by + bh + 14}" text-anchor="middle" font-size="11" fill="${C_TXT}">1e${q}</text>`;
+  }
+  g += `<text x="${bx - 8}" y="${by + bh}" text-anchor="end" font-size="12" fill="${C_TXT}">Cn² (m⁻²ᐟ³)</text>`;
+  return g;
+}
+
+/** Cn² profile at hour index i (side panel of the Prévision Cn² chart). */
+export function cn2ProfileSvg(c: Cn2Ctx, i: number, pfW: number) {
+  const H = 400,
+    W = pfW,
+    L = 6,
+    R = 6,
+    T = 46,
+    B = 56,
+    pw = W - L - R,
+    ph = H - T - B;
+  const t = c.times[i];
+  const d = new Date(t ?? 0),
+    Yz = (z: number) => T + ph - ((Math.min(Math.max(z, c.za), c.zb) - c.za) / (c.zb - c.za)) * ph,
+    x0 = c.lo - 1,
+    x1 = c.hi + 0.5,
+    X = (v: number) => L + ((Math.min(Math.max(v, x0), x1) - x0) / (x1 - x0)) * pw;
+  let g = `<rect x="${L}" y="${T}" width="${pw}" height="${ph}" fill="#262c3b"/>`;
+  g += `<text x="${L}" y="12" font-size="10" fill="#e6ebf6" font-weight="500">${ddmm(d)} ${pad2(d.getUTCHours())}h ${tr("TU")}</text>`;
+  const row = c.lg[i];
+  if (!row || row.every((v) => v == null))
+    return g + `<text x="${L + pw / 2}" y="${T + ph / 2}" text-anchor="middle" font-size="11" fill="${C_TXT}">${tr("pas de Cn² (H+0 ou trou)")}</text>`;
+  for (let q = Math.ceil(x0); q <= Math.floor(x1); q++)
+    g += `<line x1="${X(q)}" x2="${X(q)}" y1="${T}" y2="${T + ph}" stroke="#3a4258"/>${(q - Math.ceil(x0)) % 2 ? "" : `<text x="${X(q)}" y="${T + ph + 14}" text-anchor="middle" font-size="8" fill="${C_TXT}">1e${q}</text>`}`;
+  const pts: number[][] = [];
+  c.heights.forEach((z, k) => {
+    if (z < c.za || z > c.zb) return;
+    const v = row[k];
+    if (v != null) pts.push([X(v), Yz(z)]);
+  });
+  if (pts.length > 1) g += pl(pts, 'stroke="#5eead4" stroke-width="2"');
+  pts.forEach(([x, y]) => (g += `<circle cx="${x}" cy="${y}" r="2" fill="#5eead4"/>`));
+  const hc = c.hc[i];
+  if (hc != null && hc >= c.za && hc <= c.zb)
+    g += `<line x1="${L}" x2="${L + pw}" y1="${Yz(hc)}" y2="${Yz(hc)}" stroke="#000" stroke-width="4.2"/><line x1="${L}" x2="${L + pw}" y1="${Yz(hc)}" y2="${Yz(hc)}" stroke="#ff2bd6" stroke-width="2.4"/><text x="${L + 4}" y="${Yz(hc) - 4}" font-size="12" font-weight="500" fill="#ff2bd6" stroke="#000" stroke-width="3" paint-order="stroke">BL</text><text x="${L + pw - 2}" y="${Yz(hc) - 3}" text-anchor="end" font-size="9" fill="#ff2bd6">${Math.round(hc)} m</text>`;
+  const step = c.zb - c.za > 8000 ? 2000 : c.zb - c.za > 2000 ? 500 : 100;
+  for (let z = Math.ceil(c.za / step) * step; z <= c.zb; z += step)
+    g += `<line x1="${L}" x2="${L + pw}" y1="${Yz(z)}" y2="${Yz(z)}" stroke="#3a4258" stroke-width="0.6"/>`;
+  const s = c.see[i];
+  g += `<text x="${L + pw / 2}" y="${H - 6}" text-anchor="middle" font-size="9" fill="${C_TXT}">Cn²</text><text x="${L}" y="${T - 7}" font-size="9" fill="${C_TXT}">seeing ${s != null ? s.toFixed(2) + '"' : "–"}${isNightDate(d) ? "" : tr(" (jour)")}</text>`;
+  return g;
+}
+
+/* ---------- model variables ---------- */
+export const PVDEF: [id: string, label: string, unit: string, color: string, real: boolean][] = [
+  ["see", "Seeing", '"', "#8fd0ff", true],
+  ["dth", "Stabilité (dθ/dz, 10–100 m)", " K/100 m", "#ff9f6b", false],
+  ["hc", "BL", " m", "#ff3cf0", true],
+  ["u10", "Vent à 10 m", " km/h", "#9be89b", false],
+  ["u100", "Vent à 100 m", " km/h", "#4fc06a", false],
+  ["u500", "Vent à 500 m", " km/h", "#1f8f45", false],
+  ["shl", "Cisaillement (10 m – 500 m)", " m/s/km", "#f2c14e", false],
+  ["shj", "Cisaillement jetstream", " m/s/km", "#e8743b", false],
+  ["tke", "TKE", " m²/s²", "#c79bff", false],
+  ["t2", "Température", " °C", "#ff6b6b", false],
+];
+export const PVGRP = [
+  ["see", "dth", "hc", "tke", "t2"],
+  ["u10", "u100", "u500", "shl", "shj"],
+];
+
+/** Value of variable `id` at time t; seeing and BL are real, the others fictitious (not in the export yet). */
+function pvValue(t: number, id: string, s: number, byT: Map<number, Forecast["points"][number]>) {
+  const p = byT.get(t),
+    d = new Date(t),
+    i = t / HOUR,
+    hr = d.getUTCHours() + d.getUTCMinutes() / 60,
+    di = Math.cos(((hr - 14) / 24) * 2 * Math.PI),
+    r = (a: number, b: number, c: number) => Math.sin(i / a + s * b + c);
+  switch (id) {
+    case "see":
+      return p?.seeing_arcsec ?? null;
+    case "hc":
+      return p?.h_coulim_m ?? null;
+    case "dth":
+      return 0.4 - 1.6 * di + 0.4 * r(7, 1, 0);
+    case "u10":
+      return Math.max(0, 9 + 5 * r(11, 1, 0) + 3 * di + 2 * r(2.9, 2, 1));
+    case "u100":
+      return Math.max(0, 17 + 7 * r(11, 1, 0.3) - 2 * di + 3 * r(3.3, 2, 2));
+    case "u500":
+      return Math.max(0, 26 + 9 * r(13, 1, 0.6) + 3 * r(4.1, 3, 1));
+    case "shl":
+      return Math.max(0, 4 + 2.5 * r(9, 1, 1) - 1.5 * di);
+    case "shj":
+      return Math.max(0, 12 + 6 * r(29, 1, 0.5) + 2 * r(6, 2, 0));
+    case "tke":
+      return Math.max(0.02, 0.25 + 0.45 * Math.max(0, di) + 0.1 * r(5, 1, 2));
+    case "t2":
+      return 12 + 6 * di + 3 * r(40, 1, 0);
+  }
+  return null;
+}
+
+export interface PvPanel {
+  svg: string;
+  W: number;
+  H: number;
+  ranges: Record<string, [number, number]>;
+}
+
+/** One sub-panel of model variables (night hours only, nights glued with a gap). */
+export function pvPanel(fc: Forecast, name: string, sel: Set<string>): PvPanel {
+  const s = (hash(name) % 97) / 10;
+  const byT = new Map(fc.points.map((p) => [ms(p.valid_time), p]));
+  const tl = [...byT.keys()].sort((a, b) => a - b).filter((t) => isNightDate(new Date(t)));
+  const D: Record<string, { a: (number | null)[]; lo: number; hi: number }> = {};
+  PVDEF.forEach(([id]) => {
+    const a = tl.map((t) => {
+      const v = pvValue(t, id, s, byT);
+      return v != null && isFinite(v) ? v : null;
+    });
+    const ok = a.filter((v): v is number => v != null);
+    D[id] = { a, lo: ok.length ? Math.min(...ok) : 0, hi: ok.length ? Math.max(...ok) : 1 };
+  });
+  const GAP = 1.5,
+    PX: number[] = [];
+  let pos = 0;
+  tl.forEach((t, j) => {
+    if (j && t - tl[j - 1]! > HOUR) pos += GAP;
+    PX.push(pos);
+    pos++;
+  });
+  const NP = Math.max(1, pos);
+  const chosen = PVDEF.filter((q) => sel.has(q[0])),
+    units = [...new Set(chosen.map((q) => q[2]))],
+    common = units.length === 1,
+    W = 640,
+    H = 200,
+    L = common ? 44 : 12,
+    R = 8,
+    T = 10,
+    B = 22,
+    pw = W - L - R,
+    ph = H - T - B,
+    X = (j: number) => L + (PX[j]! / NP) * pw,
+    cwn = pw / NP;
+  let g = "";
+  tl.forEach((t, j) => {
+    if (!j || t - tl[j - 1]! > HOUR) {
+      if (j)
+        g += `<line x1="${X(j) - (cwn * GAP) / 2}" x2="${X(j) - (cwn * GAP) / 2}" y1="${T}" y2="${T + ph}" stroke="${C_TXT}" stroke-width="0.6" stroke-dasharray="2 3"/>`;
+      const b0 = new Date(t - 12 * HOUR),
+        e = new Date(b0.getTime() + 24 * HOUR);
+      g += `<text x="${X(j) + 2}" y="${T + ph + 15}" font-size="10" fill="${C_TXT}">${ddmm(b0)}→${ddmm(e)}</text>`;
+    }
+  });
+  let lo = 0,
+    hi = 1;
+  if (common && chosen.length) {
+    lo = Math.min(0, ...chosen.map((q) => D[q[0]]!.lo));
+    hi = Math.max(...chosen.map((q) => D[q[0]]!.hi)) * 1.08 || 1;
+  }
+  const Yc = (v: number) => T + ph - ((v - lo) / (hi - lo)) * ph;
+  if (common && chosen.length) {
+    const st = (hi - lo) / 4,
+      dg = hi - lo >= 20 ? 0 : hi - lo >= 2 ? 1 : 2;
+    for (let k2 = 0; k2 <= 4; k2++) {
+      const v = lo + st * k2;
+      g += `<line x1="${L}" x2="${W - R}" y1="${Yc(v)}" y2="${Yc(v)}" stroke="${C_LINE}" stroke-width="0.6"/><text x="${L - 4}" y="${Yc(v) + 3.5}" text-anchor="end" font-size="10" fill="${C_TXT}">${v.toFixed(dg)}<tspan font-weight="700">${k2 === 4 ? units[0]!.trim() : ""}</tspan></text>`;
+    }
+  } else {
+    for (let k2 = 0; k2 <= 4; k2++)
+      g += `<line x1="${L}" x2="${W - R}" y1="${T + (ph * k2) / 4}" y2="${T + (ph * k2) / 4}" stroke="${C_LINE}" stroke-width="0.6"/>`;
+    if (chosen.length)
+      g += `<text x="${L + 4}" y="${T + 11}" font-size="10" fill="${C_TXT}">${tr("échelle propre à chaque courbe (valeurs à droite)")}</text>`;
+  }
+  chosen.forEach(([id, , , col]) => {
+    const S2 = D[id]!,
+      Y = common ? Yc : (v: number) => T + ph - ((v - S2.lo) / (S2.hi - S2.lo || 1)) * ph * 0.92 - ph * 0.04;
+    let seg: number[][] = [],
+      pv: number | null = null;
+    const fl = () => {
+      if (seg.length > 1) g += pl(seg, `stroke="${col}" stroke-width="1.8" stroke-dasharray="5 3"`);
+      seg = [];
+    };
+    S2.a.forEach((v, j) => {
+      if (v == null) {
+        fl();
+        pv = null;
+        return;
+      }
+      if (pv != null && tl[j]! - tl[pv]! > HOUR) fl();
+      seg.push([X(j) + cwn / 2, Y(v)]);
+      pv = j;
+    });
+    fl();
+  });
+  if (!chosen.length)
+    g += `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" font-size="12" fill="${C_TXT}">${tr("Coche une ou plusieurs variables à droite.")}</text>`;
+  const ranges: Record<string, [number, number]> = {};
+  PVDEF.forEach(([id]) => (ranges[id] = [D[id]!.lo, D[id]!.hi]));
+  return { svg: g, W, H, ranges };
+}

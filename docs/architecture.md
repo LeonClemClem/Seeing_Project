@@ -27,7 +27,7 @@ Cloud Run Service seeing-web-{env}   FastAPI: /api/* + built React SPA   ◄─�
 | `packages/seeing_db/` | SQLAlchemy models + Alembic migrations (incl. site seed). Shared by batch and api. | shared |
 | `apps/batch/` | Cloud Run Job: download AROME, run `seeing_core`, persist via `seeing_db`. | core |
 | `apps/api/` | FastAPI app; serves `/api/*` and the built SPA. | web |
-| `apps/web/` | React + Vite + TypeScript SPA (MapLibre, ECharts). | web |
+| `apps/web/` | React + Vite + TypeScript SPA ("Seeing AROME" UI: canvas map and SVG charts, FR/EN; mock data layer in `src/mock/` for views without endpoints). | web |
 | `infra/terraform/` | All GCP resources. | infra |
 
 Python 3.12 everywhere, Poetry 1.8 with path dependencies (`packages/*` are depended on with
