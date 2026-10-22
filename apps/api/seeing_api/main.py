@@ -4,6 +4,9 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 
 from seeing_api.api import router
@@ -25,6 +28,14 @@ def create_app(static_dir: str | Path | None = None) -> FastAPI:
         if request.url.path.startswith("/api/") and "cache-control" not in response.headers:
             response.headers["Cache-Control"] = API_CACHE if response.status_code < 400 else "no-store"
         return response
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(request: Request, exc: RequestValidationError):
+        """422 as usual, but auth errors never echo what was submitted (it may be a password)."""
+        if not request.url.path.startswith("/api/auth/"):
+            return await request_validation_exception_handler(request, exc)
+        errors = [{k: v for k, v in e.items() if k not in {"input", "ctx", "url"}} for e in exc.errors()]
+        return JSONResponse({"detail": jsonable_encoder(errors)}, status_code=422)
 
     @app.get("/healthz", response_model=Health)
     def healthz() -> Health:

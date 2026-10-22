@@ -1,8 +1,10 @@
 """`seeing-create-user`: create an app account, or update an existing one with --update.
 
 Sign-up only creates `user` accounts; use this to create the first administrator and the shared
-CosmoDrôme team account. The password is never a command-line argument (it would land in shell
-history and process lists): it is read from $SEEING_USER_PASSWORD when set, otherwise prompted.
+CosmoDrôme team account. The password is never a command-line argument (process lists): it is
+prompted (recommended), or read from $SEEING_USER_PASSWORD for non-interactive runs (an inline
+`VAR=... command` still lands in shell history; prefer exporting it from a secret store).
+Changing a password ends all the account's sessions.
 
     poetry run seeing-create-user --email admin@example.org --role admin
 """
@@ -12,10 +14,10 @@ import getpass
 import os
 import sys
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from seeing_api.auth import MIN_PASSWORD_LENGTH, hash_password, normalize_email
-from seeing_db import User, UserRole, make_engine, make_session_factory
+from seeing_db import User, UserRole, UserSession, make_engine, make_session_factory
 
 PASSWORD_ENV = "SEEING_USER_PASSWORD"  # noqa: S105 - the name of an environment variable, not a password
 
@@ -23,7 +25,9 @@ PASSWORD_ENV = "SEEING_USER_PASSWORD"  # noqa: S105 - the name of an environment
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Create (or with --update, modify) an app account.")
     parser.add_argument("--email", required=True, help="login e-mail (stored lower-cased)")
-    parser.add_argument("--role", choices=[r.value for r in UserRole], default=UserRole.user.value, help="account type")
+    parser.add_argument(
+        "--role", choices=[r.value for r in UserRole], help="account type (new accounts: user; --update: unchanged)"
+    )
     parser.add_argument("--display-name", help="name shown in the app")
     parser.add_argument(
         "--update", action="store_true", help="the account exists: set its password, role and display name"
@@ -58,8 +62,12 @@ def main(argv: list[str] | None = None) -> None:
             if user is None:
                 user = User(email=email)
                 session.add(user)
+            else:
+                # A new password ends every existing session (e.g. one opened by someone else).
+                session.execute(delete(UserSession).where(UserSession.user_id == user.id))
             user.password_hash = password_hash
-            user.role = UserRole(args.role)
+            if args.role is not None or user.role is None:
+                user.role = UserRole(args.role or UserRole.user.value)
             if args.display_name is not None:
                 user.display_name = args.display_name.strip() or None
             session.commit()

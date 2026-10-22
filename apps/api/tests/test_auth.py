@@ -147,3 +147,10 @@ def test_role_comes_from_the_database(client):
         s.scalar(select(User)).role = UserRole.admin
         s.commit()
     assert client.get("/api/me").json()["user"]["role"] == "admin"
+
+
+def test_validation_errors_do_not_echo_the_password(client):
+    r = signup(client, email="bob@example.org", password="secret1")
+    assert r.status_code == 422 and "secret1" not in r.text
+    r = client.post("/api/auth/login", json={"email": "not-an-email", "password": "hunter2hunter2"})
+    assert r.status_code == 422 and "hunter2hunter2" not in r.text and "not-an-email" not in r.text

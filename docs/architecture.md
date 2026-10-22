@@ -161,7 +161,8 @@ server-side session; the browser holds a random token in the `seeing_session` co
 JSON-only auth POSTs (no CORS is configured). `current_user` / `require_role(...)` are the FastAPI
 dependencies for endpoints that need an account. Sign-up only creates `user` accounts; create
 `admin` and `team` accounts with `seeing-create-user --email ... --role admin|team` (password from
-the prompt or `SEEING_USER_PASSWORD`). Not implemented yet: login rate limiting, e-mail
+the prompt, or `SEEING_USER_PASSWORD` for non-interactive runs; `--update` changes password, name and,
+only if given, role, and ends the account's sessions). Auth 422 responses never echo submitted values. Not implemented yet: login rate limiting, e-mail
 verification, password reset.
 
 IAP still sits in front of the Cloud Run service, so a visitor needs IAP access before reaching the
