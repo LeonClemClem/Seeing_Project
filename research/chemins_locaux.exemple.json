@@ -1,0 +1,9 @@
+{
+  "_lisez_moi": "Copier ce fichier en chemins_locaux.json (non versionne) et mettre ses propres dossiers. Une cle absente = dossier par defaut dans donnees/.",
+  "arome_runs": "D:/seeing/Arome_runs",
+  "cache": "D:/seeing/cache_validation",
+  "previsions": "D:/seeing/previsions",
+  "tests": "D:/seeing/tests",
+  "mesures": "D:/seeing/mesures",
+  "mesures_v1": "D:/seeing/V1"
+}

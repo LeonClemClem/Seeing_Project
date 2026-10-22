@@ -37,5 +37,15 @@ crash.log
 .coverage
 *.tsbuildinfo
 
-# Claude Code worktrees / local state
-.claude/
+# Claude Code local state (skills and agents ARE shared)
+.claude/*
+!.claude/skills/
+!.claude/agents/
+
+# Chemins et donnees propres a chaque machine (voir research/chemins.py)
+research/chemins_locaux.json
+donnees/
+*.log
+
+# Donnees reelles de la maquette (regenerees par research/export_lieux_site.py)
+apps/maquette/lieux_data.js

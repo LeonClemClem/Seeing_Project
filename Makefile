@@ -70,3 +70,14 @@ test-batch:
 # Local run against DATABASE_URL (run `make migrate` first). ARGS="--run-time 2026-10-13T00:00Z --keep-gribs"
 batch-run:
 	cd apps/batch && poetry install -q && poetry run seeing-batch run $(ARGS)
+
+# ---- Python style (see ruff.toml and .claude/skills/python) ------------------------------------
+.PHONY: lint format
+
+lint:
+	ruff check research
+	ruff format --check research
+
+format:
+	ruff check --fix research
+	ruff format research

@@ -1,0 +1,26 @@
+# Ruff configuration for the whole repository (lint + format + import sorting).
+# Usage: `ruff check .`, `ruff check --fix .`, `ruff format .` — or `make lint` / `make format`.
+line-length = 120
+target-version = "py312"
+extend-exclude = ["research/papers", "apps/web/node_modules"]
+
+[lint]
+# E/W pycodestyle (PEP 8), F pyflakes, I isort, B bugbear, UP pyupgrade, N pep8-naming, S bandit (security)
+select = ["E", "W", "F", "I", "B", "UP", "N", "S"]
+ignore = [
+    "E501",   # long lines are reported by the formatter, not as lint errors
+    "N803",   # physics variables keep their usual names (K_TKE, Cn2, ...)
+    "N806",
+    "N816",
+    "S101",   # assert is fine in tests
+]
+
+[lint.per-file-ignores]
+"**/tests/**" = ["S"]
+
+[lint.isort]
+known-first-party = ["chemins", "seeing_project", "seeing_db", "seeing_api"]
+combine-as-imports = true
+
+[format]
+quote-style = "double"
