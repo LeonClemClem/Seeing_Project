@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "Database models and migrations shared by the seeing batch job and API."
 authors = ["defqoon <thomas.hossler@gmail.com>"]
 packages = [{include = "seeing_db"}]
-include = ["seeing_db/alembic.ini"]
 
 [tool.poetry.dependencies]
 python = ">=3.12,<3.13"
