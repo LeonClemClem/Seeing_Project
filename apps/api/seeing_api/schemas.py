@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from seeing_api.auth import UserOut
+
 
 class SiteOut(BaseModel):
     slug: str
@@ -41,8 +43,11 @@ class Cn2Out(BaseModel):
 
 
 class MeOut(BaseModel):
+    #: Identity asserted by IAP (header), independent of the app account.
     email: str | None
     env: str
+    #: The logged-in app account, or None.
+    user: UserOut | None = None
 
 
 class Health(BaseModel):

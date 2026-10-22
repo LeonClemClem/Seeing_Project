@@ -32,7 +32,7 @@ web-install:
 
 # FastAPI on :8000 with reload (uses DATABASE_URL; run `make db-up migrate dev-seed` first).
 api-dev:
-	cd apps/api && STATIC_DIR=$${STATIC_DIR:-../web/dist} poetry run uvicorn seeing_api.main:app --reload --port 8000
+	cd apps/api && COOKIE_SECURE=$${COOKIE_SECURE:-false} STATIC_DIR=$${STATIC_DIR:-../web/dist} poetry run uvicorn seeing_api.main:app --reload --port 8000
 
 # Vite on :5173, proxies /api to :8000.
 web-dev:

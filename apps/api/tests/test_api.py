@@ -98,4 +98,4 @@ def test_me_reads_iap_header(client):
 
 def test_me_env(client, monkeypatch):
     monkeypatch.setenv("ENV", "prod")
-    assert client.get("/api/me").json() == {"email": None, "env": "prod"}
+    assert client.get("/api/me").json() == {"email": None, "env": "prod", "user": None}
