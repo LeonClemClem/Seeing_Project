@@ -7,7 +7,8 @@
 #   the image is built only if that tag is not already in Artifact Registry, so deploying the
 #   same commit to prod after dev reuses the dev image.
 # - With a tag: deploys that existing image (rollback / promotion); never builds.
-# - web: build web image -> update + execute seeing-migrate-<env> -> deploy seeing-web-<env>.
+# - web: build web image -> update + execute seeing-migrate-<env> -> deploy seeing-web-<env>
+#   -> update seeing-create-user-<env>.
 # - batch: build batch image -> update seeing-batch-<env> (next scheduled run uses it).
 set -euo pipefail
 
@@ -80,6 +81,10 @@ deploy_web() {
 
   echo "==> deploying seeing-web-${ENV}"
   gc run deploy "seeing-web-${ENV}" --region="$REGION" --image="$image"
+
+  # Same image: the account-administration job must run the same code and migrations.
+  echo "==> updating seeing-create-user-${ENV}"
+  gc run jobs update "seeing-create-user-${ENV}" --region="$REGION" --image="$image"
 }
 
 deploy_batch() {
