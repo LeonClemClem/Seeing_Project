@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy import (
     REAL,
     Boolean,
+    CheckConstraint,
     DateTime,
     Enum,
     Float,
@@ -98,3 +99,49 @@ class Cn2Profile(Base):
 
     run: Mapped[ModelRun] = relationship(back_populates="cn2_profiles")
     site: Mapped[Site] = relationship()
+
+
+class UserRole(enum.StrEnum):
+    """Account types: an individual user, the shared CosmoDrôme team account, or an administrator."""
+
+    user = "user"
+    team = "team"
+    admin = "admin"
+
+
+class User(Base):
+    """An app account. E-mails are stored lower-cased; the password is an Argon2id hash."""
+
+    __tablename__ = "users"
+    __table_args__ = (CheckConstraint("email = lower(email)", name="users_email_lowercase"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True)
+    password_hash: Mapped[str] = mapped_column(Text)
+    display_name: Mapped[str | None] = mapped_column(String(120))
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole, name="user_role", values_callable=lambda e: [m.value for m in e]),
+        default=UserRole.user,
+        server_default=UserRole.user.value,
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    sessions: Mapped[list["UserSession"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class UserSession(Base):
+    """A login session. `id` is the SHA-256 hex digest of the cookie token, never the token itself."""
+
+    __tablename__ = "user_sessions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="sessions")
