@@ -1,0 +1,80 @@
+/**
+ * Places shown in the selector: public observing sites from the API (real forecasts) and the
+ * user's personal places, which are mock data until places CRUD exists on the backend.
+ */
+import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
+
+import { api, queryKeys, type Site } from "../api";
+import { KDEF } from "../mock/engine";
+import { useUi, type K3, type Role, type UiState } from "../store";
+
+export interface Place {
+  id: string;
+  nom: string;
+  lat: number;
+  lon: number;
+  alt: number | null;
+  kind: "pub" | "mine";
+  /** API slug for public sites. */
+  slug?: string;
+  /** Fitted K of the place. For API sites these are placeholders: the batch computes with its own K. */
+  K: K3;
+  /** Real forecasts from the API (as opposed to the fictitious model). */
+  real: boolean;
+  /** Measurement factor of the fictitious monitor (mock places). */
+  f: number;
+  /** Mock table columns of "Mes lieux". */
+  vis?: "partagé · position approchée" | "privé";
+  mesures?: string;
+  kSrc?: "indépendants" | "facteur" | "voisins";
+  prev?: "run global 12Z" | "hors France · en file, 2e";
+}
+
+export const MOCK_PLACES: Place[] = [
+  { id: "mine:jardin", nom: "Jardin", lat: 44.3, lon: 5.3, alt: null, kind: "mine", K: [11.6, 20.8, 0.1], real: false, f: 1.0, vis: "partagé · position approchée", mesures: "3 CSV · 42 h de nuit", kSrc: "facteur", prev: "run global 12Z" },
+  { id: "mine:col", nom: "Col de la Croix", lat: 44.612, lon: 5.701, alt: null, kind: "mine", K: [6.1, 33, 0.1], real: false, f: 0.92, vis: "privé", mesures: "8 CSV · 96 h de nuit", kSrc: "indépendants", prev: "run global 12Z" },
+  { id: "mine:star", nom: "Star party", lat: 46.912, lon: 10.54, alt: null, kind: "mine", K: [...KDEF], real: false, f: 1.12, vis: "privé", mesures: "", kSrc: "voisins", prev: "hors France · en file, 2e" },
+];
+
+export const siteToPlace = (s: Site): Place => ({
+  id: "pub:" + s.slug,
+  nom: s.name,
+  lat: s.lat,
+  lon: s.lon,
+  alt: s.altitude_m,
+  kind: "pub",
+  slug: s.slug,
+  K: [...KDEF],
+  real: true,
+  f: 1,
+});
+
+export function useSites() {
+  return useQuery({ queryKey: queryKeys.sites, queryFn: api.sites });
+}
+
+export function usePlaces(): { pub: Place[]; mine: Place[]; all: Place[] } {
+  const sites = useSites();
+  return useMemo(() => {
+    const pub = (sites.data ?? []).map(siteToPlace);
+    return { pub, mine: MOCK_PLACES, all: [...pub, ...MOCK_PLACES] };
+  }, [sites.data]);
+}
+
+export function useCurrentPlace(): Place {
+  const id = useUi((s) => s.place);
+  const { all } = usePlaces();
+  return all.find((p) => p.id === id) ?? MOCK_PLACES[0]!;
+}
+
+/** K of public sites are visible to the administrator only; everyone sees the K of their own places. */
+export const kHidden = (p: Place, role: Role) => p.kind === "pub" && role !== "admin";
+
+export const kTxt = (K: K3, hid: boolean, f: (v: number) => string | number = (v) => v) =>
+  hid ? "K confidentiels" : `K_TKE = ${f(K[0])}  K_CIS = ${f(K[1])}  K_conv = ${f(K[2])}`;
+
+/** Select a place and load its fitted K, like the mockup's applyLieuK(). */
+export function selectPlace(p: Place): Partial<UiState> {
+  return { place: p.id, KCAL: [...p.K], K: [...p.K], kmode: "A" };
+}

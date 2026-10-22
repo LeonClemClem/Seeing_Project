@@ -5,7 +5,7 @@ import { BrowserRouter } from "react-router-dom";
 
 import { ApiError } from "./api";
 import App from "./App";
-import { TimeZoneProvider } from "./lib/timezone";
+import { getState } from "./store";
 import "./styles.css";
 
 const queryClient = new QueryClient({
@@ -18,14 +18,14 @@ const queryClient = new QueryClient({
   },
 });
 
+document.documentElement.lang = getState().lang;
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <TimeZoneProvider>
-        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <App />
-        </BrowserRouter>
-      </TimeZoneProvider>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <App />
+      </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,
 );
