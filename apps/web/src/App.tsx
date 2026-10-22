@@ -5,7 +5,8 @@ import Header from "./components/Header";
 import { HatchDefs } from "./components/ui";
 import { tr } from "./i18n";
 import Carte from "./pages/Carte";
-import { APropos, Compte, SeeingMonitor, Tutoriel } from "./pages/Static";
+import Compte from "./pages/Compte";
+import { APropos, SeeingMonitor, Tutoriel } from "./pages/Static";
 import { useUi } from "./store";
 
 const Prevision = lazy(() => import("./pages/Prevision"));

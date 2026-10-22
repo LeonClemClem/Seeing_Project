@@ -1,7 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 
-import { api, queryKeys } from "../api";
+import { useMe, useSyncRole } from "../data/auth";
 import { kHidden, selectPlace, useCurrentPlace, usePlaces } from "../data/places";
 import { tr } from "../i18n";
 import { useLatestRunTime } from "../lib/hooks";
@@ -20,10 +19,11 @@ const TABS: [path: string, label: string][] = [
   ["/seeing-monitor", "Besoin d'un seeing monitor ?"],
 ];
 
-const initials = (email: string | null | undefined) => {
-  if (!email) return "–";
-  const parts = email.split("@")[0]!.split(/[._-]+/).filter(Boolean);
-  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? parts[0]?.[1] ?? "")).toUpperCase();
+/** Two letters from a display name ("Ada Lovelace" → "AL") or an e-mail ("ada.l@x" → "AL"). */
+const initials = (name: string | null | undefined, email: string | null | undefined) => {
+  const parts = (name?.trim() ? name.trim().split(/\s+/) : (email ?? "").split("@")[0]!.split(/[._-]+/)).filter(Boolean);
+  if (!parts.length) return "–";
+  return ((parts[0]![0] ?? "") + (parts[1]?.[0] ?? parts[0]![1] ?? "")).toUpperCase();
 };
 
 export default function Header() {
@@ -33,7 +33,9 @@ export default function Header() {
   const kmode = useUi((s) => s.kmode);
   const { pub, mine, all } = usePlaces();
   const place = useCurrentPlace();
-  const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  const me = useMe();
+  useSyncRole();
+  const user = me.data?.user ?? null;
   const { runTime } = useLatestRunTime();
   const loc = useLocation();
 
@@ -92,9 +94,14 @@ export default function Header() {
           >
             {lang === "en" ? "FR" : "EN"}
           </button>
-          <div className="av" title={me.data?.email ?? tr("Compte de démonstration")}>
-            {initials(me.data?.email)}
-          </div>
+          <Link
+            to="/compte"
+            className="av"
+            style={{ color: "inherit", textDecoration: "none", ...(user ? { borderColor: "var(--arome)" } : {}) }}
+            title={user ? `${user.display_name ?? user.email} · ${tr("Compte")}` : tr("Se connecter")}
+          >
+            {user ? initials(user.display_name, user.email) : initials(null, me.data?.email)}
+          </Link>
         </div>
       </div>
       <div className="strip">

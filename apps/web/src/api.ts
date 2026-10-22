@@ -37,9 +37,21 @@ export interface Cn2 {
   cn2: (number | null)[][];
 }
 
+export type UserRole = "user" | "team" | "admin";
+
+export interface User {
+  id: number;
+  email: string;
+  display_name: string | null;
+  role: UserRole;
+}
+
 export interface Me {
+  /** Identity asserted by IAP, independent of the app account. */
   email: string | null;
   env: string;
+  /** Logged-in app account, or null. */
+  user: User | null;
 }
 
 export class ApiError extends Error {
@@ -51,8 +63,12 @@ export class ApiError extends Error {
   }
 }
 
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(path, { headers: { Accept: "application/json" } });
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(path, {
+    ...init,
+    credentials: "same-origin",
+    headers: { Accept: "application/json", ...init.headers },
+  });
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -63,11 +79,19 @@ async function get<T>(path: string): Promise<T> {
     }
     throw new ApiError(res.status, detail);
   }
-  return (await res.json()) as T;
+  return (res.status === 204 ? undefined : await res.json()) as T;
 }
+
+const get = <T>(path: string) => request<T>(path);
+/** JSON POST: the auth endpoints only accept application/json (CSRF guard). */
+const post = <T>(path: string, body: unknown = {}) =>
+  request<T>(path, { method: "POST", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } });
 
 export const api = {
   me: () => get<Me>("/api/me"),
+  signup: (b: { email: string; password: string; display_name?: string }) => post<User>("/api/auth/signup", b),
+  login: (b: { email: string; password: string }) => post<User>("/api/auth/login", b),
+  logout: () => post<void>("/api/auth/logout"),
   sites: () => get<Site[]>("/api/sites"),
   latestRun: () => get<Run>("/api/runs/latest"),
   forecast: (slug: string, run = "latest") =>

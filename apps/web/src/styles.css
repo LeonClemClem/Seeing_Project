@@ -98,3 +98,4 @@ a{color:#9cc7ff}
 .hghead{margin-bottom:4px}
 .loading{padding:24px;color:var(--muted)}
 details>summary{list-style-position:inside}
+button:disabled{opacity:.5;cursor:not-allowed}
