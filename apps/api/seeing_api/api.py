@@ -5,10 +5,11 @@ import os
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from seeing_api.auth import NO_STORE, CurrentUser, user_out
 from seeing_api.db import get_session
 from seeing_api.schemas import Cn2Out, ForecastOut, ForecastPoint, MeOut, RunOut, SiteOut
 from seeing_db import Cn2Profile, Forecast, ModelRun, RunStatus, Site
@@ -62,10 +63,11 @@ def resolve_run(session: Session, run: str) -> ModelRun:
 
 
 @router.get("/me", response_model=MeOut)
-def me(request: Request) -> MeOut:
+def me(request: Request, response: Response, user: CurrentUser) -> MeOut:
+    response.headers["Cache-Control"] = NO_STORE
     raw = request.headers.get(IAP_EMAIL_HEADER)
     email = raw.split(":", 1)[-1] if raw else None
-    return MeOut(email=email or None, env=os.environ.get("ENV", "dev"))
+    return MeOut(email=email or None, env=os.environ.get("ENV", "dev"), user=user_out(user) if user else None)
 
 
 @router.get("/sites", response_model=list[SiteOut])

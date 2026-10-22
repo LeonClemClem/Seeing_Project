@@ -49,3 +49,8 @@ donnees/
 
 # Donnees reelles de la maquette (regenerees par research/export_lieux_site.py)
 apps/maquette/lieux_data.js
+
+# Local environment files (may hold DB URLs or SEEING_USER_PASSWORD)
+.env
+.env.*
+!.env.example

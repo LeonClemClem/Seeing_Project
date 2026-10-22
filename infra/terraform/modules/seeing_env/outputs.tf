@@ -14,6 +14,15 @@ output "migrate_job" {
   value = module.migrate.name
 }
 
+output "create_user_job" {
+  value = module.create_user.name
+}
+
+output "user_password_secret" {
+  description = "Secret holding the password seeing-create-user-<env> sets."
+  value       = google_secret_manager_secret.user_password.secret_id
+}
+
 output "web_service_account" {
   value = google_service_account.web.email
 }

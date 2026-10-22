@@ -14,3 +14,12 @@ output "batch_job" {
 output "migrate_job" {
   value = module.env.migrate_job
 }
+
+output "create_user_job" {
+  description = "Cloud Run job running seeing-create-user inside the VPC."
+  value       = module.env.create_user_job
+}
+
+output "user_password_secret" {
+  value = module.env.user_password_secret
+}

@@ -82,6 +82,72 @@ module "migrate" {
   depends_on = [google_secret_manager_secret_iam_member.db_password]
 }
 
+# --- Account administration: seeing-create-user inside the VPC ----------------------------------
+# Sign-up only creates `user` accounts. This job (same image as the web service, Direct VPC egress to
+# the DB VM) creates admin/team accounts. Its password comes from a Secret Manager secret whose
+# first version is a random bootstrap password; add a new version to choose another one. See
+# infra/terraform/README.md, "Create an admin account".
+# NOTE: the random_password result is stored in the Terraform state (private bucket).
+
+resource "random_password" "user_bootstrap" {
+  length  = 24
+  special = false
+}
+
+resource "google_secret_manager_secret" "user_password" {
+  secret_id = "user-bootstrap-password-${var.env}"
+  labels    = { app = "seeing" }
+
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+}
+
+resource "google_secret_manager_secret_version" "user_password" {
+  secret      = google_secret_manager_secret.user_password.id
+  secret_data = random_password.user_bootstrap.result
+
+  lifecycle {
+    # Later versions are added by hand (gcloud secrets versions add); never roll them back.
+    ignore_changes = [secret_data]
+  }
+}
+
+resource "google_secret_manager_secret_iam_member" "user_password" {
+  secret_id = google_secret_manager_secret.user_password.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = google_service_account.web.member
+}
+
+module "create_user" {
+  source = "../cloud_run_job"
+
+  name                  = "seeing-create-user-${var.env}"
+  region                = var.region
+  image                 = var.job_image
+  command               = ["seeing-create-user"]
+  service_account_email = google_service_account.web.email
+  network               = var.network_id
+  subnetwork            = var.subnet_id
+  cpu                   = "1"
+  memory                = "512Mi"
+  timeout_seconds       = 120
+  max_retries           = 0
+  env                   = local.db_env
+  secret_env            = merge(local.db_secret_env, { SEEING_USER_PASSWORD = google_secret_manager_secret.user_password.secret_id })
+  deletion_protection   = var.deletion_protection
+
+  depends_on = [
+    google_secret_manager_secret_iam_member.db_password,
+    google_secret_manager_secret_iam_member.user_password,
+    google_secret_manager_secret_version.user_password,
+  ]
+}
+
 # --- Batch job + schedule -------------------------------------------------------------------------
 
 module "batch" {

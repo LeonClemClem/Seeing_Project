@@ -30,10 +30,12 @@ ENV PATH=/opt/venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     STATIC_DIR=/app/static \
+    ALEMBIC_CONFIG=/app/database/alembic.ini \
     PORT=8080
 RUN useradd --system --uid 10001 --home-dir /app --shell /usr/sbin/nologin app
 COPY --from=python-build /opt/venv /opt/venv
 COPY --from=web /web/dist /app/static
+COPY database /app/database
 WORKDIR /app
 USER app
 EXPOSE 8080

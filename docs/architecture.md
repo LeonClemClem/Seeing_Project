@@ -24,7 +24,8 @@ Cloud Run Service seeing-web-{env}   FastAPI: /api/* + built React SPA   ◄─�
 |---|---|---|
 | `research/` | Original scripts, papers, Poetry env for experiments. Not imported by the apps. | friend |
 | `packages/seeing_core/` | Pure seeing computation refactored from `research/SeeingAromeV2_correction_conv_tke.py`. | core |
-| `packages/seeing_db/` | SQLAlchemy models + Alembic migrations (incl. site seed). Shared by batch and api. | shared |
+| `packages/seeing_db/` | SQLAlchemy models, DB config and the `seeing-migrate` runner. Shared by batch and api. | shared |
+| `database/` | Alembic: `alembic.ini`, `migrations/env.py`, `migrations/versions/` (incl. site seed). See `database/README.md`. | shared |
 | `apps/batch/` | Cloud Run Job: download AROME, run `seeing_core`, persist via `seeing_db`. | core |
 | `apps/api/` | FastAPI app; serves `/api/*` and the built SPA. | web |
 | `apps/web/` | React + Vite + TypeScript SPA ("Seeing AROME" UI: canvas map and SVG charts, FR/EN; mock data layer in `src/mock/` for views without endpoints). | web |
@@ -34,10 +35,11 @@ Python 3.12 everywhere, Poetry 1.8 with path dependencies (`packages/*` are depe
 `{path = "../../packages/<name>", develop = true}`). Docker builds use the **repo root** as
 context so path dependencies resolve.
 
-## Database (`packages/seeing_db`)
+## Database (`packages/seeing_db`, `database/`)
 
 Postgres 16. Schema is defined by the SQLAlchemy models in `packages/seeing_db/seeing_db/models.py`
-and created by Alembic (`packages/seeing_db/seeing_db/migrations`). Tables:
+and created by Alembic (`database/migrations`; `seeing-migrate` = `alembic upgrade head`, finds
+`database/alembic.ini` via `ALEMBIC_CONFIG` or the repo checkout). Tables:
 
 - `sites(id, slug UNIQUE, name, lat, lon, altitude_m NULL, k_tke_conv, k_tke, k_cis, active, created_at)`
 - `model_runs(id, run_time UNIQUE (AROME cycle, UTC), status ∈ {running, success, failed},
@@ -48,6 +50,10 @@ and created by Alembic (`packages/seeing_db/seeing_db/migrations`). Tables:
 - `cn2_profiles(id, run_id → model_runs ON DELETE CASCADE, site_id → sites, valid_time, lead_hour,
   heights_m REAL[], cn2 REAL[], UNIQUE(run_id, site_id, lead_hour))`. `heights_m` are metres above
   ground level, on a regular display grid (100 m steps up to the top of the profile).
+- `users(id, email UNIQUE (lower-cased, CHECK email = lower(email)), password_hash (Argon2id),
+  display_name NULL, role ∈ {user, team, admin}, is_active, created_at, last_login_at NULL)`
+- `user_sessions(id = SHA-256 hex of the cookie token, user_id → users ON DELETE CASCADE, created_at,
+  expires_at (indexed), last_seen_at)`. The raw token exists only in the user's cookie.
 
 Rules:
 - The batch job writes a run as `running`, inserts all rows, then flips to `success` in one
@@ -74,8 +80,18 @@ Batch only:
 | `RETENTION_DAYS` | `14` | Model runs older than this are deleted. |
 | `LOG_LEVEL` | `INFO` | |
 
-API only: `PORT` (8080, set by Cloud Run), `STATIC_DIR` (`/app/static`, built SPA), `ENV`
-(`dev`/`prod`, shown in the UI header).
+API only:
+
+| Var | Default | Meaning |
+|---|---|---|
+| `PORT` | `8080` | Set by Cloud Run. |
+| `STATIC_DIR` | `/app/static` | Built SPA. |
+| `ENV` | `dev` | `dev`/`prod`, shown in the UI. |
+| `SESSION_DAYS` | `30` | Login session lifetime; a session used past half its lifetime is extended. |
+| `COOKIE_SECURE` | `true` | `false` only for plain-HTTP local dev (`make api-dev` sets it). |
+| `SIGNUP_ENABLED` | `true` | `false` refuses `POST /api/auth/signup` (403). |
+| `ALEMBIC_CONFIG` | repo `database/alembic.ini` | Path of the Alembic ini for `seeing-migrate`; `/app/database/alembic.ini` in the web image. |
+| `SEEING_USER_PASSWORD` | – | Password for `seeing-create-user` when run non-interactively. |
 
 ## seeing_core interface
 
@@ -124,15 +140,33 @@ All responses are JSON; times are ISO 8601 UTC (`Z`).
 - `GET /api/sites/{slug}/cn2?run=latest|<ISO run_time>` →
   `{site: {...}, run_time, valid_times: [...], heights_m: [...], cn2: [[...per height...] per valid_time]}`
   (`null` for missing values; heights are the union grid, padded with null).
-- `GET /api/me` → `{email, env}`: IAP user (from `X-Goog-Authenticated-User-Email`, prefix stripped,
-  `null` without IAP) and `ENV`, for the UI header.
+- `GET /api/me` → `{email, env, user}`: IAP user (from `X-Goog-Authenticated-User-Email`, prefix
+  stripped, `null` without IAP), `ENV`, and the logged-in app account
+  `user: {id, email, display_name, role} | null`. `Cache-Control: no-store`.
+- `POST /api/auth/signup {email, password, display_name?}` → 201 + session cookie, the new `user`
+  (role `user`). 409 if the e-mail exists, 422 if invalid or the password is under 10 characters,
+  403 if `SIGNUP_ENABLED=false`.
+- `POST /api/auth/login {email, password}` → 200 + session cookie; 401 with the same body for an
+  unknown e-mail or a wrong password.
+- `POST /api/auth/logout` → 204, deletes the session and clears the cookie.
+- Auth POSTs must be `Content-Type: application/json` (415 otherwise).
 - Unknown slug or run → 404; a `run` that is neither `latest` nor ISO 8601 → 422.
 - `/api/*` responses carry `Cache-Control: private, max-age=300`; hashed SPA assets are cached for a
   year (`immutable`), `index.html` is `no-cache`.
 - Everything else not under `/api` serves the SPA (`index.html` fallback for client routes).
 
-Auth: none in the app. IAP sits in front of the Cloud Run service; the app can read
-`X-Goog-Authenticated-User-Email` for display only.
+Auth: app accounts (`seeing_api/auth.py`). Passwords are hashed with Argon2id. A login creates a
+server-side session; the browser holds a random token in the `seeing_session` cookie (`HttpOnly`,
+`SameSite=Lax`, `Secure`, `Path=/`), the database only its SHA-256. CSRF protection = SameSite=Lax +
+JSON-only auth POSTs (no CORS is configured). `current_user` / `require_role(...)` are the FastAPI
+dependencies for endpoints that need an account. Sign-up only creates `user` accounts; create
+`admin` and `team` accounts with `seeing-create-user --email ... --role admin|team` (password from
+the prompt, or `SEEING_USER_PASSWORD` for non-interactive runs; `--update` changes password, name and,
+only if given, role, and ends the account's sessions). Auth 422 responses never echo submitted values. Not implemented yet: login rate limiting, e-mail
+verification, password reset.
+
+IAP still sits in front of the Cloud Run service, so a visitor needs IAP access before reaching the
+app's login; opening sign-up to the public means removing IAP from `seeing-web-{env}`.
 
 ## Containers
 
@@ -140,7 +174,7 @@ Registry: `us-central1-docker.pkg.dev/project-astrarome/seeing/<image>:<git-sha>
 
 | Image | Dockerfile | Entrypoint | Used by |
 |---|---|---|---|
-| `web` | `apps/api/Dockerfile` (multi-stage: node builds `apps/web`, python runs FastAPI) | `uvicorn seeing_api.main:app --host 0.0.0.0 --port $PORT`; also contains `alembic` (`seeing-migrate` = `alembic upgrade head`) | `seeing-web-{env}` service, `seeing-migrate-{env}` job |
+| `web` | `apps/api/Dockerfile` (multi-stage: node builds `apps/web`, python runs FastAPI) | `uvicorn seeing_api.main:app --host 0.0.0.0 --port $PORT`; also contains `database/` at `/app/database` (`seeing-migrate` = `alembic upgrade head`) and `seeing-create-user` | `seeing-web-{env}` service, `seeing-migrate-{env}` job |
 | `batch` | `apps/batch/Dockerfile` | `seeing-batch run` | `seeing-batch-{env}` job |
 
 ## Infra names
