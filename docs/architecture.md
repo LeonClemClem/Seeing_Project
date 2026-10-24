@@ -11,7 +11,8 @@ Cloud Scheduler ──► Cloud Run Job  seeing-batch-{env}   download AROME →
                         ▼
    e2-micro VM "seeing-db" (COS, postgres:16 container, no public IP)  DBs: seeing_dev, seeing_prod
                         ▲
-Cloud Run Service seeing-web-{env}   FastAPI: /api/* + built React SPA   ◄── IAP (project owners)
+Cloud Run Service seeing-web-{env}   FastAPI: /api/* + built React SPA   ◄── dev: IAP (project owners)
+                                                                         prod: public, seeingthesky.com
 ```
 
 - GCP project `project-astrarome`, region **`us-central1`** (always-free e2-micro for the DB VM).
@@ -165,8 +166,9 @@ the prompt, or `SEEING_USER_PASSWORD` for non-interactive runs; `--update` chang
 only if given, role, and ends the account's sessions). Auth 422 responses never echo submitted values. Not implemented yet: login rate limiting, e-mail
 verification, password reset.
 
-IAP still sits in front of the Cloud Run service, so a visitor needs IAP access before reaching the
-app's login; opening sign-up to the public means removing IAP from `seeing-web-{env}`.
+In dev, IAP still sits in front of the Cloud Run service, so a visitor needs IAP access before
+reaching the app's login. Prod is public (`web_public = true`): anyone can sign up on
+seeingthesky.com.
 
 ## Containers
 
@@ -187,7 +189,7 @@ Registry: `us-central1-docker.pkg.dev/project-astrarome/seeing/<image>:<git-sha>
 | Artifact Registry | `seeing` (docker), `dockerhub` (remote repo proxying Docker Hub, for the postgres image) |
 | Secrets | `db-password-postgres`, `db-password-dev`, `db-password-prod` |
 | DB / user per env | `seeing_dev` / `seeing_dev`, `seeing_prod` / `seeing_prod` |
-| Service accounts | `seeing-web-{env}`, `seeing-batch-{env}`, `seeing-db-vm`, `seeing-scheduler` |
+| Service accounts | `seeing-web-{env}`, `seeing-batch-{env}`, `seeing-db-vm`, `seeing-scheduler`, `seeing-build`, `seeing-deployer` (GitHub Actions, WIF) |
 | Cloud Run | `seeing-web-{env}` (service), `seeing-batch-{env}`, `seeing-migrate-{env}` (jobs) |
 | Backups | Daily data disk snapshots of `seeing-db-data` (snapshot schedule `seeing-db-data-daily`), 7-day retention, stored in `us-central1` |
 | Scheduler | `seeing-batch-prod` (4×/day, after the 00/06/12/18 UTC AROME cycles are published), `seeing-batch-dev` (1×/day) |
