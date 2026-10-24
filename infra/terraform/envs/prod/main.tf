@@ -24,7 +24,7 @@ module "env" {
   db_port                         = local.shared.db_port
   db_password_secret_id           = local.shared.db_password_secret_ids[var.env]
   scheduler_service_account_email = local.shared.scheduler_service_account_email
-  deployer_service_account_email  = local.shared.deployer_service_account_email
+  deployer_service_account_email  = local.shared.deployer_service_account_emails[var.env]
   iap_members                     = var.iap_members
   web_public                      = var.web_public
   custom_domains                  = var.custom_domains

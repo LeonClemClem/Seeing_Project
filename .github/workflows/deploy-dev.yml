@@ -27,7 +27,7 @@ jobs:
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: projects/5123733464/locations/global/workloadIdentityPools/github/providers/seeing-project
-          service_account: seeing-deployer@project-astrarome.iam.gserviceaccount.com
+          service_account: seeing-deployer-dev@project-astrarome.iam.gserviceaccount.com
       - uses: google-github-actions/setup-gcloud@v2
       - name: Build and deploy (migrations, web, batch)
         run: infra/scripts/deploy.sh dev all

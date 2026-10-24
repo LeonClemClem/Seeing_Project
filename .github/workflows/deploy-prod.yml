@@ -34,7 +34,7 @@ jobs:
         with:
           # Outputs of `terraform -chdir=infra/terraform/shared output` (not secrets).
           workload_identity_provider: projects/5123733464/locations/global/workloadIdentityPools/github/providers/seeing-project
-          service_account: seeing-deployer@project-astrarome.iam.gserviceaccount.com
+          service_account: seeing-deployer-prod@project-astrarome.iam.gserviceaccount.com
       - uses: google-github-actions/setup-gcloud@v2
       - name: Build and deploy (migrations, web, batch)
         run: infra/scripts/deploy.sh prod all

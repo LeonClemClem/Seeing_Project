@@ -19,6 +19,7 @@ locals {
     superuser_secret     = var.superuser_secret_id
     databases            = var.databases
     client_cidrs         = var.client_cidrs
+    db_client_cidrs      = var.db_client_cidrs
     max_connections      = var.pg_max_connections
     shared_buffers       = var.pg_shared_buffers
     effective_cache_size = var.pg_effective_cache_size

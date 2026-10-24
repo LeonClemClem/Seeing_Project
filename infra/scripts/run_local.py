@@ -15,6 +15,7 @@ migrated only by the "Deploy to dev" workflow.
 
 import argparse
 import os
+import re
 import shutil
 import signal
 import socket
@@ -32,6 +33,8 @@ DEFAULT_PROJECT = "project-astrarome"
 DEFAULT_ZONE = "us-central1-a"
 DEFAULT_DB_VM = "seeing-db"
 DEFAULT_TUNNEL_PORT = 15432
+DEV_DB = "seeing_dev"  # database and role; laptops can only reach dev (pg_hba)
+DEV_DB_SECRET = "db-password-dev"  # noqa: S105 (Secret Manager id, not a password)
 LOCAL_DATABASE_URL = "postgresql+psycopg://seeing:seeing@localhost:5432/seeing_dev"
 API_PORT = 8000  # apps/web/vite.config.ts proxies /api to this port
 WEB_PORT = 5173  # Vite's port, set in apps/web/vite.config.ts
@@ -46,10 +49,9 @@ def parse_args(argv=None):
         "--db", choices=["dev", "local"], default="dev", help="dev: shared dev database on GCP (default); local: docker"
     )
     parser.add_argument("--install", action="store_true", help="install Python and Node dependencies first")
-    parser.add_argument("--project", default=DEFAULT_PROJECT, help="GCP project")
-    parser.add_argument("--zone", default=DEFAULT_ZONE, help="zone of the database VM")
-    parser.add_argument("--db-vm", default=DEFAULT_DB_VM, help="name of the database VM")
-    parser.add_argument("--env", default="dev", help="environment whose database is used with --db dev")
+    parser.add_argument("--project", default=DEFAULT_PROJECT, type=gcp_name, help="GCP project")
+    parser.add_argument("--zone", default=DEFAULT_ZONE, type=gcp_name, help="zone of the database VM")
+    parser.add_argument("--db-vm", default=DEFAULT_DB_VM, type=gcp_name, help="name of the database VM")
     parser.add_argument("--tunnel-port", type=int, default=DEFAULT_TUNNEL_PORT, help="local port of the IAP tunnel")
     return parser.parse_args(argv)
 
@@ -58,6 +60,13 @@ def fail(message: str) -> None:
     """Print a plain-language error and exit."""
     print(f"\nERROR: {message}\n", file=sys.stderr)
     sys.exit(1)
+
+
+def gcp_name(value: str) -> str:
+    """argparse type: a GCP project / zone / VM name (also keeps cmd.exe from seeing odd characters)."""
+    if not re.fullmatch(r"[a-z][a-z0-9-]{0,62}", value):
+        raise argparse.ArgumentTypeError(f"invalid name: {value!r}")
+    return value
 
 
 def tool(name: str, hint: str) -> str:
@@ -69,9 +78,12 @@ def tool(name: str, hint: str) -> str:
 
 
 def port_in_use(port: int) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(0.5)
-        return sock.connect_ex(("127.0.0.1", port)) == 0
+    """Whether something listens on localhost:port (IPv4 or IPv6, whichever localhost resolves to)."""
+    try:
+        with socket.create_connection(("localhost", port), timeout=0.5):
+            return True
+    except OSError:
+        return False
 
 
 def start(cmd: list[str], cwd: Path, env: dict[str, str] | None = None) -> subprocess.Popen:
@@ -81,9 +93,7 @@ def start(cmd: list[str], cwd: Path, env: dict[str, str] | None = None) -> subpr
 
 
 def stop(proc: subprocess.Popen) -> None:
-    """Stop a process started by start() and everything it launched."""
-    if proc.poll() is not None:
-        return
+    """Stop a process started by start() and everything it launched (even if it already exited)."""
     if IS_WINDOWS:
         subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True)  # noqa: S603, S607
     else:
@@ -95,7 +105,10 @@ def stop(proc: subprocess.Popen) -> None:
         proc.wait(timeout=10)
     except subprocess.TimeoutExpired:
         if not IS_WINDOWS:
-            os.killpg(proc.pid, signal.SIGKILL)
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
 
 
 def install(poetry: str, npm: str) -> None:
@@ -107,7 +120,7 @@ def install(poetry: str, npm: str) -> None:
 
 def dev_database_url(gcloud: str, args, processes: list[subprocess.Popen]) -> str:
     """Open the IAP tunnel to the dev database and return its SQLAlchemy URL."""
-    print(f"==> Reading the {args.env} database password from Secret Manager...")
+    print("==> Reading the dev database password from Secret Manager...")
     secret = subprocess.run(  # noqa: S603
         [
             gcloud,
@@ -115,7 +128,7 @@ def dev_database_url(gcloud: str, args, processes: list[subprocess.Popen]) -> st
             "versions",
             "access",
             "latest",
-            f"--secret=db-password-{args.env}",
+            f"--secret={DEV_DB_SECRET}",
             f"--project={args.project}",
         ],
         capture_output=True,
@@ -152,9 +165,8 @@ def dev_database_url(gcloud: str, args, processes: list[subprocess.Popen]) -> st
             fail(f"the database tunnel did not open within {TUNNEL_TIMEOUT_S} s.")
         time.sleep(0.5)
 
-    name = f"seeing_{args.env}"
     password = quote(secret.stdout.strip(), safe="")
-    return f"postgresql+psycopg://{name}:{password}@localhost:{args.tunnel_port}/{name}"
+    return f"postgresql+psycopg://{DEV_DB}:{password}@localhost:{args.tunnel_port}/{DEV_DB}"
 
 
 def interrupt(signum, frame):

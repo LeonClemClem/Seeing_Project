@@ -50,9 +50,9 @@ output "build_source_bucket" {
   value = google_storage_bucket.build_source.name
 }
 
-output "deployer_service_account_email" {
-  description = "SA used by GitHub Actions (service_account in .github/workflows/deploy-*.yml)."
-  value       = google_service_account.deployer.email
+output "deployer_service_account_emails" {
+  description = "env => SA used by GitHub Actions (service_account in .github/workflows/deploy-<env>.yml)."
+  value       = { for env, sa in google_service_account.deployer : env => sa.email }
 }
 
 output "github_workload_identity_provider" {

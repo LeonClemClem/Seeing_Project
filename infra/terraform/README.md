@@ -27,7 +27,7 @@ free tiers (target < $10/month for dev + prod together).
                          │  Artifact Registry: seeing (app images), dockerhub (Docker Hub cache)      │
                          │  Secret Manager: db-password-postgres / -dev / -prod                       │
                          │  Cloud Build (SA seeing-build) → seeing/{web,batch}:<git-sha>              │
- GitHub Actions ──WIF────► SA seeing-deployer runs infra/scripts/deploy.sh                            │
+ GitHub Actions ──WIF────► SA seeing-deployer-{env} runs infra/scripts/deploy.sh                      │
                          └────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -36,7 +36,7 @@ Terraform roots (each has its own state):
 | Root | State | Contents |
 |---|---|---|
 | `bootstrap/` | **local** (`bootstrap/terraform.tfstate`, gitignored) | APIs, IAP service agent, state bucket `project-astrarome-tfstate` |
-| `shared/` | `gs://project-astrarome-tfstate/shared` | VPC + firewall, Artifact Registry repos, DB secrets, DB VM + snapshot schedule, `seeing-scheduler`, `seeing-build` and `seeing-deployer` SAs, GitHub Workload Identity pool, Cloud Build source bucket, budget |
+| `shared/` | `gs://project-astrarome-tfstate/shared` | VPC + firewall, Artifact Registry repos, DB secrets, DB VM + snapshot schedule, `seeing-scheduler`, `seeing-build` and `seeing-deployer-{dev,prod}` SAs, GitHub Workload Identity pool, Cloud Build source bucket, budget |
 | `envs/dev`, `envs/prod` | `.../envs/dev`, `.../envs/prod` | `modules/seeing_env`: SAs `seeing-web-{env}`/`seeing-batch-{env}`, web service (+ prod domain mappings), batch + migrate jobs, Cloud Scheduler job |
 
 Modules: `network`, `db_vm`, `cloud_run_service`, `cloud_run_job`, `scheduled_job`, `seeing_env`
@@ -59,11 +59,13 @@ darwin_amd64.
   two owners get `roles/iap.httpsResourceAccessor` on the service. No `allUsers`.
 - Web, prod (`web_public = true`): no IAP, `allUsers` is `roles/run.invoker`; the app's own
   accounts protect what needs protecting.
-- GitHub Actions (`seeing-deployer`, see [CI/CD](#cicd)): Workload Identity Federation, no key.
-  Only `LeonClemClem/Seeing_Project`, on `refs/heads/main` or a manual `workflow_dispatch`, can
-  impersonate it; pull requests cannot. It has `run.developer`, `cloudbuild.builds.editor`,
-  `logging.viewer`, actAs on `seeing-build` and on the env runtime SAs, admin on the build source
-  bucket and read on the `seeing` registry.
+- GitHub Actions (`seeing-deployer-{dev,prod}`, see [CI/CD](#cicd)): Workload Identity Federation,
+  no key. Only `LeonClemClem/Seeing_Project` can get a token, and only on a push to `main` or a
+  manual `workflow_dispatch` (pull requests cannot). `seeing-deployer-prod` is reachable from
+  `refs/heads/main` only; `seeing-deployer-dev` from any allowed token (the "Deploy to dev" button
+  on any branch). Each has `run.developer`, `cloudbuild.builds.editor`, `logging.viewer`, actAs on
+  `seeing-build` and on **its own** env's runtime SAs (so dev's cannot deploy prod), admin on the
+  build source bucket and read on the `seeing` registry.
 - Each Cloud Run SA can read only its own environment's DB password secret. Cloud Run's service
   agent pulls images from same-project Artifact Registry without extra grants; logs are written
   automatically.
@@ -276,13 +278,13 @@ GitHub Actions, in `.github/workflows/`:
 | `deploy-dev.yml` (*Deploy to dev*) | manual: Actions → Deploy to dev → Run workflow → branch | `infra/scripts/deploy.sh dev all` on that branch |
 
 They authenticate with Workload Identity Federation: pool `github`, provider `seeing-project`
-and SA `seeing-deployer`, all in `shared/`. The provider name and SA e-mail are written in the
+and SAs `seeing-deployer-dev` / `seeing-deployer-prod`, all in `shared/`. The provider name and SA e-mail are written in the
 workflows (`terraform -chdir=shared output`); they are not secrets. Deploys of the same commit
 reuse its image (tag = short SHA), so prod after dev does not rebuild. A failed deploy leaves the
 previous revision serving.
 
 Prerequisites: `bootstrap/` applied with `iamcredentials` and `sts` APIs, then `shared/`, then
-`envs/*` (they grant `seeing-deployer` actAs on their runtime SAs).
+`envs/*` (they grant `seeing-deployer-<env>` actAs on their runtime SAs).
 
 ## Day to day
 
@@ -325,8 +327,9 @@ PGPASSWORD="$(gcloud secrets versions access latest --secret db-password-dev)" \
   psql "host=localhost port=15432 dbname=seeing_dev user=seeing_dev"
 ```
 
-Opening 5432 to IAP (`iap_tcp_ports`) adds 35.235.240.0/20 to the firewall rule, the host
-firewall and `pg_hba`; after changing it, apply `shared/` and reset the VM.
+Opening 5432 to IAP (`iap_tcp_ports`) adds 35.235.240.0/20 to the firewall rule and the host
+firewall, and to `pg_hba` for `seeing_dev` only (prod is never reachable from a laptop); after
+changing it, apply `shared/` and reset the VM.
 
 ## Backups & restore
 

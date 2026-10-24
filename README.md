@@ -151,7 +151,7 @@ failed run to read the error, fix it in a new pull request, or ask for help.
 | Message | What to do |
 |---|---|
 | `could not read the database password` | Run `gcloud auth login` again (logins expire), with the project member's account. |
-| `port(s) [...] already in use` | The site is already running in another terminal: stop it with Ctrl+C there (or restart the computer). |
+| `port(s) [...] already in use` | The site is already running in another terminal: stop it with Ctrl+C there. Always stop with Ctrl+C rather than closing the window (on Windows, closing it can leave the site running in the background); if that happened, restart the computer. |
 | `'poetry' was not found` (or `npm`, `gcloud`) | Install it (section 1), then open a **new** terminal. |
 | `dependencies are not installed yet` | Run the command once with `--install`. |
 | The page loads but shows no forecast | Check the terminal for an error from the API; run with `--install` after a `git pull`. |

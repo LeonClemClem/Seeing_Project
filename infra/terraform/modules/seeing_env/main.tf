@@ -38,7 +38,7 @@ resource "google_secret_manager_secret_iam_member" "db_password" {
   member    = each.value
 }
 
-# deploy.sh (GitHub Actions) deploys the service and jobs, which run as these SAs.
+# deploy.sh (GitHub Actions, seeing-deployer-<env>) deploys the service and jobs, which run as these SAs.
 resource "google_service_account_iam_member" "deployer_acts_as" {
   for_each = {
     web   = google_service_account.web.name

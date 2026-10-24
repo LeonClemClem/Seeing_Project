@@ -26,7 +26,7 @@ Read these before deep work — this summary links rather than duplicates:
 | `infra/terraform/` | `bootstrap/`, `shared/` (VPC, registry, DB VM, secrets, budget), `envs/{dev,prod}`, `modules/*`. |
 | `infra/scripts/deploy.sh`, `cloudbuild.yaml` | Build image via Cloud Build, roll out to Cloud Run. |
 | `infra/scripts/run_local.py` | Cross-platform launcher: IAP tunnel to the dev DB + uvicorn + Vite (`make run-local`). |
-| `.github/workflows/` | `ci.yml` (tests on PRs), `deploy-prod.yml` (merge to `main` → prod), `deploy-dev.yml` (manual button → dev). WIF, SA `seeing-deployer`. |
+| `.github/workflows/` | `ci.yml` (tests on PRs), `deploy-prod.yml` (merge to `main` → prod), `deploy-dev.yml` (manual button → dev). WIF, SAs `seeing-deployer-{dev,prod}` (prod only from `main`). |
 | `Makefile`, `docker-compose.yml`, `ruff.toml`, `.isort.cfg` | Local dev; Python style (ruff, line length 120). |
 | `.claude/skills/`, `.claude/agents/` | Shared agent skills: `github` (branch/PR workflow), `python` (coding standards), `red-team` (pre-push review via the `red-team` agent), `project-status` (this summary). |
 | `seeing_project/`, root `pyproject.toml` | Pre-monorepo leftovers (to clean up). |

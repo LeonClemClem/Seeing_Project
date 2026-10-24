@@ -189,7 +189,7 @@ Registry: `us-central1-docker.pkg.dev/project-astrarome/seeing/<image>:<git-sha>
 | Artifact Registry | `seeing` (docker), `dockerhub` (remote repo proxying Docker Hub, for the postgres image) |
 | Secrets | `db-password-postgres`, `db-password-dev`, `db-password-prod` |
 | DB / user per env | `seeing_dev` / `seeing_dev`, `seeing_prod` / `seeing_prod` |
-| Service accounts | `seeing-web-{env}`, `seeing-batch-{env}`, `seeing-db-vm`, `seeing-scheduler`, `seeing-build`, `seeing-deployer` (GitHub Actions, WIF) |
+| Service accounts | `seeing-web-{env}`, `seeing-batch-{env}`, `seeing-db-vm`, `seeing-scheduler`, `seeing-build`, `seeing-deployer-{dev,prod}` (GitHub Actions, WIF) |
 | Cloud Run | `seeing-web-{env}` (service), `seeing-batch-{env}`, `seeing-migrate-{env}` (jobs) |
 | Backups | Daily data disk snapshots of `seeing-db-data` (snapshot schedule `seeing-db-data-daily`), 7-day retention, stored in `us-central1` |
 | Scheduler | `seeing-batch-prod` (4×/day, after the 00/06/12/18 UTC AROME cycles are published), `seeing-batch-dev` (1×/day) |

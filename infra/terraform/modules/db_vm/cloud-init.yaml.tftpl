@@ -13,7 +13,7 @@ write_files:
       local   all       all                scram-sha-256
       host    all       all       127.0.0.1/32  scram-sha-256
 %{ for db, secret in databases ~}
-%{ for cidr in client_cidrs ~}
+%{ for cidr in concat(client_cidrs, lookup(db_client_cidrs, db, [])) ~}
       host    ${db}  ${db}  ${cidr}  scram-sha-256
 %{ endfor ~}
 %{ endfor ~}
@@ -156,7 +156,7 @@ write_files:
 runcmd:
   - bash /etc/seeing/setup-disk.sh
   # COS's host firewall drops inbound traffic by default; open 5432 for the allowed clients.
-%{ for cidr in client_cidrs ~}
+%{ for cidr in distinct(concat(client_cidrs, flatten(values(db_client_cidrs)))) ~}
   - iptables -C INPUT -p tcp -s ${cidr} --dport 5432 -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp -s ${cidr} --dport 5432 -j ACCEPT
 %{ endfor ~}
   - systemctl daemon-reload
