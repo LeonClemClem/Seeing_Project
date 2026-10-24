@@ -17,6 +17,7 @@ module "env" {
   source = "../../modules/seeing_env"
 
   env                             = var.env
+  project_id                      = local.shared.project_id
   region                          = local.shared.region
   network_id                      = local.shared.network_id
   subnet_id                       = local.shared.subnet_id

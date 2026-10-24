@@ -123,7 +123,7 @@ resource "google_cloud_run_domain_mapping" "this" {
   location = var.region
 
   metadata {
-    namespace = data.google_project.this.project_id
+    namespace = var.project_id
   }
 
   spec {

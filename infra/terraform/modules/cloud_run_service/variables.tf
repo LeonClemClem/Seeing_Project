@@ -81,6 +81,11 @@ variable "public" {
   default     = false
 }
 
+variable "project_id" {
+  description = "Project of the service (domain mapping namespace)."
+  type        = string
+}
+
 variable "custom_domains" {
   description = "Domains mapped to the service (e.g. example.com), verified in Search Console first."
   type        = list(string)

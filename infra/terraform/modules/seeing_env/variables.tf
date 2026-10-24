@@ -1,3 +1,7 @@
+variable "project_id" {
+  type = string
+}
+
 variable "env" {
   description = "dev or prod."
   type        = string

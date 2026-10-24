@@ -70,6 +70,7 @@ module "web" {
   iap_members           = var.iap_members
   public                = var.web_public
   custom_domains        = var.custom_domains
+  project_id            = var.project_id
   deletion_protection   = var.deletion_protection
 
   depends_on = [google_secret_manager_secret_iam_member.db_password]
