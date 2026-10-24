@@ -190,6 +190,8 @@ libraries changed.
 
 ## 3. Make a change and publish it
 
+**Step-by-step guide for every change: [docs/dev-cycle.md](docs/dev-cycle.md).** Summary below.
+
 `main` is the published version: nobody changes it directly. Each change goes through a
 **branch** and a **pull request** (PR). The full workflow, with good commit messages, is in
 [.claude/skills/github/SKILL.md](.claude/skills/github/SKILL.md).

@@ -7,6 +7,7 @@
 Forecasts astronomical **seeing** (optical turbulence, arcseconds at 500 nm, lower is better) for observing sites from Météo-France **AROME** (1.3 km) GRIB2 output plus an empirical Cn² model ("V2", with K_TKE / K_CIS / K_conv coefficients). Repo owner is a friend who adds research scripts under `research/`; Thomas Hossler builds the product around them.
 
 Read these before deep work — this summary links rather than duplicates:
+- `docs/dev-cycle.md` — the owner's step-by-step change cycle (branch → local → Deploy to dev → PR → merge).
 - `docs/architecture.md` — the contract: DB schema, env vars, API endpoints, seeing_core interface, container/infra names.
 - `infra/terraform/README.md` — infra architecture, security model, cost, first-time runbook, IAP fixes.
 - `research/README.md` — the original algorithm, explained for beginners.
