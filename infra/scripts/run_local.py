@@ -1,8 +1,8 @@
 """Run the website on this computer: FastAPI on :8000 and Vite on :5173 (live reload).
 
-By default the data comes from the shared **dev** database on GCP, reached through an IAP tunnel
-(`gcloud compute start-iap-tunnel`), so you see real forecasts. `--db local` uses the Postgres of
-`docker compose` instead (`make db-up migrate dev-seed`).
+The data comes from the shared **dev** database on GCP, reached through an IAP tunnel
+(`gcloud compute start-iap-tunnel`), so you see real forecasts. The database VM has no public IP:
+the tunnel goes through Google's IAP, which only lets project members in.
 
 Works on Windows, macOS and Linux with only the standard library:
 
@@ -35,7 +35,6 @@ DEFAULT_DB_VM = "seeing-db"
 DEFAULT_TUNNEL_PORT = 15432
 DEV_DB = "seeing_dev"  # database and role; laptops can only reach dev (pg_hba)
 DEV_DB_SECRET = "db-password-dev"  # noqa: S105 (Secret Manager id, not a password)
-LOCAL_DATABASE_URL = "postgresql+psycopg://seeing:seeing@localhost:5432/seeing_dev"
 API_PORT = 8000  # apps/web/vite.config.ts proxies /api to this port
 WEB_PORT = 5173  # Vite's port, set in apps/web/vite.config.ts
 TUNNEL_TIMEOUT_S = 60
@@ -45,9 +44,6 @@ IS_WINDOWS = os.name == "nt"
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Run the Seeing website locally (API + live-reloading frontend).")
-    parser.add_argument(
-        "--db", choices=["dev", "local"], default="dev", help="dev: shared dev database on GCP (default); local: docker"
-    )
     parser.add_argument("--install", action="store_true", help="install Python and Node dependencies first")
     parser.add_argument("--project", default=DEFAULT_PROJECT, type=gcp_name, help="GCP project")
     parser.add_argument("--zone", default=DEFAULT_ZONE, type=gcp_name, help="zone of the database VM")
@@ -181,11 +177,9 @@ def main(argv=None):
         signal.signal(signal.SIGHUP, interrupt)
     poetry = tool("poetry", "Install Poetry (see the README, 'One-time setup').")
     npm = tool("npm", "Install Node.js 20 LTS (see the README, 'One-time setup').")
-    gcloud = (
-        tool("gcloud", "Install the Google Cloud CLI (see the README, 'One-time setup').") if args.db == "dev" else ""
-    )
+    gcloud = tool("gcloud", "Install the Google Cloud CLI (see the README, 'One-time setup').")
 
-    ports = [API_PORT, WEB_PORT] + ([args.tunnel_port] if args.db == "dev" else [])
+    ports = [API_PORT, WEB_PORT, args.tunnel_port]
     busy = [p for p in ports if port_in_use(p)]
     if busy:
         fail(f"port(s) {busy} already in use: is the site already running in another terminal? Stop it with Ctrl+C.")
@@ -197,13 +191,7 @@ def main(argv=None):
 
     processes: list[subprocess.Popen] = []
     try:
-        if args.db == "dev":
-            database_url = dev_database_url(gcloud, args, processes)
-        else:
-            if not port_in_use(5432):
-                fail("no local database on port 5432: start it with `make db-up migrate dev-seed` (needs Docker).")
-            database_url = LOCAL_DATABASE_URL
-
+        database_url = dev_database_url(gcloud, args, processes)
         env = {**os.environ, "DATABASE_URL": database_url, "COOKIE_SECURE": "false", "ENV": "local"}
         print("==> Starting the API (http://localhost:8000/api/docs)...")
         processes.append(

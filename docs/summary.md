@@ -39,7 +39,7 @@ Deploys: GitHub Actions through Workload Identity Federation run `infra/scripts/
 
 ## Local dev
 
-Against the dev DB: `python infra/scripts/run_local.py [--install]` (IAP tunnel on :15432, API :8000, Vite :5173; beginner steps in `README.md`). Fully local: `make db-up migrate dev-seed`, then `make run-local ARGS="--db local"` or `make api-dev` + `make web-dev`. Tests: `make test-core test-batch test-api test-web`. Others: `web-image`, `batch-run`, `revision MSG=...`, `lint` / `format` (ruff on `research/`). Accounts: sign up on the Compte page; create an admin or the team account with `cd apps/api && poetry run seeing-create-user --email ... --role admin`.
+Against the dev DB: `python infra/scripts/run_local.py [--install]` (IAP tunnel on :15432, API :8000, Vite :5173; beginner steps in `README.md`). Fully local (developers only, not in the README): `make db-up migrate dev-seed`, then `make api-dev` + `make web-dev`. Tests: `make test-core test-batch test-api test-web`. Others: `web-image`, `batch-run`, `revision MSG=...`, `lint` / `format` (ruff on `research/`). Accounts: sign up on the Compte page; create an admin or the team account with `cd apps/api && poetry run seeing-create-user --email ... --role admin`.
 
 ## Gotchas
 

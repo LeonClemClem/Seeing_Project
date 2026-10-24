@@ -99,7 +99,7 @@ flowchart LR
 ## 1. One-time setup
 
 You need: **Git**, **Python 3.12**, **Poetry**, **Node.js 20 or newer** and the **Google Cloud CLI**
-(`gcloud`). Docker is optional (only for running the tests or a local database).
+(`gcloud`).
 
 **Windows**: open *PowerShell* and run:
 
@@ -178,6 +178,12 @@ What happens behind the scenes: the script opens a secure tunnel to the **dev da
 Cloud (so you see real forecasts), then starts the API (http://localhost:8000/api/docs) and the
 website. It never changes the structure of the database. Accounts you create on the *Compte* page
 are real accounts of the dev database.
+
+The database server has **no public address on the internet**. The tunnel goes through Google's
+*Identity-Aware Proxy*, which first checks that your `gcloud` login is a member of the project;
+then the database itself asks for its password, which the script reads from Google's secret store
+(it is never written to a file). From a computer, only the dev database can be reached, never the
+production one.
 
 After pulling changes from GitHub (`git pull`), run once with `--install` again in case the
 libraries changed.
@@ -279,24 +285,11 @@ Changing the **structure** of the database (a new table or column) needs a migra
 [database/README.md](database/README.md). Your computer uses the dev database as it is; the
 migration reaches it when the branch is deployed with **Deploy to dev**.
 
-## 7. For developers
+## 7. Tests and infrastructure
 
-Also needs Docker and make. Local database instead of the dev one:
-
-```bash
-make db-up migrate dev-seed   # local Postgres on :5432, tables, a fake forecast run
-make run-local ARGS="--db local"
-```
-
-```bash
-make api-install web-install
-make api-dev        # FastAPI on http://localhost:8000 (API docs at /api/docs)
-make web-dev        # Vite on http://localhost:5173, proxies /api to :8000
-make test-api       # pytest against a throwaway Postgres on :55434
-make test-web       # typecheck + eslint + vitest
-make test-core test-batch
-make web-image      # production image (apps/api/Dockerfile, repo root as context)
-```
+GitHub runs all the tests on every pull request (section 3, step 5), so you don't need to run
+them yourself. For the curious, `make test-api`, `make test-web`, `make test-core` and
+`make test-batch` run the same tests on your computer (they need Docker and make).
 
 Infrastructure, deployments by hand (`infra/scripts/deploy.sh`), CI/CD and the domain:
 [infra/terraform/README.md](infra/terraform/README.md).
