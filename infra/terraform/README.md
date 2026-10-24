@@ -8,7 +8,8 @@ free tiers (target < $10/month for dev + prod together).
 
 ```
                          ┌───────────────────── project-astrarome / us-central1 ─────────────────────┐
- browser (owner) ──HTTPS──► Cloud Run service seeing-web-{env}  (IAP enabled natively, no LB)        │
+ browser ──────────HTTPS──► Cloud Run service seeing-web-{env}  (dev: native IAP; prod: public +     │
+                         │   domain mapping seeingthesky.com, no LB in both cases)                    │
                          │   SA seeing-web-{env}, min 0 / max 2, 1 vCPU / 512Mi, request billing      │
                          │        │ Direct VPC egress (PRIVATE_RANGES_ONLY)                           │
  Cloud Scheduler ─OAuth──► Cloud Run Admin API jobs/seeing-batch-{env}:run                            │
@@ -26,6 +27,7 @@ free tiers (target < $10/month for dev + prod together).
                          │  Artifact Registry: seeing (app images), dockerhub (Docker Hub cache)      │
                          │  Secret Manager: db-password-postgres / -dev / -prod                       │
                          │  Cloud Build (SA seeing-build) → seeing/{web,batch}:<git-sha>              │
+ GitHub Actions ──WIF────► SA seeing-deployer runs infra/scripts/deploy.sh                            │
                          └────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -34,8 +36,8 @@ Terraform roots (each has its own state):
 | Root | State | Contents |
 |---|---|---|
 | `bootstrap/` | **local** (`bootstrap/terraform.tfstate`, gitignored) | APIs, IAP service agent, state bucket `project-astrarome-tfstate` |
-| `shared/` | `gs://project-astrarome-tfstate/shared` | VPC + firewall, Artifact Registry repos, DB secrets, DB VM + snapshot schedule, `seeing-scheduler` and `seeing-build` SAs, Cloud Build source bucket, budget |
-| `envs/dev`, `envs/prod` | `.../envs/dev`, `.../envs/prod` | `modules/seeing_env`: SAs `seeing-web-{env}`/`seeing-batch-{env}`, web service, batch + migrate jobs, Cloud Scheduler job |
+| `shared/` | `gs://project-astrarome-tfstate/shared` | VPC + firewall, Artifact Registry repos, DB secrets, DB VM + snapshot schedule, `seeing-scheduler`, `seeing-build` and `seeing-deployer` SAs, GitHub Workload Identity pool, Cloud Build source bucket, budget |
+| `envs/dev`, `envs/prod` | `.../envs/dev`, `.../envs/prod` | `modules/seeing_env`: SAs `seeing-web-{env}`/`seeing-batch-{env}`, web service (+ prod domain mappings), batch + migrate jobs, Cloud Scheduler job |
 
 Modules: `network`, `db_vm`, `cloud_run_service`, `cloud_run_job`, `scheduled_job`, `seeing_env`
 (composition used by both env roots). The two env roots are identical except for the backend
@@ -52,9 +54,16 @@ darwin_amd64.
 
 ### Security model
 
-- Web: IAP on the Cloud Run service. The IAP service agent
+- Web, dev: IAP on the Cloud Run service. The IAP service agent
   `service-5123733464@gcp-sa-iap.iam.gserviceaccount.com` is the only `roles/run.invoker`; the
   two owners get `roles/iap.httpsResourceAccessor` on the service. No `allUsers`.
+- Web, prod (`web_public = true`): no IAP, `allUsers` is `roles/run.invoker`; the app's own
+  accounts protect what needs protecting.
+- GitHub Actions (`seeing-deployer`, see [CI/CD](#cicd)): Workload Identity Federation, no key.
+  Only `LeonClemClem/Seeing_Project`, on `refs/heads/main` or a manual `workflow_dispatch`, can
+  impersonate it; pull requests cannot. It has `run.developer`, `cloudbuild.builds.editor`,
+  `logging.viewer`, actAs on `seeing-build` and on the env runtime SAs, admin on the build source
+  bucket and read on the `seeing` registry.
 - Each Cloud Run SA can read only its own environment's DB password secret. Cloud Run's service
   agent pulls images from same-project Artifact Registry without extra grants; logs are written
   automatically.
@@ -235,15 +244,50 @@ longer holds a live password.
 
 ### 8. Prod
 
-```bash
-terraform -chdir=envs/prod init
-terraform -chdir=envs/prod apply
-infra/scripts/deploy.sh prod all     # same commit => reuses the images built for dev
-```
+Prod is public (`web_public = true`) on `seeingthesky.com` and `www.seeingthesky.com`
+(`custom_domains` in `envs/prod/terraform.tfvars`), with Cloud Run domain mappings: no load
+balancer, Google-managed certificate.
+
+1. Verify the domain once, with the account that runs Terraform: Google Search Console →
+   **Add property** → **Domain** `seeingthesky.com` → add the TXT record it gives at the registrar
+   → **Verify**.
+2. Apply:
+   ```bash
+   terraform -chdir=envs/prod init
+   terraform -chdir=envs/prod apply
+   terraform -chdir=envs/prod output domain_dns_records
+   ```
+3. At the registrar, create the records from that output: A and AAAA records on the apex
+   (`seeingthesky.com`) and a CNAME `www` → `ghs.googlehosted.com.`. The certificate is issued
+   15 min – a few hours after DNS propagates (`gcloud beta run domain-mappings describe
+   --domain seeingthesky.com --region us-central1` shows the status).
+4. Deploy: merge to `main` (see [CI/CD](#cicd)), or by hand `infra/scripts/deploy.sh prod all`
+   (same commit as dev: reuses the images). Then fill the DB once:
+   `gcloud run jobs execute seeing-batch-prod --region us-central1 --wait`.
+
+## CI/CD
+
+GitHub Actions, in `.github/workflows/`:
+
+| Workflow | When | What |
+|---|---|---|
+| `ci.yml` (*Tests*) | every pull request | `make test-api`, `test-core`, `test-batch`, `test-web` |
+| `deploy-prod.yml` (*Deploy to prod*) | push (merge) to `main` | the tests, then `infra/scripts/deploy.sh prod all`, then `/healthz` on the prod service |
+| `deploy-dev.yml` (*Deploy to dev*) | manual: Actions → Deploy to dev → Run workflow → branch | `infra/scripts/deploy.sh dev all` on that branch |
+
+They authenticate with Workload Identity Federation: pool `github`, provider `seeing-project`
+and SA `seeing-deployer`, all in `shared/`. The provider name and SA e-mail are written in the
+workflows (`terraform -chdir=shared output`); they are not secrets. Deploys of the same commit
+reuse its image (tag = short SHA), so prod after dev does not rebuild. A failed deploy leaves the
+previous revision serving.
+
+Prerequisites: `bootstrap/` applied with `iamcredentials` and `sts` APIs, then `shared/`, then
+`envs/*` (they grant `seeing-deployer` actAs on their runtime SAs).
 
 ## Day to day
 
-- **Deploy**: `infra/scripts/deploy.sh <dev|prod> <web|batch|all> [tag]`. Without a tag it builds
+- **Deploy**: automatic for prod on merge to `main`, button for dev (see [CI/CD](#cicd)). By
+  hand: `infra/scripts/deploy.sh <dev|prod> <web|batch|all> [tag]`. Without a tag it builds
   HEAD (only if that tag doesn't exist yet). With a tag it only deploys an existing image.
 - **Change infra**: edit, `terraform -chdir=<root> plan`, `apply`. Order when both change:
   `shared` before `envs/*`.
@@ -258,6 +302,18 @@ infra/scripts/deploy.sh prod all     # same commit => reuses the images built fo
 
 ## Connect to the database
 
+From a laptop, the simplest is the IAP TCP tunnel (`iap_tcp_ports = ["22", "5432"]` in
+`shared/terraform.tfvars`), which works the same on Windows, macOS and Linux.
+`infra/scripts/run_local.py` uses it to run the website locally against the dev DB.
+
+```bash
+gcloud compute start-iap-tunnel seeing-db 5432 --local-host-port=localhost:15432 --zone us-central1-a
+PGPASSWORD="$(gcloud secrets versions access latest --secret db-password-dev)" \
+  psql "host=localhost port=15432 dbname=seeing_dev user=seeing_dev"
+```
+
+Other ways:
+
 ```bash
 # Shell on the VM (OS Login over IAP), then psql inside the container
 gcloud compute ssh seeing-db --zone us-central1-a --tunnel-through-iap
@@ -269,10 +325,8 @@ PGPASSWORD="$(gcloud secrets versions access latest --secret db-password-dev)" \
   psql "host=localhost port=15432 dbname=seeing_dev user=seeing_dev"
 ```
 
-Plain IAP TCP forwarding (`gcloud compute start-iap-tunnel seeing-db 5432
---local-host-port=localhost:15432 --zone us-central1-a`) needs Postgres opened to the IAP range:
-set `iap_tcp_ports = ["22", "5432"]` in `shared/terraform.tfvars`, apply, and reset the VM (adds
-35.235.240.0/20 to the firewall rule, host firewall and `pg_hba`).
+Opening 5432 to IAP (`iap_tcp_ports`) adds 35.235.240.0/20 to the firewall rule, the host
+firewall and `pg_hba`; after changing it, apply `shared/` and reset the VM.
 
 ## Backups & restore
 

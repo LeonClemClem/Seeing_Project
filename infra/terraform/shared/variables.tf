@@ -53,3 +53,9 @@ variable "alert_emails" {
   description = "E-mail addresses that receive budget alerts (max 5)."
   type        = list(string)
 }
+
+variable "github_repository" {
+  description = "owner/name of the GitHub repository whose Actions may deploy (Workload Identity Federation)."
+  type        = string
+  default     = "LeonClemClem/Seeing_Project"
+}

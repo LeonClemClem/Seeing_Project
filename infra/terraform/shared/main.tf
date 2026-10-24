@@ -205,6 +205,85 @@ resource "google_storage_bucket_iam_member" "build_source" {
   member = google_service_account.build.member
 }
 
+# --- GitHub Actions deployer (Workload Identity Federation, no keys) ----------------------------
+# .github/workflows/deploy-{prod,dev}.yml exchange GitHub's OIDC token for this SA and run
+# infra/scripts/deploy.sh. Only this repository can get a token, and only for pushes to main
+# (prod) or a manual "Run workflow" (dev): pull requests, including from forks, never can.
+
+resource "google_iam_workload_identity_pool" "github" {
+  workload_identity_pool_id = "github"
+  display_name              = "GitHub Actions"
+}
+
+resource "google_iam_workload_identity_pool_provider" "github" {
+  workload_identity_pool_id          = google_iam_workload_identity_pool.github.workload_identity_pool_id
+  workload_identity_pool_provider_id = "seeing-project"
+  display_name                       = "Seeing_Project repository"
+
+  attribute_mapping = {
+    "google.subject"       = "assertion.sub"
+    "attribute.repository" = "assertion.repository"
+    "attribute.ref"        = "assertion.ref"
+    "attribute.event_name" = "assertion.event_name"
+  }
+  attribute_condition = <<-EOT
+    assertion.repository == "${var.github_repository}" &&
+    (assertion.ref == "refs/heads/main" || assertion.event_name == "workflow_dispatch")
+  EOT
+
+  oidc {
+    issuer_uri = "https://token.actions.githubusercontent.com"
+  }
+}
+
+resource "google_service_account" "deployer" {
+  account_id   = "seeing-deployer"
+  display_name = "Seeing deployer (GitHub Actions)"
+}
+
+resource "google_service_account_iam_member" "deployer_wif" {
+  service_account_id = google_service_account.deployer.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_repository}"
+}
+
+# Deploy Cloud Run services/jobs and execute the migrate job; read build logs (CLOUD_LOGGING_ONLY
+# builds stream from Cloud Logging); submit builds. The env roots grant actAs on their runtime SAs.
+resource "google_project_iam_member" "deployer" {
+  for_each = toset([
+    "roles/run.developer",
+    "roles/logging.viewer",
+    "roles/cloudbuild.builds.editor",
+    "roles/serviceusage.serviceUsageConsumer",
+  ])
+
+  project = var.project_id
+  role    = each.value
+  member  = google_service_account.deployer.member
+}
+
+# `gcloud builds submit --service-account=seeing-build` needs actAs on the build SA.
+resource "google_service_account_iam_member" "deployer_acts_as_build" {
+  service_account_id = google_service_account.build.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = google_service_account.deployer.member
+}
+
+# Upload source tarballs (bucket-scoped admin: gcloud also reads the bucket's metadata).
+resource "google_storage_bucket_iam_member" "deployer_source" {
+  bucket = google_storage_bucket.build_source.name
+  role   = "roles/storage.admin"
+  member = google_service_account.deployer.member
+}
+
+# deploy.sh checks whether an image tag already exists before building.
+resource "google_artifact_registry_repository_iam_member" "deployer_read" {
+  location   = var.region
+  repository = google_artifact_registry_repository.seeing.repository_id
+  role       = "roles/artifactregistry.reader"
+  member     = google_service_account.deployer.member
+}
+
 # --- Budget alerts ------------------------------------------------------------------------------
 # One budget of $10 with alerts at 100% ($10) and 200% ($20) of actual spend, plus 100% of
 # forecasted spend. Emails go to billing account admins/users (default IAM recipients), to the

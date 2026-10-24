@@ -1,5 +1,9 @@
 env = "prod"
 
+# Public site on seeingthesky.com (the app has its own accounts); iap_members is then unused.
+web_public     = true
+custom_domains = ["seeingthesky.com", "www.seeingthesky.com"]
+
 iap_members = [
   "user:thomas.hossler@gmail.com",
   "user:QalbalHayya@gmail.com",

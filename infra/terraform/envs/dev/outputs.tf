@@ -1,5 +1,5 @@
 output "web_url" {
-  description = "IAP-protected URL of the web service."
+  description = "Cloud Run URL of the web service (IAP-protected unless web_public)."
   value       = module.env.web_url
 }
 
@@ -22,4 +22,9 @@ output "create_user_job" {
 
 output "user_password_secret" {
   value = module.env.user_password_secret
+}
+
+output "domain_dns_records" {
+  description = "DNS records to create at the registrar for each custom domain."
+  value       = module.env.domain_dns_records
 }

@@ -30,3 +30,7 @@ output "web_service_account" {
 output "batch_service_account" {
   value = google_service_account.batch.email
 }
+
+output "domain_dns_records" {
+  value = module.web.domain_dns_records
+}

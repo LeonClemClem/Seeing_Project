@@ -71,8 +71,20 @@ variable "secret_env" {
 }
 
 variable "iap_members" {
-  description = "Principals granted roles/iap.httpsResourceAccessor (e.g. user:someone@gmail.com)."
+  description = "Principals granted roles/iap.httpsResourceAccessor (e.g. user:someone@gmail.com). Ignored when public."
   type        = list(string)
+}
+
+variable "public" {
+  description = "true: no IAP, allUsers may invoke the service. false: behind IAP, iap_members only."
+  type        = bool
+  default     = false
+}
+
+variable "custom_domains" {
+  description = "Domains mapped to the service (e.g. example.com), verified in Search Console first."
+  type        = list(string)
+  default     = []
 }
 
 variable "deletion_protection" {

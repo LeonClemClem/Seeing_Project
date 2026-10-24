@@ -13,8 +13,20 @@ variable "env" {
 }
 
 variable "iap_members" {
-  description = "Principals allowed through IAP to the web service."
+  description = "Principals allowed through IAP to the web service (ignored when web_public)."
   type        = list(string)
+}
+
+variable "web_public" {
+  description = "true: public web service (no IAP). false: IAP, iap_members only."
+  type        = bool
+  default     = false
+}
+
+variable "custom_domains" {
+  description = "Domains mapped to the web service, verified in Search Console beforehand."
+  type        = list(string)
+  default     = []
 }
 
 variable "web_image" {
