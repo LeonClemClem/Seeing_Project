@@ -277,8 +277,8 @@ GitHub Actions, in `.github/workflows/`:
 
 | Workflow | When | What |
 |---|---|---|
-| `ci.yml` (*Tests*) | every pull request | `make test-api`, `test-core`, `test-batch`, `test-web` |
-| `deploy-prod.yml` (*Deploy to prod*) | push (merge) to `main` | the tests, then `infra/scripts/deploy.sh prod all` (fails if the new revision does not pass `/healthz`) |
+| `ci.yml` (*Tests*) | every pull request, unless it only touches docs (`**.md`, `docs/`), `research/`, `apps/maquette/`, `.claude/` or `infra/terraform/` | `make test-api`, `test-core`, `test-batch`, `test-web` |
+| `deploy-prod.yml` (*Deploy to prod*) | push (merge) to `main` with the same exceptions; or manually (Run workflow, `main` only) | the tests, then `infra/scripts/deploy.sh prod all` (fails if the new revision does not pass `/healthz`) |
 | `deploy-dev.yml` (*Deploy to dev*) | manual: Actions → Deploy to dev → Run workflow → branch | `infra/scripts/deploy.sh dev all` on that branch |
 
 They authenticate with Workload Identity Federation: pool `github`, provider `seeing-project`

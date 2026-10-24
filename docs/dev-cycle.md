@@ -118,6 +118,11 @@ When the tests are green (and the change was reviewed if needed):
 2. GitHub starts **Deploy to prod** by itself: follow it in **Actions** → **Deploy to prod**. It
    runs the tests again, then publishes (about 10–15 minutes).
 3. Green tick: https://seeingthesky.com shows your change.
+
+   Changes that only touch documentation (`.md` files, `docs/`), `research/`, the mock-up
+   (`apps/maquette/`) or the Terraform files do not run the tests or the deployment: nothing on
+   the website changes, so there is nothing to publish. Those pull requests show no **Tests**
+   checks; merge them directly.
 4. Clean up on your computer and get ready for the next change:
    ```bash
    git switch main
