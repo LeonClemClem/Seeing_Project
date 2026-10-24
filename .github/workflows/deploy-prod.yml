@@ -1,0 +1,41 @@
+# Every merge (push) to main: run the tests, then build and deploy web + batch to prod
+# (https://seeingthesky.com) with infra/scripts/deploy.sh. Authenticates to GCP through Workload
+# Identity Federation (no keys): see "CI/CD" in infra/terraform/README.md.
+name: Deploy to prod
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  # One prod deploy at a time; a newer merge waits instead of cancelling a deploy halfway.
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: tests
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
+      url: https://seeingthesky.com
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          # Outputs of `terraform -chdir=infra/terraform/shared output` (not secrets).
+          workload_identity_provider: projects/5123733464/locations/global/workloadIdentityPools/github/providers/seeing-project
+          service_account: seeing-deployer-prod@project-astrarome.iam.gserviceaccount.com
+      - uses: google-github-actions/setup-gcloud@v2
+      # `gcloud run deploy` fails unless the new revision passes its /healthz startup probe.
+      - name: Build and deploy (migrations, web, batch)
+        run: infra/scripts/deploy.sh prod all

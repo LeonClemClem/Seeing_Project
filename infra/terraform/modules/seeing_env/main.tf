@@ -38,6 +38,18 @@ resource "google_secret_manager_secret_iam_member" "db_password" {
   member    = each.value
 }
 
+# deploy.sh (GitHub Actions, seeing-deployer-<env>) deploys the service and jobs, which run as these SAs.
+resource "google_service_account_iam_member" "deployer_acts_as" {
+  for_each = {
+    web   = google_service_account.web.name
+    batch = google_service_account.batch.name
+  }
+
+  service_account_id = each.value
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${var.deployer_service_account_email}"
+}
+
 # --- Web service + migrations job (same image) --------------------------------------------------
 
 module "web" {
@@ -56,6 +68,9 @@ module "web" {
   env                   = local.db_env
   secret_env            = local.db_secret_env
   iap_members           = var.iap_members
+  public                = var.web_public
+  custom_domains        = var.custom_domains
+  project_id            = var.project_id
   deletion_protection   = var.deletion_protection
 
   depends_on = [google_secret_manager_secret_iam_member.db_password]

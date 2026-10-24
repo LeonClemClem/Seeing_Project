@@ -17,6 +17,7 @@ module "env" {
   source = "../../modules/seeing_env"
 
   env                             = var.env
+  project_id                      = local.shared.project_id
   region                          = local.shared.region
   network_id                      = local.shared.network_id
   subnet_id                       = local.shared.subnet_id
@@ -24,7 +25,10 @@ module "env" {
   db_port                         = local.shared.db_port
   db_password_secret_id           = local.shared.db_password_secret_ids[var.env]
   scheduler_service_account_email = local.shared.scheduler_service_account_email
+  deployer_service_account_email  = local.shared.deployer_service_account_emails[var.env]
   iap_members                     = var.iap_members
+  web_public                      = var.web_public
+  custom_domains                  = var.custom_domains
 
   web_image         = var.web_image
   job_image         = var.job_image

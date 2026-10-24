@@ -1,3 +1,7 @@
+variable "project_id" {
+  type = string
+}
+
 variable "env" {
   description = "dev or prod."
   type        = string
@@ -38,8 +42,25 @@ variable "scheduler_service_account_email" {
   type = string
 }
 
+variable "deployer_service_account_email" {
+  description = "SA of the GitHub Actions deployer; may act as this env's runtime SAs."
+  type        = string
+}
+
 variable "iap_members" {
   type = list(string)
+}
+
+variable "web_public" {
+  description = "Serve the web service publicly instead of behind IAP."
+  type        = bool
+  default     = false
+}
+
+variable "custom_domains" {
+  description = "Custom domains mapped to the web service."
+  type        = list(string)
+  default     = []
 }
 
 variable "web_image" {

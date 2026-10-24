@@ -1,5 +1,10 @@
 env = "prod"
 
+# seeingthesky.com, behind IAP (iap_members only) like dev for now. Set web_public = true to open
+# it to everyone (the app has its own accounts; sign-up is then open to the public).
+web_public     = false
+custom_domains = ["seeingthesky.com", "www.seeingthesky.com"]
+
 iap_members = [
   "user:thomas.hossler@gmail.com",
   "user:QalbalHayya@gmail.com",

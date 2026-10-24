@@ -1,5 +1,6 @@
-# Cloud Run service behind native IAP (no load balancer), request-based billing, scale to zero,
-# Direct VPC egress for private ranges only.
+# Cloud Run service, either behind native IAP or public (no load balancer in both cases), with
+# optional custom domains, request-based billing, scale to zero, Direct VPC egress for private
+# ranges only.
 
 data "google_project" "this" {}
 
@@ -12,7 +13,7 @@ resource "google_cloud_run_v2_service" "this" {
   location = var.region
 
   ingress              = "INGRESS_TRAFFIC_ALL"
-  iap_enabled          = true
+  iap_enabled          = !var.public
   invoker_iam_disabled = false
   deletion_protection  = var.deletion_protection
 
@@ -93,20 +94,39 @@ resource "google_cloud_run_v2_service" "this" {
   }
 }
 
-# IAP calls the service as its service agent: it must be an invoker. No allUsers binding.
+# Private: IAP calls the service as its service agent, so it is the only invoker.
+# Public: anyone may invoke it (the app has its own accounts).
 resource "google_cloud_run_v2_service_iam_member" "iap_invoker" {
   name     = google_cloud_run_v2_service.this.name
   location = var.region
   role     = "roles/run.invoker"
-  member   = local.iap_service_agent
+  member   = var.public ? "allUsers" : local.iap_service_agent
 }
 
-# Who may pass IAP.
+# Who may pass IAP (only when private).
 resource "google_iap_web_cloud_run_service_iam_member" "accessors" {
-  for_each = toset(var.iap_members)
+  for_each = var.public ? toset([]) : toset(var.iap_members)
 
   cloud_run_service_name = google_cloud_run_v2_service.this.name
   location               = var.region
   role                   = "roles/iap.httpsResourceAccessor"
   member                 = each.value
+}
+
+# Custom domains (Cloud Run domain mapping: no load balancer, Google-managed certificate). The
+# domain must first be verified in Search Console by the account that runs Terraform; the DNS
+# records to create at the registrar are in the `domain_dns_records` output.
+resource "google_cloud_run_domain_mapping" "this" {
+  for_each = toset(var.custom_domains)
+
+  name     = each.value
+  location = var.region
+
+  metadata {
+    namespace = var.project_id
+  }
+
+  spec {
+    route_name = google_cloud_run_v2_service.this.name
+  }
 }

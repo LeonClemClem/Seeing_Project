@@ -22,7 +22,12 @@ test:
 TEST_PG := web-pg
 export TEST_DATABASE_URL ?= postgresql+psycopg://seeing:seeing@localhost:55434/seeing_test
 
-.PHONY: api-install web-install api-dev web-dev dev-seed test-api test-web web-image
+.PHONY: api-install web-install api-dev web-dev dev-seed test-api test-web web-image run-local
+
+# API + live-reloading website against the dev database on GCP (IAP tunnel). See README.
+# ARGS="--install" the first time; ARGS="--db local" for the docker-compose database.
+run-local:
+	python3 infra/scripts/run_local.py $(ARGS)
 
 api-install:
 	cd apps/api && poetry install

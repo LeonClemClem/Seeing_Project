@@ -92,6 +92,12 @@ variable "client_cidrs" {
   type        = list(string)
 }
 
+variable "db_client_cidrs" {
+  description = "Database name => extra CIDRs allowed in pg_hba for that database only (also opened in the host firewall)."
+  type        = map(list(string))
+  default     = {}
+}
+
 variable "pg_max_connections" {
   type    = number
   default = 40
