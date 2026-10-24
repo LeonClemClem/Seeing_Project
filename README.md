@@ -214,13 +214,25 @@ The dev website is a private copy of the site where you can try a branch before 
 production, with the dev data.
 
 1. Push your branch to GitHub (section 3, step 3).
-2. On https://github.com/LeonClemClem/Seeing_Project, open the **Actions** tab.
-3. In the list on the left, click **Deploy to dev**.
-4. Click **Run workflow** (on the right), choose your branch in **Use workflow from**, then the
-   green **Run workflow** button.
-5. Wait for the green tick (10–15 minutes the first time for a branch; a few minutes if that
-   exact version was already built). Click the run to follow each step.
-6. Open https://seeing-web-dev-62naw3atjq-uc.a.run.app (sign in with Google).
+2. Open this page (bookmark it):
+   **https://github.com/LeonClemClem/Seeing_Project/actions/workflows/deploy-dev.yml**
+
+   To get there by clicking instead: on the repository page, click **Actions** in the top bar
+   (between *Pull requests* and *Projects*), then **Deploy to dev** in the left-hand list
+   *All workflows*.
+3. Above the list of past runs there is a grey box saying *"This workflow has a
+   workflow_dispatch event trigger."* On its right is a **Run workflow ▾** button: click it.
+4. A small window opens with **Use workflow from: Branch: main ▾**. Click `main` and choose
+   **your branch** in the list (type its name to find it).
+5. Click the green **Run workflow** button in that window. After a few seconds a new line
+   appears in the list with a yellow dot (running); click it to follow each step.
+6. Wait for the green tick: 10–15 minutes the first time for a branch, a few minutes if that
+   exact version was already built.
+7. Open https://seeing-web-dev-62naw3atjq-uc.a.run.app (sign in with Google).
+
+If there is no **Deploy to dev** in the list or no **Run workflow** button: GitHub only shows
+this button once the file `.github/workflows/deploy-dev.yml` is on `main`, and only to people
+who can push to the repository. Check that you are signed in to GitHub with your account.
 
 Only one branch is on dev at a time: the last one deployed. If your branch changes the structure
 of the database, deploying it to dev applies that change to the dev database.
