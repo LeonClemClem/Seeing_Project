@@ -33,7 +33,7 @@ Read these before deep work — this summary links rather than duplicates:
 
 ## Runtime on GCP (`project-astrarome`, us-central1)
 
-Cloud Scheduler → Cloud Run Job `seeing-batch-{env}` (prod 4×/day aligned on AROME 00/06/12/18Z, dev 1×/day) → Postgres 16 container on e2-micro VM `seeing-db` (private IP 10.10.0.10, daily disk snapshots) ← Cloud Run service `seeing-web-{env}` (API + SPA). Dev (https://seeing-web-dev-62naw3atjq-uc.a.run.app) is behind Cloud Run native **IAP** (the two owners); prod is public on **seeingthesky.com** (+ www) through Cloud Run domain mappings, no load balancer. App accounts are its own (`/api/auth`). Image: `us-central1-docker.pkg.dev/project-astrarome/seeing/web:<sha>`.
+Cloud Scheduler → Cloud Run Job `seeing-batch-{env}` (prod 4×/day aligned on AROME 00/06/12/18Z, dev 1×/day) → Postgres 16 container on e2-micro VM `seeing-db` (private IP 10.10.0.10, daily disk snapshots) ← Cloud Run service `seeing-web-{env}` (API + SPA). Dev (https://seeing-web-dev-62naw3atjq-uc.a.run.app) is behind Cloud Run native **IAP** (the two owners); prod is on **seeingthesky.com** (+ www) through Cloud Run domain mappings, no load balancer, also behind IAP with the same two owners for now (`web_public = false`; flipping it opens the site). App accounts are its own (`/api/auth`). Image: `us-central1-docker.pkg.dev/project-astrarome/seeing/web:<sha>`.
 
 Deploys: GitHub Actions through Workload Identity Federation run `infra/scripts/deploy.sh` (prod on merge to `main`, dev by the "Deploy to dev" button). Dev env is live; as of 2026-10-24 prod and the WIF/IAP-5432 changes of `feat/handoff-cicd` are written and planned but not applied (rollout order: bootstrap → shared + VM reset → domain verification → envs/prod → DNS records).
 
@@ -63,7 +63,7 @@ Against the dev DB: `python infra/scripts/run_local.py [--install]` (IAP tunnel 
 9. 2026-10-22, branch `feat/user-accounts` (stacked on the replica): Alembic moved to `database/` (`74bd3d1`); `users` and `user_sessions` tables, revision 0003 (`c319161`); `/api/auth` sign-up / login / logout with Argon2id and httpOnly session cookies (`4e13eeb`); `seeing-create-user` CLI (`fc02512`); Compte page and header avatar wired to the API (`ea38372`).
 
 10. Frontend replica and user accounts squash-merged to `main` as `af9c8e4` (PR #4) and `a0268ce` (PR #5).
-11. 2026-10-24, branch `feat/handoff-cicd`: prod public on seeingthesky.com via domain mappings + WIF deployer + IAP TCP 5432 (`cd34449`); `run_local.py` (`bf8d234`); GitHub Actions tests / deploy prod / deploy dev (`4eda14b`); beginner README and CI/CD + domain runbook (`d91cbc9`).
+11. 2026-10-24, branch `feat/handoff-cicd`: prod on seeingthesky.com via domain mappings (behind IAP for now) + WIF deployer + IAP TCP 5432 (`cd34449`); `run_local.py` (`bf8d234`); GitHub Actions tests / deploy prod / deploy dev (`4eda14b`); beginner README and CI/CD + domain runbook (`d91cbc9`).
 
 ## Roadmap
 
@@ -72,4 +72,4 @@ Against the dev DB: `python infra/scripts/run_local.py [--install]` (IAP tunnel 
 3. Global calibration of the map (absolute values).
 4. Other models beyond AROME V2bd.
 5. Clean up pre-monorepo leftovers at the repo root.
-6. **Accounts follow-ups:** login rate limiting, e-mail verification and password reset, account export/deletion (buttons are disabled), now urgent since prod is public (sign-up is open on seeingthesky.com).
+6. **Accounts follow-ups:** login rate limiting, e-mail verification and password reset, account export/deletion (buttons are disabled), needed before setting `web_public = true` on prod (public sign-up on seeingthesky.com).

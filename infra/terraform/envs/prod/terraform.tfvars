@@ -1,7 +1,8 @@
 env = "prod"
 
-# Public site on seeingthesky.com (the app has its own accounts); iap_members is then unused.
-web_public     = true
+# seeingthesky.com, behind IAP (iap_members only) like dev for now. Set web_public = true to open
+# it to everyone (the app has its own accounts; sign-up is then open to the public).
+web_public     = false
 custom_domains = ["seeingthesky.com", "www.seeingthesky.com"]
 
 iap_members = [

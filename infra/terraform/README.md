@@ -8,8 +8,8 @@ free tiers (target < $10/month for dev + prod together).
 
 ```
                          ┌───────────────────── project-astrarome / us-central1 ─────────────────────┐
- browser ──────────HTTPS──► Cloud Run service seeing-web-{env}  (dev: native IAP; prod: public +     │
-                         │   domain mapping seeingthesky.com, no LB in both cases)                    │
+ browser (owner) ──HTTPS──► Cloud Run service seeing-web-{env}  (IAP enabled natively, no LB;        │
+                         │   prod also on seeingthesky.com through a domain mapping)                  │
                          │   SA seeing-web-{env}, min 0 / max 2, 1 vCPU / 512Mi, request billing      │
                          │        │ Direct VPC egress (PRIVATE_RANGES_ONLY)                           │
  Cloud Scheduler ─OAuth──► Cloud Run Admin API jobs/seeing-batch-{env}:run                            │
@@ -54,11 +54,11 @@ darwin_amd64.
 
 ### Security model
 
-- Web, dev: IAP on the Cloud Run service. The IAP service agent
+- Web: IAP on the Cloud Run service, in both environments. The IAP service agent
   `service-5123733464@gcp-sa-iap.iam.gserviceaccount.com` is the only `roles/run.invoker`; the
   two owners get `roles/iap.httpsResourceAccessor` on the service. No `allUsers`.
-- Web, prod (`web_public = true`): no IAP, `allUsers` is `roles/run.invoker`; the app's own
-  accounts protect what needs protecting.
+- `web_public = true` (not used yet) removes IAP: `allUsers` becomes `roles/run.invoker` and the
+  app's own accounts protect what needs protecting.
 - GitHub Actions (`seeing-deployer-{dev,prod}`, see [CI/CD](#cicd)): Workload Identity Federation,
   no key. Only `LeonClemClem/Seeing_Project` can get a token, and only on a push to `main` or a
   manual `workflow_dispatch` (pull requests cannot). `seeing-deployer-prod` is reachable from
@@ -246,9 +246,11 @@ longer holds a live password.
 
 ### 8. Prod
 
-Prod is public (`web_public = true`) on `seeingthesky.com` and `www.seeingthesky.com`
-(`custom_domains` in `envs/prod/terraform.tfvars`), with Cloud Run domain mappings: no load
-balancer, Google-managed certificate.
+Prod is on `seeingthesky.com` and `www.seeingthesky.com` (`custom_domains` in
+`envs/prod/terraform.tfvars`), with Cloud Run domain mappings: no load balancer, Google-managed
+certificate. It stays behind IAP (`web_public = false`, same `iap_members` as dev) until the
+accounts follow-ups are done. Cloud Run domain mappings are a Preview feature: if IAP sign-in does
+not work through the domain, use the `web_url` output (`*.run.app`) meanwhile.
 
 1. Verify the domain once, with the account that runs Terraform: Google Search Console →
    **Add property** → **Domain** `seeingthesky.com` → add the TXT record it gives at the registrar
@@ -263,7 +265,9 @@ balancer, Google-managed certificate.
    (`seeingthesky.com`) and a CNAME `www` → `ghs.googlehosted.com.`. The certificate is issued
    15 min – a few hours after DNS propagates (`gcloud beta run domain-mappings describe
    --domain seeingthesky.com --region us-central1` shows the status).
-4. Deploy: merge to `main` (see [CI/CD](#cicd)), or by hand `infra/scripts/deploy.sh prod all`
+4. IAP: Console → Cloud Run → `seeing-web-prod` → Security → IAP → pick the same OAuth client as
+   dev (step 3.3). If sign-in on seeingthesky.com fails with `redirect_uri_mismatch`, see step 3.4.
+5. Deploy: merge to `main` (see [CI/CD](#cicd)), or by hand `infra/scripts/deploy.sh prod all`
    (same commit as dev: reuses the images). Then fill the DB once:
    `gcloud run jobs execute seeing-batch-prod --region us-central1 --wait`.
 
@@ -274,7 +278,7 @@ GitHub Actions, in `.github/workflows/`:
 | Workflow | When | What |
 |---|---|---|
 | `ci.yml` (*Tests*) | every pull request | `make test-api`, `test-core`, `test-batch`, `test-web` |
-| `deploy-prod.yml` (*Deploy to prod*) | push (merge) to `main` | the tests, then `infra/scripts/deploy.sh prod all`, then `/healthz` on the prod service |
+| `deploy-prod.yml` (*Deploy to prod*) | push (merge) to `main` | the tests, then `infra/scripts/deploy.sh prod all` (fails if the new revision does not pass `/healthz`) |
 | `deploy-dev.yml` (*Deploy to dev*) | manual: Actions → Deploy to dev → Run workflow → branch | `infra/scripts/deploy.sh dev all` on that branch |
 
 They authenticate with Workload Identity Federation: pool `github`, provider `seeing-project`

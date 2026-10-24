@@ -36,9 +36,6 @@ jobs:
           workload_identity_provider: projects/5123733464/locations/global/workloadIdentityPools/github/providers/seeing-project
           service_account: seeing-deployer-prod@project-astrarome.iam.gserviceaccount.com
       - uses: google-github-actions/setup-gcloud@v2
+      # `gcloud run deploy` fails unless the new revision passes its /healthz startup probe.
       - name: Build and deploy (migrations, web, batch)
         run: infra/scripts/deploy.sh prod all
-      - name: Smoke test
-        run: |
-          url="$(gcloud run services describe seeing-web-prod --region us-central1 --project project-astrarome --format='value(status.url)')"
-          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${url}/healthz"

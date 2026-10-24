@@ -2,7 +2,7 @@
 
 Forecasts of astronomical **seeing** (optical turbulence, in arcseconds) for observing sites in
 France, computed from Météo-France's AROME weather model and published on
-**https://seeingthesky.com**.
+**https://seeingthesky.com** (for now private: Google sign-in, project members only).
 
 | Path | What |
 |---|---|
@@ -23,9 +23,9 @@ How the pieces fit together, and the contracts between them: [docs/architecture.
 |---|---|---|---|
 | **Your computer** | http://localhost:5173 | the **dev** database (real forecasts) | instantly, every time you save a file |
 | **Dev website** (private) | https://seeing-web-dev-62naw3atjq-uc.a.run.app | the dev database | when you click **Deploy to dev** in GitHub |
-| **Production** (public) | https://seeingthesky.com | the prod database | automatically, ~15 min after a pull request is merged into `main` |
+| **Production** (private for now) | https://seeingthesky.com | the prod database | automatically, ~15 min after a pull request is merged into `main` |
 
-The dev website asks you to sign in with Google: only the project members' accounts get in.
+Both websites ask you to sign in with Google: only the project members' accounts get in, for now.
 
 ## 1. One-time setup
 

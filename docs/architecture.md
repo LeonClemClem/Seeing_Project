@@ -11,8 +11,8 @@ Cloud Scheduler ──► Cloud Run Job  seeing-batch-{env}   download AROME →
                         ▼
    e2-micro VM "seeing-db" (COS, postgres:16 container, no public IP)  DBs: seeing_dev, seeing_prod
                         ▲
-Cloud Run Service seeing-web-{env}   FastAPI: /api/* + built React SPA   ◄── dev: IAP (project owners)
-                                                                         prod: public, seeingthesky.com
+Cloud Run Service seeing-web-{env}   FastAPI: /api/* + built React SPA   ◄── IAP (project owners)
+                                                                         prod also on seeingthesky.com
 ```
 
 - GCP project `project-astrarome`, region **`us-central1`** (always-free e2-micro for the DB VM).
@@ -166,9 +166,9 @@ the prompt, or `SEEING_USER_PASSWORD` for non-interactive runs; `--update` chang
 only if given, role, and ends the account's sessions). Auth 422 responses never echo submitted values. Not implemented yet: login rate limiting, e-mail
 verification, password reset.
 
-In dev, IAP still sits in front of the Cloud Run service, so a visitor needs IAP access before
-reaching the app's login. Prod is public (`web_public = true`): anyone can sign up on
-seeingthesky.com.
+IAP still sits in front of the Cloud Run service in both environments (prod included, on
+seeingthesky.com), so a visitor needs IAP access before reaching the app's login. Opening prod to
+the public is `web_public = true` in `infra/terraform/envs/prod/terraform.tfvars`.
 
 ## Containers
 
