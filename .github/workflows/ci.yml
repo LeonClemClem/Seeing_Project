@@ -3,6 +3,15 @@ name: Tests
 
 on:
   pull_request:
+    # Skip when only these change (a PR touching anything else still runs everything). Keep this
+    # list identical in ci.yml and deploy-prod.yml.
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "research/**"
+      - "apps/maquette/**"
+      - ".claude/**"
+      - "infra/terraform/**" # applied by hand, not deployed by this pipeline
   workflow_call:
 
 permissions:

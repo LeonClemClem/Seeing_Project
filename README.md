@@ -27,10 +27,79 @@ How the pieces fit together, and the contracts between them: [docs/architecture.
 
 Both websites ask you to sign in with Google: only the project members' accounts get in, for now.
 
+## How the pieces fit together
+
+```mermaid
+flowchart LR
+    subgraph laptop["Your computer"]
+        browser["Browser"]
+        local["run_local.py<br/>API :8000 + website :5173"]
+    end
+
+    subgraph github["GitHub"]
+        repo["Repository<br/>branches, pull requests, main"]
+        tests["Tests<br/>(every pull request)"]
+        deploydev["Deploy to dev<br/>(button)"]
+        deployprod["Deploy to prod<br/>(merge to main)"]
+    end
+
+    subgraph gcp["Google Cloud - project-astrarome"]
+        build["Cloud Build<br/>builds the images"]
+        registry["Artifact Registry<br/>web + batch images"]
+        iap["Google sign-in (IAP)<br/>project members only"]
+        subgraph dev["dev"]
+            webdev["seeing-web-dev<br/>website + API"]
+            batchdev["seeing-batch-dev<br/>1x per day"]
+        end
+        subgraph prod["prod"]
+            webprod["seeing-web-prod<br/>website + API<br/>seeingthesky.com"]
+            batchprod["seeing-batch-prod<br/>4x per day"]
+        end
+        db[("Database VM seeing-db<br/>Postgres: seeing_dev, seeing_prod")]
+        scheduler["Cloud Scheduler"]
+    end
+
+    meteo["Meteo-France<br/>AROME forecasts"]
+
+    repo --> tests
+    repo --> deploydev
+    repo --> deployprod
+    deploydev --> build
+    deployprod --> build
+    build --> registry
+    registry --> webdev
+    registry --> webprod
+    registry --> batchdev
+    registry --> batchprod
+
+    browser --> iap
+    iap --> webdev
+    iap --> webprod
+    browser --> local
+    local -- "secure tunnel (IAP)" --> db
+
+    scheduler --> batchdev
+    scheduler --> batchprod
+    meteo --> batchdev
+    meteo --> batchprod
+    batchdev -- "writes forecasts" --> db
+    batchprod -- "writes forecasts" --> db
+    webdev -- "reads seeing_dev" --> db
+    webprod -- "reads seeing_prod" --> db
+```
+
+- **Batch jobs** download each AROME run from Météo-France, compute the seeing for every site and
+  store it in the database. Cloud Scheduler starts them (prod 4 times a day, dev once a day).
+- **Web services** show the website and answer its API calls from the database.
+- **dev** and **prod** share the same database machine but have separate databases: what you do on
+  dev (or on your computer) never touches prod data.
+- **GitHub Actions** builds and deploys the code: no one needs Google Cloud passwords or keys for
+  that.
+
 ## 1. One-time setup
 
 You need: **Git**, **Python 3.12**, **Poetry**, **Node.js 20 or newer** and the **Google Cloud CLI**
-(`gcloud`). Docker is optional (only for running the tests or a local database).
+(`gcloud`).
 
 **Windows**: open *PowerShell* and run:
 
@@ -110,10 +179,18 @@ Cloud (so you see real forecasts), then starts the API (http://localhost:8000/ap
 website. It never changes the structure of the database. Accounts you create on the *Compte* page
 are real accounts of the dev database.
 
+The database server has **no public address on the internet**. The tunnel goes through Google's
+*Identity-Aware Proxy*, which first checks that your `gcloud` login is a member of the project;
+then the database itself asks for its password, which the script reads from Google's secret store
+(it is never written to a file). From a computer, only the dev database can be reached, never the
+production one.
+
 After pulling changes from GitHub (`git pull`), run once with `--install` again in case the
 libraries changed.
 
 ## 3. Make a change and publish it
+
+**Step-by-step guide for every change: [docs/dev-cycle.md](docs/dev-cycle.md).** Summary below.
 
 `main` is the published version: nobody changes it directly. Each change goes through a
 **branch** and a **pull request** (PR). The full workflow, with good commit messages, is in
@@ -136,17 +213,66 @@ libraries changed.
    **Compare & pull request**, describe the change, **Create pull request**.
 5. GitHub runs the tests on it (the **Tests** checks at the bottom of the PR). Wait for them to
    turn green. If one is red, click **Details** to see what failed, fix it, commit and push again.
-6. *Optional*: try it on the dev website: GitHub → **Actions** → **Deploy to dev** →
-   **Run workflow** → choose your branch → **Run workflow**. About 10–15 minutes later, the dev
-   website shows your branch.
-7. **Merge** the pull request (*Squash and merge*). GitHub then tests `main` again and deploys it
-   to https://seeingthesky.com: follow it in **Actions** → **Deploy to prod**. A green tick means
-   the site is updated.
+6. *Optional*: try it on the dev website (section 4).
+7. **Merge** the pull request: prod updates itself (section 5).
 
-If a deployment is red, the previous version stays online: nothing breaks for visitors. Open the
-failed run to read the error, fix it in a new pull request, or ask for help.
+## 4. Deploy to dev (try a branch online)
 
-## 4. Troubleshooting
+The dev website is a private copy of the site where you can try a branch before it goes to
+production, with the dev data.
+
+1. Push your branch to GitHub (section 3, step 3).
+2. Open this page (bookmark it):
+   **https://github.com/LeonClemClem/Seeing_Project/actions/workflows/deploy-dev.yml**
+
+   To get there by clicking instead: on the repository page, click **Actions** in the top bar
+   (between *Pull requests* and *Projects*), then **Deploy to dev** in the left-hand list
+   *All workflows*.
+3. Above the list of past runs there is a grey box saying *"This workflow has a
+   workflow_dispatch event trigger."* On its right is a **Run workflow ▾** button: click it.
+4. A small window opens with **Use workflow from: Branch: main ▾**. Click `main` and choose
+   **your branch** in the list (type its name to find it).
+5. Click the green **Run workflow** button in that window. After a few seconds a new line
+   appears in the list with a yellow dot (running); click it to follow each step.
+6. Wait for the green tick: 10–15 minutes the first time for a branch, a few minutes if that
+   exact version was already built.
+7. Open https://seeing-web-dev-62naw3atjq-uc.a.run.app (sign in with Google).
+
+If there is no **Deploy to dev** in the list or no **Run workflow** button: GitHub only shows
+this button once the file `.github/workflows/deploy-dev.yml` is on `main`, and only to people
+who can push to the repository. Check that you are signed in to GitHub with your account.
+
+Only one branch is on dev at a time: the last one deployed. If your branch changes the structure
+of the database, deploying it to dev applies that change to the dev database.
+
+## 5. Deploy to prod (publish on seeingthesky.com)
+
+Production is updated **only** by merging a pull request into `main`:
+
+1. Open your pull request and check the **Tests** are green.
+2. Click **Squash and merge**, then **Confirm**.
+3. GitHub runs **Deploy to prod** by itself (see the **Actions** tab): the tests again, then the
+   build, the database update and the new version of the website and batch job. About 10–15
+   minutes.
+4. Green tick: https://seeingthesky.com shows the new version.
+
+If a deployment is red, the previous version stays online: nothing breaks for visitors. Click
+the failed run, then the red step, to read the error. Fix it in a new pull request, or ask for
+help. To re-run a deployment that failed for a temporary reason, open the run and click
+**Re-run jobs**.
+
+New forecasts appear on their own (the batch job runs 4 times a day). To compute one right away
+after a change to the calculation:
+
+```bash
+gcloud run jobs execute seeing-batch-prod --region us-central1 --project project-astrarome
+```
+
+Deploying by hand (without GitHub), going back to an older version, and the infrastructure
+itself are explained in [infra/terraform/README.md](infra/terraform/README.md) (*Day to day*,
+*Roll back*).
+
+## 6. Troubleshooting
 
 | Message | What to do |
 |---|---|
@@ -161,24 +287,11 @@ Changing the **structure** of the database (a new table or column) needs a migra
 [database/README.md](database/README.md). Your computer uses the dev database as it is; the
 migration reaches it when the branch is deployed with **Deploy to dev**.
 
-## 5. For developers
+## 7. Tests and infrastructure
 
-Also needs Docker and make. Local database instead of the dev one:
-
-```bash
-make db-up migrate dev-seed   # local Postgres on :5432, tables, a fake forecast run
-make run-local ARGS="--db local"
-```
-
-```bash
-make api-install web-install
-make api-dev        # FastAPI on http://localhost:8000 (API docs at /api/docs)
-make web-dev        # Vite on http://localhost:5173, proxies /api to :8000
-make test-api       # pytest against a throwaway Postgres on :55434
-make test-web       # typecheck + eslint + vitest
-make test-core test-batch
-make web-image      # production image (apps/api/Dockerfile, repo root as context)
-```
+GitHub runs all the tests on every pull request (section 3, step 5), so you don't need to run
+them yourself. For the curious, `make test-api`, `make test-web`, `make test-core` and
+`make test-batch` run the same tests on your computer (they need Docker and make).
 
 Infrastructure, deployments by hand (`infra/scripts/deploy.sh`), CI/CD and the domain:
 [infra/terraform/README.md](infra/terraform/README.md).

@@ -7,6 +7,7 @@
 Forecasts astronomical **seeing** (optical turbulence, arcseconds at 500 nm, lower is better) for observing sites from Météo-France **AROME** (1.3 km) GRIB2 output plus an empirical Cn² model ("V2", with K_TKE / K_CIS / K_conv coefficients). Repo owner is a friend who adds research scripts under `research/`; Thomas Hossler builds the product around them.
 
 Read these before deep work — this summary links rather than duplicates:
+- `docs/dev-cycle.md` — the owner's step-by-step change cycle (branch → local → Deploy to dev → PR → merge).
 - `docs/architecture.md` — the contract: DB schema, env vars, API endpoints, seeing_core interface, container/infra names.
 - `infra/terraform/README.md` — infra architecture, security model, cost, first-time runbook, IAP fixes.
 - `research/README.md` — the original algorithm, explained for beginners.
@@ -39,7 +40,7 @@ Deploys: GitHub Actions through Workload Identity Federation run `infra/scripts/
 
 ## Local dev
 
-Against the dev DB: `python infra/scripts/run_local.py [--install]` (IAP tunnel on :15432, API :8000, Vite :5173; beginner steps in `README.md`). Fully local: `make db-up migrate dev-seed`, then `make run-local ARGS="--db local"` or `make api-dev` + `make web-dev`. Tests: `make test-core test-batch test-api test-web`. Others: `web-image`, `batch-run`, `revision MSG=...`, `lint` / `format` (ruff on `research/`). Accounts: sign up on the Compte page; create an admin or the team account with `cd apps/api && poetry run seeing-create-user --email ... --role admin`.
+Against the dev DB: `python infra/scripts/run_local.py [--install]` (IAP tunnel on :15432, API :8000, Vite :5173; beginner steps in `README.md`). Fully local (developers only, not in the README): `make db-up migrate dev-seed`, then `make api-dev` + `make web-dev`. Tests: `make test-core test-batch test-api test-web`. Others: `web-image`, `batch-run`, `revision MSG=...`, `lint` / `format` (ruff on `research/`). Accounts: sign up on the Compte page; create an admin or the team account with `cd apps/api && poetry run seeing-create-user --email ... --role admin`.
 
 ## Gotchas
 

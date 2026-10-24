@@ -1,4 +1,4 @@
-# Every merge (push) to main: run the tests, then build and deploy web + batch to prod
+# Every merge (push) to main that touches the code: run the tests, then build and deploy web + batch to prod
 # (https://seeingthesky.com) with infra/scripts/deploy.sh. Authenticates to GCP through Workload
 # Identity Federation (no keys): see "CI/CD" in infra/terraform/README.md.
 name: Deploy to prod
@@ -6,6 +6,17 @@ name: Deploy to prod
 on:
   push:
     branches: [main]
+    # Skip when only these change (a PR touching anything else still runs everything). Keep this
+    # list identical in ci.yml and deploy-prod.yml.
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "research/**"
+      - "apps/maquette/**"
+      - ".claude/**"
+      - "infra/terraform/**" # applied by hand, not deployed by this pipeline
+  # Manual run (Actions → Deploy to prod → Run workflow), e.g. after a skipped docs-only merge.
+  workflow_dispatch:
 
 permissions:
   contents: read
