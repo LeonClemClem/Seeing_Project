@@ -11,6 +11,7 @@ class SiteOut(BaseModel):
     lat: float
     lon: float
     altitude_m: float | None
+    visibility: str
 
 
 class RunOut(BaseModel):

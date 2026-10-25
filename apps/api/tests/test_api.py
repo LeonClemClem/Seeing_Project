@@ -14,10 +14,19 @@ def test_sites_lists_active_seeded_sites(client, session):
     assert r.status_code == 200
     assert r.headers["cache-control"] == "private, max-age=300"
     sites = {s["slug"]: s for s in r.json()}
-    assert {"saint-veran", "pic-du-midi", "copernic-gap"} <= set(sites)
+    assert set(sites) == {"saint-veran", "pic-du-midi", "ohp", "cosmodrome"}
     assert sites["saint-veran"]["altitude_m"] == 2930.0
-    assert sites["copernic-gap"]["altitude_m"] is None
-    assert set(sites["saint-veran"]) == {"slug", "name", "lat", "lon", "altitude_m"}
+    assert sites["cosmodrome"]["altitude_m"] is None
+    assert set(sites["saint-veran"]) == {"slug", "name", "lat", "lon", "altitude_m", "visibility"}
+    assert {s: sites[s]["visibility"] for s in sites} == {
+        "saint-veran": "public", "pic-du-midi": "public", "ohp": "public", "cosmodrome": "shared",
+    }
+
+
+def test_hidden_sites_are_not_served(client, session):
+    # Copernic and Verclause are still computed by the batch but not offered on the website.
+    assert client.get("/api/sites/copernic-gap/forecast").status_code == 404
+    assert client.get("/api/sites/verclause/cn2").status_code == 404
 
 
 def test_latest_run_404_when_no_success(client, session):

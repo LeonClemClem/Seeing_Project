@@ -10,7 +10,7 @@ import { MOCK_PLACES, useCurrentPlace, usePlaces } from "../data/places";
 import { tr } from "../i18n";
 import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, parseCoord, relief, SARD, SHAREDV, ZONES, type Box, type Poly } from "../lib/geo";
 import { useLatestRunTime } from "../lib/hooks";
-import { D2R, esc, fmt, med, pad2, runLabel, turbo, turboGradient } from "../lib/util";
+import { D2R, esc, fmt, pad2, runLabel, turbo, turboGradient } from "../lib/util";
 import { REF } from "../mock/engine";
 import { useUi } from "../store";
 
@@ -157,7 +157,6 @@ export default function Carte() {
   const [playing, setPlaying] = useState(false);
   const [MZH, setMZH] = useState(-1);
   const [tip, setTip] = useState<string | null>(null);
-  const [stats, setStats] = useState<[string, string]>(["–", "–"]);
   const [newPt, setNewPt] = useState<[number, number] | null>(null);
   const loc = useLocation();
   const [showNew, setShowNew] = useState(() => !!(loc.state as { newPlace?: boolean } | null)?.newPlace);
@@ -215,8 +214,7 @@ export default function Carte() {
     const cx = cv.getContext("2d")!;
     const C = (cache.current = viewCache(VW, cache.current));
     const img = cx.createImageData(CW, CH),
-      D = img.data,
-      all: number[] = [];
+      D = img.data;
     for (let j = 0; j < CW * CH; j++) {
       const p = j * 4;
       if (C.sea[j]) {
@@ -230,7 +228,6 @@ export default function Carte() {
       const s = C.base[j]! * frameFac(C.las[j]!, C.los[j]!),
         c = LUT[Math.min(255, Math.round((s / 6) * 255))]!,
         d = C.iso[j] ? 0.45 : 1;
-      if (!(j % 7) && !(((j / CW) | 0) % 7)) all.push(s);
       D[p] = c[0] * d;
       D[p + 1] = c[1] * d;
       D[p + 2] = c[2] * d;
@@ -363,8 +360,6 @@ export default function Carte() {
     const hkm = Math.round((VW.la1 - VW.la0) * 111.2),
       zmax = VW.la1 - VW.la0 <= ZMIN + 1e-6;
     label(tr(`${hkm} × ${km} km${zmax ? " · zoom maximal" : ""} · isolignes ${isoStep(VW)} m`), CW - (zmax ? 300 : 200), CH - 12);
-    all.sort((a, b) => a - b);
-    setStats(all.length ? [all[0]!.toFixed(1) + '"', med(all).toFixed(1) + '"'] : ["–", "–"]);
   }, [VW, frameFac, toXY, pub, MZH, newPt, role, lang]);
 
   /* ---------- animation ---------- */
@@ -719,16 +714,6 @@ export default function Carte() {
                 {tr("(résultats disponibles environ")} <span className="mono">1 h 15</span> {tr("après l'arrivée du run)")}
               </span>
             </p>
-            <div className="tiles">
-              <div className="tile">
-                <div className="l">{tr("Meilleure maille")}</div>
-                <div className="v">{stats[0]}</div>
-              </div>
-              <div className="tile">
-                <div className="l">{tr("Médiane de la zone")}</div>
-                <div className="v">{stats[1]}</div>
-              </div>
-            </div>
             <p className="note">
               {tr(
                 "Calcul global sur tout le domaine AROME (terres et bande côtière de 106 km) toutes les 6 heures, à chaque run principal : 00Z, 06Z, 12Z, 18Z ; les runs secondaires ne sont pas utilisés. La carte est calibrée une fois pour toutes par l'administrateur : elle ne change pas avec la calibration des lieux. Hors du domaine, ou en mer au-delà de la bande côtière, un lieu passe par la file d'attente.",

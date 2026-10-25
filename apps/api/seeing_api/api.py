@@ -34,11 +34,14 @@ def utc(dt: datetime) -> datetime:
 
 
 def site_out(site: Site) -> SiteOut:
-    return SiteOut(slug=site.slug, name=site.name, lat=site.lat, lon=site.lon, altitude_m=clean(site.altitude_m))
+    return SiteOut(
+        slug=site.slug, name=site.name, lat=site.lat, lon=site.lon, altitude_m=clean(site.altitude_m),
+        visibility=site.visibility,
+    )
 
 
 def get_site(session: Session, slug: str) -> Site:
-    site = session.scalar(select(Site).where(Site.slug == slug, Site.active.is_(True)))
+    site = session.scalar(select(Site).where(Site.slug == slug, Site.active.is_(True), Site.visibility != "hidden"))
     if site is None:
         raise HTTPException(404, f"Unknown site '{slug}'")
     return site
@@ -72,7 +75,9 @@ def me(request: Request, response: Response, user: CurrentUser) -> MeOut:
 
 @router.get("/sites", response_model=list[SiteOut])
 def list_sites(session: SessionDep) -> list[SiteOut]:
-    sites = session.scalars(select(Site).where(Site.active.is_(True)).order_by(Site.name))
+    sites = session.scalars(
+        select(Site).where(Site.active.is_(True), Site.visibility != "hidden").order_by(Site.name)
+    )
     return [site_out(s) for s in sites]
 
 

@@ -19,7 +19,7 @@ import { setState, useLangMemo, useUi } from "../store";
 type Sel = { t: "lx"; id: string } | { t: "sh"; k: number };
 
 export default function Lieux() {
-  const { pub } = usePlaces();
+  const { pub, sh } = usePlaces();
   const role = useUi((s) => s.role);
   const current = useUi((s) => s.place);
   const mesf = useUi((s) => s.mesf);
@@ -27,7 +27,7 @@ export default function Lieux() {
   const [sel, setSel] = useState<Sel>({ t: "lx", id: current });
   const [open, setOpen] = useState({ pub: false, sh: false });
 
-  const all = [...MOCK_PLACES, ...pub];
+  const all = [...MOCK_PLACES, ...pub, ...sh];
   const l = sel.t === "lx" ? (all.find((p) => p.id === sel.id) ?? MOCK_PLACES[0]!) : null;
   const toggleM = (k: "brut" | "horaire" | "courbe") => setState((s) => ({ mesf: { ...s.mesf, [k]: !s.mesf[k] } }));
 
@@ -141,9 +141,31 @@ export default function Lieux() {
         style={{ marginTop: 10, border: "1px solid var(--line)", borderRadius: 10, padding: "8px 12px", background: "var(--panel)" }}
       >
         <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
-          {tr("Partagés par la communauté")} <span className="small muted">({SHAREDV.length})</span>
+          {tr("Partagés par la communauté")} <span className="small muted">({sh.length + SHAREDV.length})</span>
         </summary>
         <div className="tiles" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", marginTop: 6 }}>
+          {sh.length > 0 && (
+            <div style={{ gridColumn: "1/-1" }} className="small muted">
+              {tr("Observatoires (données réelles)")}
+            </div>
+          )}
+          {sh.map((p) =>
+            tile(
+              sel.t === "lx" && sel.id === p.id,
+              p.id,
+              () => setSel({ t: "lx", id: p.id }),
+              <>
+                <div style={{ fontWeight: 500 }}>{p.nom}</div>
+                <div className="small muted mono">
+                  {p.lat.toFixed(3)} N · {p.lon.toFixed(3)} E
+                </div>
+                <div className="small" style={{ marginTop: 4 }}>
+                  {p.alt != null ? `${Math.round(p.alt)} m` : "–"}
+                </div>
+                <div className="small muted">{tr("prévisions du dernier run · pas de mesures")}</div>
+              </>,
+            ),
+          )}
           <div style={{ gridColumn: "1/-1", marginTop: 6 }} className="small muted">
             {tr("Lieux de membres (position floutée à 5–11 km, données fictives dans la maquette)")}
           </div>
@@ -299,7 +321,7 @@ function PlaceDetail({ l }: { l: Place }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
           <h2>
             {tr("Historique")} · {tr(l.nom)}
-            {l.kind === "pub" ? tr(" (site public)") : ""}
+            {l.kind === "pub" ? tr(l.shared ? " (partagé par la communauté)" : " (site public)") : ""}
           </h2>
           <span className="small muted mono">
             {tr(kTxt(l.K, hid, fmt))}
