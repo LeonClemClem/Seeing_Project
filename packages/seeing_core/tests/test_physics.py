@@ -9,7 +9,7 @@ from seeing_core import ExtractedRun, SiteSpec, compute_from_extracted, parse_gr
 from seeing_core.cn2 import cn2_convective, cn2_shear, cn2_tke
 from seeing_core.constants import HEIGHTS, LAMBDA
 from seeing_core.profiles import get_h_coulim, surface_kinematic_heat_flux
-from seeing_core.seeing import display_cn2_profile, display_grid, integrate_seeing
+from seeing_core.seeing import display_cn2_profile, display_grid, integrate_seeing, seeing_from_integral, v2bd_blend
 
 
 def test_integrate_seeing_constant_profile():
@@ -147,3 +147,32 @@ def test_k_coefficients_come_from_site():
     b = compute_from_extracted(run, [SiteSpec("s", 44.0, 6.0, 0.3, 6.0, 60.0)], 0)["s"].hours[0]
     # Both TKE and shear branches doubled -> integral doubled (the convective one is unused here).
     assert b.integral_cn2 == pytest.approx(2 * a.integral_cn2, rel=1e-12)
+
+
+def test_v2bd_blend_soft_transition():
+    z = np.array([0.0, 400.0, 500.0, 600.0, 2000.0])
+    one = np.ones_like(z)
+    zero = np.zeros_like(z)
+    # weights: boundary-layer terms far below H_COULIM, shear far above, half / half at H_COULIM
+    c = v2bd_blend(z, 500.0, one, zero, one, k_tke=2.0, k_cis=10.0, k_conv=0.1)
+    assert c[0] == pytest.approx(2.0, rel=1e-3)
+    assert c[2] == pytest.approx(0.5 * 2.0 + 0.5 * 10.0)
+    assert c[-1] == pytest.approx(10.0, rel=1e-3)
+    w = 0.5 * (1 - np.tanh(-100.0 / 100.0))
+    assert c[1] == pytest.approx(w * 2.0 + (1 - w) * 10.0)
+    # NaN terms count as zero, the convective term has its own K
+    c = v2bd_blend(z, 500.0, np.full_like(z, np.nan), one, np.full_like(z, np.nan), 2.0, 10.0, 0.1)
+    assert c[0] == pytest.approx(0.1, rel=1e-3)
+    assert c[-1] == pytest.approx(0.0)
+
+
+def test_seeing_from_integral_matches_integrate_seeing():
+    z = np.array([0.0, 500.0, 1000.0])
+    cn2 = np.full(3, 1e-16)
+    assert seeing_from_integral(1e-13) == pytest.approx(integrate_seeing(z, cn2))
+    assert np.isnan(seeing_from_integral(0.0)[2])
+
+
+def test_unknown_model_rejected():
+    with pytest.raises(ValueError):
+        compute_from_extracted(_synthetic_run(hours=(0,)), [SITE], forecast_hours=0, model="V9")

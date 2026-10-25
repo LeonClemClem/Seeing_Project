@@ -17,7 +17,7 @@ Read these before deep work — this summary links rather than duplicates:
 | Path | Role |
 |---|---|
 | `research/` | The scripts in service (owned by Clément, the repo owner): V1, V2 (`SeeingAromeV2_correction_conv_tke.py`) and V2b models, run computation (`calcul_run.py`), validation and site history, global map (`carte_seeing.py`), fisheye (`ciel_seeing.py`), seeing-monitor collectors (`collect-seeing*.ps1`, `releve_*`), and `export_lieux_site.py` (real data for the mock-up). Machine paths come from `chemins.py` + `chemins_locaux.json` (not committed). Own Poetry env; apps do **not** import it. |
-| `packages/seeing_core/` | V2 algorithm as pure modules: `compute_sites(grib_dir, sites, forecast_hours)`. Equivalence tests vs. real-run fixtures. |
+| `packages/seeing_core/` | Seeing model as pure modules: `compute_sites(grib_dir, sites, forecast_hours, model)`, V2bd by default (soft transition at H_COULIM), V2 kept and tested for equivalence vs. real-run fixtures. |
 | `packages/seeing_db/` | SQLAlchemy models + DB config + `seeing-migrate` runner. Tables `sites`, `model_runs`, `forecasts`, `cn2_profiles`, `users`, `user_sessions`. |
 | `database/` | Alembic (`alembic.ini`, `migrations/versions/0001…0003`); `make revision MSG=...` adds one. See `database/README.md`. |
 | `apps/batch/` | Cloud Run Job `seeing-batch run [--run-time] [--keep-gribs]`: download AROME → seeing_core → Postgres. 14-day retention. |

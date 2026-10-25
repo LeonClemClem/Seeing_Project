@@ -40,7 +40,8 @@ def test_load_sites_uses_db_coefficients(db):
     with db() as s:
         sites = dict((spec.slug, spec) for _, spec in persist.load_sites(s))
     assert {"copernic-gap", "saint-veran", "verclause", "cosmodrome", "pic-du-midi"} <= set(sites)
-    assert sites["verclause"].k_tke == 4.0 and sites["verclause"].k_cis == 40.0
+    # calibrated V2bd K of migration 0006
+    assert sites["verclause"].k_tke == 3.94 and sites["verclause"].k_cis == 49.7 and sites["verclause"].k_tke_conv == 0.1
 
 
 def test_store_replace_and_nan_to_null(db):

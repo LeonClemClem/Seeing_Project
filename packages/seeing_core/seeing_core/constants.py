@@ -15,6 +15,14 @@ R_D = 287.05
 C_FC = 2.1  # free-convection constant (Wyngaard-Izumi-Collins, a~4.9 b~9) -- to be calibrated
 SSHF_SIGN = -1.0  # -1 if sshf is positive downwards (ECMWF-like convention); to be verified
 
+# Seeing model. "V2bd" (default, research model since 15/10/2026): V2b shear (evaluated on the levels
+# above H_COULIM only, gradients on those levels) + soft transition at H_COULIM:
+#   w(z) = 0.5 * (1 - tanh((z - H_COULIM) / V2BD_TRANSITION_M))
+#   Cn2 = w * (K_TKE * Cn2_TKE + K_conv * Cn2_conv) + (1 - w) * K_CIS * Cn2_shear
+# "V2": original script (hard cut at H_COULIM), kept for the equivalence test.
+MODEL = "V2bd"
+V2BD_TRANSITION_M = 100.0
+
 # Top of the AROME heightAboveGround grids (HP1/HP2). This is a grid limit, not a physical one:
 # the boundary between the boundary-layer (TKE) and free-atmosphere (shear) models is H_COULIM.
 HAG_TOP_M = 3000.0

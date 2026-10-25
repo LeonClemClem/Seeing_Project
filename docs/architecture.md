@@ -116,11 +116,21 @@ class SiteForecast:
     slug: str; run_time: datetime; hours: list[HourResult]
 
 def compute_sites(grib_dir: Path, sites: Sequence[SiteSpec],
-                  forecast_hours: int = 51) -> dict[str, SiteForecast]: ...
+                  forecast_hours: int = 51, model: str = "V2bd") -> dict[str, SiteForecast]: ...
 ```
 
 All sites are extracted in a **single pass** over each GRIB file. No globals, no matplotlib in
-the computation path; numerical results must match the V2 script for the same inputs.
+the computation path.
+
+`model` (default `seeing_core.constants.MODEL = "V2bd"`):
+- `"V2bd"`, the research model since 2026-10-15: TKE model on the whole profile, convective closure
+  in the TKE holes below H_COULIM, V2b shear on the levels above H_COULIM only (gradients on those
+  levels), mixed by a soft transition `w = 0.5 * (1 - tanh((z - H_COULIM) / 100 m))`:
+  `Cn2 = w * (K_TKE * Cn2_TKE + K_conv * Cn2_conv) + (1 - w) * K_CIS * Cn2_shear`.
+- `"V2"`: the original script (hard cut at H_COULIM); results must match it for the same inputs
+  (`tests/test_v2_equivalence.py`).
+
+The K in `sites` are the calibrated V2bd K (migration 0006).
 
 ## Batch CLI (`apps/batch`, console script `seeing-batch`)
 
