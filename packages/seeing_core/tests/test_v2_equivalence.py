@@ -60,8 +60,22 @@ def assert_matches_v2(forecasts, expected):
 
 
 def test_physics_matches_v2(extracted, expected):
-    forecasts = compute_from_extracted(extracted, FIXTURE_SITES, forecast_hours=51)
+    forecasts = compute_from_extracted(extracted, FIXTURE_SITES, forecast_hours=51, model="V2")
     assert_matches_v2(forecasts, expected)
+
+
+def test_v2bd_close_to_v2_with_the_same_k(extracted, expected):
+    """V2bd differs from V2 only around H_COULIM (soft transition, shear gradients above H_COULIM):
+    with the same K, the hourly seeing stays within 25 % of V2 and the medians within 10 %."""
+    v2 = compute_from_extracted(extracted, FIXTURE_SITES, forecast_hours=51, model="V2")
+    v2bd = compute_from_extracted(extracted, FIXTURE_SITES, forecast_hours=51)
+    for site in FIXTURE_SITES:
+        a = np.array([h.seeing_arcsec for h in v2[site.slug].hours])
+        b = np.array([h.seeing_arcsec for h in v2bd[site.slug].hours])
+        assert np.all(np.isfinite(b)), site.slug
+        assert [h.lead_hour for h in v2bd[site.slug].hours] == [h.lead_hour for h in v2[site.slug].hours]
+        assert np.all(np.abs(b / a - 1) < 0.30), site.slug
+        assert abs(np.median(b / a) - 1) < 0.10, site.slug
 
 
 def test_serialize_roundtrip(extracted, tmp_path):
@@ -74,5 +88,5 @@ def test_serialize_roundtrip(extracted, tmp_path):
 
 @pytest.mark.skipif("SEEING_GRIB_DIR" not in os.environ, reason="set SEEING_GRIB_DIR to the GRIBs of run 2026-10-14T00Z")
 def test_grib_integration(expected):
-    forecasts = compute_sites(Path(os.environ["SEEING_GRIB_DIR"]), FIXTURE_SITES, forecast_hours=51)
+    forecasts = compute_sites(Path(os.environ["SEEING_GRIB_DIR"]), FIXTURE_SITES, forecast_hours=51, model="V2")
     assert_matches_v2(forecasts, expected)

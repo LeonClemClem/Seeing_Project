@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from seeing_core.constants import ARCSEC, DISPLAY_DZ, DISPLAY_Z0, LAMBDA
+from seeing_core.constants import ARCSEC, DISPLAY_DZ, DISPLAY_Z0, LAMBDA, V2BD_TRANSITION_M
 
 
 def integrate_seeing(z: np.ndarray, cn2: np.ndarray) -> tuple[float, float, float]:
@@ -24,13 +24,39 @@ def integrate_seeing(z: np.ndarray, cn2: np.ndarray) -> tuple[float, float, floa
     zv = zv[order]
     cv = cv[order]
 
-    integral = np.trapezoid(cv, zv)
+    return seeing_from_integral(float(np.trapezoid(cv, zv)))
+
+
+def seeing_from_integral(integral: float) -> tuple[float, float, float]:
+    """(integral, r0 [m], seeing [arcsec]) from the integral of Cn2 dz, at LAMBDA."""
     if not np.isfinite(integral) or integral <= 0:
         return float(integral), np.nan, np.nan
-
     r0 = (0.423 * (2.0 * np.pi / LAMBDA) ** 2 * integral) ** (-3.0 / 5.0)
     seeing = 0.98 * LAMBDA / r0 * ARCSEC
     return float(integral), float(r0), float(seeing)
+
+
+def v2bd_blend(
+    z: np.ndarray,
+    h_coulim: float,
+    tke1: np.ndarray,
+    conv1: np.ndarray,
+    shear1: np.ndarray,
+    k_tke: float,
+    k_cis: float,
+    k_conv: float,
+    transition_m: float = V2BD_TRANSITION_M,
+) -> np.ndarray:
+    """V2bd Cn2 from the three model terms computed at K = 1 (NaN counts as 0):
+
+        w = 0.5 * (1 - tanh((z - H_COULIM) / transition_m))
+        Cn2 = w * (K_TKE * tke1 + K_conv * conv1) + (1 - w) * K_CIS * shear1
+
+    Same as profil_v2bd() of the research figures (research/figure_cn2_sites.py)."""
+    z = np.asarray(z, dtype=float)
+    w = 0.5 * (1.0 - np.tanh((z - h_coulim) / transition_m))
+    t, c, s = (np.nan_to_num(np.asarray(a, dtype=float), nan=0.0) for a in (tke1, conv1, shear1))
+    return w * (k_tke * t + k_conv * c) + (1.0 - w) * k_cis * s
 
 
 def interp_on_grid(z_target: np.ndarray, z_source: np.ndarray, values: np.ndarray) -> np.ndarray:

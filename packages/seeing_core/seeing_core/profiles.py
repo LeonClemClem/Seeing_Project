@@ -125,6 +125,19 @@ def free_atmosphere_profile(hag: Profile, iso: Profile, h_coulim: float) -> Prof
     }
 
 
+def full_profile(hag: Profile, iso: Profile) -> Profile:
+    """Whole meteorological profile: HAG levels up to 3000 m, then isobaric levels above, sorted.
+    Its levels at or below H_COULIM are boundary_layer_profile(), those above free_atmosphere_profile()."""
+    mask_hag = np.isfinite(hag["z"]) & (hag["z"] <= HAG_TOP_M)
+    mask_iso = np.isfinite(iso["z"]) & (iso["z"] > HAG_TOP_M)
+    out = {
+        k: np.concatenate([np.asarray(hag[k])[mask_hag], np.asarray(iso[k])[mask_iso]])
+        for k in ("z", "T", "U", "V", "P", "TKE")
+    }
+    order = np.argsort(out["z"], kind="stable")
+    return {k: v[order] for k, v in out.items()}
+
+
 def display_profile_heights(hag: Profile, iso: Profile) -> np.ndarray:
     """Altitudes of the full meteorological profile (all HAG levels up to 3000 m, IP1 above),
     independent of H_COULIM, sorted."""
