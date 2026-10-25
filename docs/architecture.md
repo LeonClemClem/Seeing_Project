@@ -60,7 +60,8 @@ Rules:
 - The batch job writes a run as `running`, inserts all rows, then flips to `success` in one
   transaction per run (re-running the same `run_time` replaces its rows: idempotent).
 - The API only ever reads runs with `status = 'success'`. "Latest" = max `run_time` with success.
-- Retention: the batch deletes runs older than `RETENTION_DAYS` (default 14) after a success.
+- Retention: the batch deletes runs older than `RETENTION_DAYS` after a success. Both environments set it to
+  36500 days: every run is kept (forecast history for the website). Only the GRIBs are deleted, as soon as computed.
 - NaN values are stored as SQL NULL.
 
 ## Configuration (env vars)
@@ -78,7 +79,7 @@ Batch only:
 |---|---|---|
 | `GRIB_DIR` | `/tmp/arome` | Scratch folder for downloaded GRIB2 (Cloud Run: in-memory FS). |
 | `FORECAST_HOURS` | `51` | Last lead hour computed (0..51). |
-| `RETENTION_DAYS` | `14` | Model runs older than this are deleted. |
+| `RETENTION_DAYS` | `14` (envs: `36500`) | Model runs older than this are deleted. 36500 = keep everything. |
 | `LOG_LEVEL` | `INFO` | |
 
 API only:
