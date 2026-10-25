@@ -11,7 +11,7 @@ import { kHidden, MOCK_PLACES, selectPlace, useCurrentPlace, type Place } from "
 import { tr } from "../i18n";
 import { parseCsv, type CsvOpts, type DateFmt, type NightPt } from "../lib/csv";
 import { C_AR, C_DAY, C_LINE, C_OBS, C_OBSD, C_TXT, dnText, fmt, pl, yaxis } from "../lib/util";
-import { calib, chourly, comp, cstats, exampleCsv, seeC } from "../mock/calibration";
+import { calib, chourly, comp, cstats, exampleCsv, hourKey, NO_FILTER, seeC, type CalFilters } from "../mock/calibration";
 import { KDEF, lieuData } from "../mock/engine";
 import { getState, setK, setState, useLangMemo, useUi, type K3 } from "../store";
 
@@ -36,6 +36,9 @@ const FMTS: [DateFmt, string][] = [
 
 /* Imported nights survive tab switches, like in the mockup (they add up, without weighting). */
 let STORE: { nights: Map<string, NightPt[]>; sel: string | null; ne: number } | null = null;
+/* Calibration filters, kept across tab switches too. */
+let FILTERS: CalFilters = NO_FILTER;
+const C_RM = "#ff4d4d"; // hours left out of the fit
 function initialStore() {
   if (!STORE) {
     STORE = { nights: new Map(), sel: null, ne: 0 };
@@ -51,7 +54,7 @@ function addTo(st: NonNullable<typeof STORE>, txt: string, o: CsvOpts) {
   return true;
 }
 
-function nightSvg(key: string, pts: NightPt[], K: K3) {
+function nightSvg(key: string, pts: NightPt[], K: K3, rm: Set<string>) {
   const C = comp(key),
     H = chourly(pts);
   const W = 700,
@@ -85,7 +88,7 @@ function nightSvg(key: string, pts: NightPt[], K: K3) {
     `stroke="${C_AR}" stroke-width="2.2"`,
   );
   pts.forEach((p) => (g += `<circle cx="${X(p.x)}" cy="${Y(p.v)}" r="1.9" fill="${C_OBS}"/>`));
-  H.forEach((p) => (g += `<rect x="${X(p.h) - 3.5}" y="${Y(p.m) - 3.5}" width="7" height="7" fill="${C_OBSD}"/>`));
+  H.forEach((p) => (g += `<rect x="${X(p.h) - 3.5}" y="${Y(p.m) - 3.5}" width="7" height="7" fill="${rm.has(hourKey(key, p.h)) ? C_RM : C_OBSD}"/>`));
   g += `<text x="${W - R}" y="${Hh - 2}" text-anchor="end" font-size="11" fill="${C_TXT}">${tr("heure TU")}</text>`;
   return g;
 }
@@ -106,6 +109,8 @@ export default function Calibrer() {
   const [err, setErr] = useState("");
   const [drop, setDrop] = useState(false);
   const [saved, setSaved] = useState("");
+  const [filters, setFiltersState] = useState(FILTERS);
+  const setFilters = (f: CalFilters) => setFiltersState((FILTERS = f));
   const fi = useRef<HTMLInputElement>(null);
 
   const refresh = () => {
@@ -130,10 +135,17 @@ export default function Calibrer() {
   };
 
   const nightsKey = [...st.nights.entries()].map(([k, v]) => k + v.length).join();
-  const cal = useLangMemo(() => calib(st.nights), [nightsKey]);
+  const cal = useLangMemo(() => calib(st.nights, filters), [nightsKey, filters]);
+  const fnote = [
+    filters.pics ? `${cal.F.pics} h peu fournie(s) retirée(s)` : "",
+    filters.courtes ? `${cal.F.courtes} nuit(s) courte(s) retirée(s)` : "",
+    filters.top ? `${cal.F.top} h au-dessus du modèle retirée(s), puis recalage` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const s = cstats(cal.P, K);
   const night = st.sel && st.nights.has(st.sel) ? st.sel : null;
-  const cch = useLangMemo(() => (night ? nightSvg(night, st.nights.get(night)!, K) : ""), [night, nightsKey, K]);
+  const cch = useLangMemo(() => (night ? nightSvg(night, st.nights.get(night)!, K, cal.F.rm) : ""), [night, nightsKey, K, cal]);
   const p2c = useLangMemo(() => (place.real ? "" : cn2Svg(K, KCAL, showObs, { mesf }, place.f)), [place, K, KCAL, showObs, mesf]);
   const corr = useLangMemo(() => corrMock(K, KCAL, place.f), [K, KCAL, place.f]);
   const hist = useLangMemo(() => lieuData(place.nom, place.f, K, KCAL), [place, K, KCAL]);
@@ -317,6 +329,50 @@ export default function Calibrer() {
                   </span>
                 ))}
               </div>
+              <div
+                id="calfilt"
+                style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", borderTop: "1px solid var(--line)", paddingTop: 6, marginTop: 6 }}
+              >
+                <span className="small muted">{tr("Filtres du calage :")}</span>
+                {(
+                  [
+                    ["pics", "pics peu fournis", "heures dont la médiane repose sur beaucoup moins de mesures que d'habitude"],
+                    ["courtes", "nuits < 3 h successives", "nuits sans au moins 3 heures comparées successives"],
+                  ] as const
+                ).map(([k, lab, title]) => (
+                  <span
+                    key={k}
+                    className={"chip" + (filters[k] ? " on" : "")}
+                    role="switch"
+                    aria-checked={filters[k]}
+                    tabIndex={0}
+                    title={tr(title)}
+                    onClick={() => setFilters({ ...filters, [k]: !filters[k] })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setFilters({ ...filters, [k]: !filters[k] });
+                      }
+                    }}
+                  >
+                    {tr(lab)}
+                  </span>
+                ))}
+                <span className="small muted" style={{ marginLeft: 4 }}>
+                  {tr("heures au-dessus du modèle :")}
+                </span>
+                <Seg
+                  value={filters.top}
+                  onChange={(top) => setFilters({ ...filters, top })}
+                  options={[
+                    [0, "0"],
+                    [1, "1 %"],
+                    [5, "5 %"],
+                    [10, "10 %"],
+                  ]}
+                />
+                <span className="small muted">{tr(fnote)}</span>
+              </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
                 <span>{tr("Mode : " + cal.mode)}</span>
                 <span className="mono">{tr(`${cal.P.length} h de nuit comparées`)}</span>
@@ -332,6 +388,12 @@ export default function Calibrer() {
                 </span>
                 <LegMes />
                 <LegMed />
+                {cal.F.rm.size > 0 && (
+                  <span>
+                    <Sw style={{ width: 8, height: 8, background: C_RM }} />
+                    {tr("heure retirée du calage")}
+                  </span>
+                )}
               </div>
               <SvgChart html={cch} viewBox="0 0 700 220" label="Nuit sélectionnée" />
             </div>

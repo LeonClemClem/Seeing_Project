@@ -24,4 +24,24 @@ describe("mock model", () => {
     expect(K[1]).toBeGreaterThan(5);
     expect(K[1]).toBeLessThan(100);
   });
+  it("filters: removes the hours above the model, then refits", () => {
+    const nights = new Map();
+    for (let n = 0; n < 4; n++) parseCsv(exampleCsv(n), { tz: "TU", off: "paris", fmt: "auto" }).nights.forEach((v, k) => nights.set(k, v));
+    const all = calib(nights);
+    const f = calib(nights, { pics: false, courtes: false, top: 10 });
+    expect(all.F.rm.size).toBe(0);
+    expect(f.F.top).toBe(Math.round(all.P.length * 0.1));
+    expect(f.P.length).toBe(all.P.length - f.F.top);
+    expect(f.F.rm.size).toBe(f.F.top);
+  });
+  it("filters: drops nights without 3 successive hours and sparse medians", () => {
+    const nights = new Map([
+      ["2026-09-28", [{ x: 8, v: 1 }, { x: 10, v: 1 }]], // 20h and 22h UTC: no 3 successive hours
+      ["2026-09-29", [6, 7, 8, 9, 10].flatMap((x) => (x === 9 ? [{ x, v: 1 }] : [0, 1, 2, 3].map(() => ({ x, v: 1 }))))],
+    ]);
+    const f = calib(nights, { pics: true, courtes: true, top: 0 });
+    expect(f.F.courtes).toBe(1);
+    expect(f.F.pics).toBe(1);
+    expect(f.P.map((p) => p.key)).toEqual(["2026-09-29|6", "2026-09-29|7", "2026-09-29|8", "2026-09-29|10"]);
+  });
 });
