@@ -71,7 +71,7 @@ variable "batch_env" {
   default = {
     GRIB_DIR       = "/tmp/arome"
     FORECAST_HOURS = "51"
-    RETENTION_DAYS = "14"
+    RETENTION_DAYS = "36500" # keep every run (history of all forecasts); GRIBs are never kept
     LOG_LEVEL      = "INFO"
   }
 }
