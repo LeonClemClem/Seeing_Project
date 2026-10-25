@@ -6,6 +6,8 @@ export interface Site {
   lat: number;
   lon: number;
   altitude_m: number | null;
+  /** "public" (observatory) or "shared" (by a team with the community); hidden sites are not served. */
+  visibility: "public" | "shared";
 }
 
 export interface Run {

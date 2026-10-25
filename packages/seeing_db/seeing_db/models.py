@@ -43,6 +43,8 @@ class Site(Base):
     k_tke: Mapped[float] = mapped_column(Float, default=3.0)
     k_cis: Mapped[float] = mapped_column(Float, default=30.0)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # public (observatories), shared (by a team with the community) or hidden (computed, not offered).
+    visibility: Mapped[str] = mapped_column(String(16), default="public", server_default="public")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

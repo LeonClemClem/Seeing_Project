@@ -18,6 +18,8 @@ export interface Place {
   kind: "pub" | "mine";
   /** API slug for public sites. */
   slug?: string;
+  /** API site shared by its team with the community (as opposed to a public observatory). */
+  shared?: boolean;
   /** Fitted K of the place. For API sites these are placeholders: the batch computes with its own K. */
   K: K3;
   /** Real forecasts from the API (as opposed to the fictitious model). */
@@ -45,6 +47,7 @@ export const siteToPlace = (s: Site): Place => ({
   alt: s.altitude_m,
   kind: "pub",
   slug: s.slug,
+  shared: s.visibility === "shared",
   K: [...KDEF],
   real: true,
   f: 1,
@@ -54,13 +57,18 @@ export function useSites() {
   return useQuery({ queryKey: queryKeys.sites, queryFn: api.sites });
 }
 
-export function usePlaces(): { pub: Place[]; mine: Place[]; all: Place[] } {
+export function usePlaces(): { pub: Place[]; sh: Place[]; mine: Place[]; all: Place[] } {
   const sites = useSites();
   return useMemo(() => {
-    const pub = (sites.data ?? []).map(siteToPlace);
-    return { pub, mine: MOCK_PLACES, all: [...pub, ...MOCK_PLACES] };
+    const api = (sites.data ?? []).map(siteToPlace);
+    const pub = api.filter((p) => !p.shared),
+      sh = api.filter((p) => p.shared);
+    return { pub, sh, mine: MOCK_PLACES, all: [...api, ...MOCK_PLACES] };
   }, [sites.data]);
 }
+
+/** Site of the shared "CosmoDrôme team" account: its team sees and sets its K. */
+export const TEAM_SITE = "cosmodrome";
 
 export function useCurrentPlace(): Place {
   const id = useUi((s) => s.place);
@@ -68,8 +76,10 @@ export function useCurrentPlace(): Place {
   return all.find((p) => p.id === id) ?? MOCK_PLACES[0]!;
 }
 
-/** K of public sites are visible to the administrator only; everyone sees the K of their own places. */
-export const kHidden = (p: Place, role: Role) => p.kind === "pub" && role !== "admin";
+/** K of public and shared sites are visible to the administrator only (and to the team for its own site);
+ * everyone sees the K of their own places. */
+export const kHidden = (p: Place, role: Role) =>
+  p.kind === "pub" && role !== "admin" && !(role === "team" && p.slug === TEAM_SITE);
 
 export const kTxt = (K: K3, hid: boolean, f: (v: number) => string | number = (v) => v) =>
   hid ? "K confidentiels" : `K_TKE = ${f(K[0])}  K_CIS = ${f(K[1])}  K_conv = ${f(K[2])}`;
