@@ -20,6 +20,8 @@ export interface Place {
   slug?: string;
   /** API site shared by its team with the community (as opposed to a public observatory). */
   shared?: boolean;
+  /** API site computed but not offered (Copernic, Drôme): the API sends it to the administrator only. */
+  hidden?: boolean;
   /** Fitted K of the place. For API sites these are placeholders: the batch computes with its own K. */
   K: K3;
   /** Real forecasts from the API (as opposed to the fictitious model). */
@@ -48,6 +50,7 @@ export const siteToPlace = (s: Site): Place => ({
   kind: "pub",
   slug: s.slug,
   shared: s.visibility === "shared",
+  hidden: s.visibility === "hidden",
   K: [...KDEF],
   real: true,
   f: 1,
@@ -57,13 +60,14 @@ export function useSites() {
   return useQuery({ queryKey: queryKeys.sites, queryFn: api.sites });
 }
 
-export function usePlaces(): { pub: Place[]; sh: Place[]; mine: Place[]; all: Place[] } {
+export function usePlaces(): { pub: Place[]; sh: Place[]; hid: Place[]; mine: Place[]; all: Place[] } {
   const sites = useSites();
   return useMemo(() => {
     const api = (sites.data ?? []).map(siteToPlace);
-    const pub = api.filter((p) => !p.shared),
-      sh = api.filter((p) => p.shared);
-    return { pub, sh, mine: MOCK_PLACES, all: [...api, ...MOCK_PLACES] };
+    const pub = api.filter((p) => !p.shared && !p.hidden),
+      sh = api.filter((p) => p.shared),
+      hid = api.filter((p) => p.hidden);
+    return { pub, sh, hid, mine: MOCK_PLACES, all: [...api, ...MOCK_PLACES] };
   }, [sites.data]);
 }
 

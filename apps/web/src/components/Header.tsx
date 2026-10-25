@@ -31,7 +31,7 @@ export default function Header() {
   const role = useUi((s) => s.role);
   const K = useUi((s) => s.K);
   const kmode = useUi((s) => s.kmode);
-  const { pub, sh, mine, all } = usePlaces();
+  const { pub, sh, hid: hiddenSites, mine, all } = usePlaces();
   const place = useCurrentPlace();
   const me = useMe();
   useSyncRole();
@@ -82,6 +82,15 @@ export default function Header() {
             {sh.length > 0 && (
               <optgroup label={tr("Partagés par la communauté")}>
                 {sh.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nom}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {hiddenSites.length > 0 && (
+              <optgroup label={tr("Administrateur : sites masqués")}>
+                {hiddenSites.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.nom}
                   </option>

@@ -136,7 +136,7 @@ the computation path; numerical results must match the V2 script for the same in
 All responses are JSON; times are ISO 8601 UTC (`Z`).
 
 - `GET /healthz` → `{"status": "ok"}` (no DB access).
-- `GET /api/sites` → `[{slug, name, lat, lon, altitude_m, visibility}]` (active, non-hidden sites only; hidden sites also 404 on their forecast/cn2).
+- `GET /api/sites` → `[{slug, name, lat, lon, altitude_m, visibility}]` (active sites; hidden ones only for a logged-in admin account, otherwise also 404 on their forecast/cn2).
 - `GET /api/runs/latest` → `{run_time, finished_at, status}` or 404 when no successful run.
 - `GET /api/sites/{slug}/forecast?run=latest|<ISO run_time>` →
   `{site: {...}, run_time, points: [{lead_hour, valid_time, seeing_arcsec, r0_m, integral_cn2, h_coulim_m}]}`

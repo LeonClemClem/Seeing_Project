@@ -149,6 +149,17 @@ def test_role_comes_from_the_database(client):
     assert client.get("/api/me").json()["user"]["role"] == "admin"
 
 
+def test_hidden_sites_only_for_the_admin(client):
+    signup(client)
+    slugs = {s["slug"] for s in client.get("/api/sites").json()}
+    assert "copernic-gap" not in slugs and "verclause" not in slugs
+    with get_session_factory()() as s:
+        s.scalar(select(User)).role = UserRole.admin
+        s.commit()
+    sites = {s["slug"]: s for s in client.get("/api/sites").json()}
+    assert sites["copernic-gap"]["visibility"] == "hidden" and sites["verclause"]["name"] == "Drôme"
+
+
 def test_validation_errors_do_not_echo_the_password(client):
     r = signup(client, email="bob@example.org", password="secret1")
     assert r.status_code == 422 and "secret1" not in r.text

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from seeing_api.auth import NO_STORE, CurrentUser, user_out
 from seeing_api.db import get_session
 from seeing_api.schemas import Cn2Out, ForecastOut, ForecastPoint, MeOut, RunOut, SiteOut
-from seeing_db import Cn2Profile, Forecast, ModelRun, RunStatus, Site
+from seeing_db import Cn2Profile, Forecast, ModelRun, RunStatus, Site, User, UserRole
 
 router = APIRouter(prefix="/api")
 
@@ -40,8 +40,16 @@ def site_out(site: Site) -> SiteOut:
     )
 
 
-def get_site(session: Session, slug: str) -> Site:
-    site = session.scalar(select(Site).where(Site.slug == slug, Site.active.is_(True), Site.visibility != "hidden"))
+def site_filter(user: User | None) -> list:
+    """Active sites; hidden ones (computed, not offered) only for the administrator."""
+    conds = [Site.active.is_(True)]
+    if user is None or user.role != UserRole.admin:
+        conds.append(Site.visibility != "hidden")
+    return conds
+
+
+def get_site(session: Session, slug: str, user: User | None = None) -> Site:
+    site = session.scalar(select(Site).where(Site.slug == slug, *site_filter(user)))
     if site is None:
         raise HTTPException(404, f"Unknown site '{slug}'")
     return site
@@ -74,10 +82,8 @@ def me(request: Request, response: Response, user: CurrentUser) -> MeOut:
 
 
 @router.get("/sites", response_model=list[SiteOut])
-def list_sites(session: SessionDep) -> list[SiteOut]:
-    sites = session.scalars(
-        select(Site).where(Site.active.is_(True), Site.visibility != "hidden").order_by(Site.name)
-    )
+def list_sites(session: SessionDep, user: CurrentUser) -> list[SiteOut]:
+    sites = session.scalars(select(Site).where(*site_filter(user)).order_by(Site.name))
     return [site_out(s) for s in sites]
 
 
@@ -92,8 +98,8 @@ def latest_run(session: SessionDep) -> RunOut:
 
 
 @router.get("/sites/{slug}/forecast", response_model=ForecastOut)
-def site_forecast(slug: str, session: SessionDep, run: RunParam = "latest") -> ForecastOut:
-    site = get_site(session, slug)
+def site_forecast(slug: str, session: SessionDep, user: CurrentUser, run: RunParam = "latest") -> ForecastOut:
+    site = get_site(session, slug, user)
     model_run = resolve_run(session, run)
     rows = session.scalars(
         select(Forecast)
@@ -120,8 +126,8 @@ def _height_key(h: float) -> float:
 
 
 @router.get("/sites/{slug}/cn2", response_model=Cn2Out)
-def site_cn2(slug: str, session: SessionDep, run: RunParam = "latest") -> Cn2Out:
-    site = get_site(session, slug)
+def site_cn2(slug: str, session: SessionDep, user: CurrentUser, run: RunParam = "latest") -> Cn2Out:
+    site = get_site(session, slug, user)
     model_run = resolve_run(session, run)
     profiles = list(
         session.scalars(
