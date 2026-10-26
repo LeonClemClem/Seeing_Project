@@ -86,10 +86,11 @@ def post_forecasts(slug: str, body: RunsIn, session: SessionDep, user: Admin) ->
                                seeing_arcsec=seeing, r0_m=r0, integral_cn2=integral if seeing else None,
                                h_coulim_m=h, i_tke=it, i_conv=ic, i_cis=isx))
         if values:
-            res = session.execute(pg_insert(Forecast).values(values).on_conflict_do_nothing(
-                index_elements=["run_id", "site_id", "lead_hour"]))
-            rows += res.rowcount or 0
-            skipped += len(values) - (res.rowcount or 0)
+            # rowcount is not reliable for multi-row inserts: count the inserted ids
+            inserted = len(session.execute(pg_insert(Forecast).values(values).on_conflict_do_nothing(
+                index_elements=["run_id", "site_id", "lead_hour"]).returning(Forecast.id)).all())
+            rows += inserted
+            skipped += len(values) - inserted
     session.commit()
     return {"site": slug, "new_runs": added_runs, "rows": rows, "kept_existing": skipped, "too_recent_runs": too_recent}
 
