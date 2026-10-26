@@ -68,11 +68,20 @@ export function exampleCsv(n: number): string {
   return t;
 }
 
-export interface CalPair {
-  c: Comp;
+export interface CalPair<C = Comp> {
+  c: C;
   m: number;
   key: string; // night|hour, see hourKey
 }
+
+/** Model behind a calibration: the terms of each night hour and the seeing they give for some K. */
+export interface CalModel<C> {
+  comp: (night: string, h: number) => C | undefined;
+  see: (K: K3, c: C) => number;
+  /** K in service (dashed curve, start of the fit). */
+  k0: K3;
+}
+export const MOCK_MODEL: CalModel<Comp> = { comp: (night, h) => comp(night)[h], see: seeC, k0: KDEF };
 export const hourKey = (night: string, h: number) => `${night}|${h}`;
 
 /** Calibration filters: sparse medians (< half the usual number of measurements of the night), nights
@@ -90,15 +99,17 @@ export interface CalRemoved {
   rm: Set<string>; // hourKey of every night hour left out of the fit
 }
 
-export function calib(
+export function calib<C = Comp>(
   nights: Map<string, NightPt[]>,
   f: CalFilters = NO_FILTER,
-): { P: CalPair[]; K: K3; mode: string; F: CalRemoved } {
-  const all: CalPair[] = [];
+  model: CalModel<C> = MOCK_MODEL as unknown as CalModel<C>,
+): { P: CalPair<C>[]; K: K3; mode: string; F: CalRemoved } {
+  const all: CalPair<C>[] = [];
   const F: CalRemoved = { pics: 0, courtes: 0, top: 0, rm: new Set() };
+  const seeC = model.see;
   nights.forEach((pts, key) => {
-    const C = comp(key),
-      H = chourly(pts).filter((p) => isNx(p.h));
+    // only the hours with model terms are compared
+    const H = chourly(pts).filter((p) => isNx(p.h) && model.comp(key, p.h) !== undefined);
     const usual = med(H.map((p) => p.n));
     let kept = H;
     if (f.pics) {
@@ -111,12 +122,12 @@ export function calib(
     }
     const keptH = new Set(kept.map((p) => p.h));
     H.forEach((p) => {
-      const pair = { c: C[p.h]!, m: p.m, key: hourKey(key, p.h) };
+      const pair = { c: model.comp(key, p.h)!, m: p.m, key: hourKey(key, p.h) };
       if (keptH.has(p.h)) all.push(pair);
       else F.rm.add(pair.key);
     });
   });
-  let { P, K, mode } = fit(all);
+  let { P, K, mode } = fit(all, model);
   if (f.top > 0 && P.length > 1) {
     const nd = Math.min(P.length - 1, Math.max(1, Math.round((P.length * f.top) / 100)));
     const drop = new Set(
@@ -127,19 +138,19 @@ export function calib(
     );
     F.top = drop.size;
     drop.forEach((k) => F.rm.add(k));
-    ({ P, K, mode } = fit(P.filter((p) => !drop.has(p.key))));
+    ({ P, K, mode } = fit(P.filter((p) => !drop.has(p.key)), model));
   }
   return { P, K, mode, F };
 }
 
-function fit(P: CalPair[]): { P: CalPair[]; K: K3; mode: string } {
-  if (!P.length) return { P, K: [...KDEF], mode: "aucune mesure" };
-  const err = (K: K3) => P.reduce((s, p) => s + Math.abs(Math.log(seeC(K, p.c) / p.m)), 0) / P.length;
+function fit<C>(P: CalPair<C>[], model: CalModel<C>): { P: CalPair<C>[]; K: K3; mode: string } {
+  if (!P.length) return { P, K: [...model.k0], mode: "aucune mesure" };
+  const err = (K: K3) => P.reduce((s, p) => s + Math.abs(Math.log(model.see(K, p.c) / p.m)), 0) / P.length;
   let best = 1e9,
-    K: K3 = [...KDEF];
+    K: K3 = [...model.k0];
   for (let i = 0; i <= 48; i++)
     for (let j = 0; j <= 48; j++) {
-      const k: K3 = [0.01 * Math.pow(15000, i / 48), 0.01 * Math.pow(15000, j / 48), 0.1],
+      const k: K3 = [0.01 * Math.pow(15000, i / 48), 0.01 * Math.pow(15000, j / 48), model.k0[2]],
         e = err(k);
       if (e < best) {
         best = e;
@@ -149,10 +160,10 @@ function fit(P: CalPair[]): { P: CalPair[]; K: K3; mode: string } {
   return { P, K, mode: "K_TKE et K_CIS indépendants" };
 }
 
-export function cstats(P: CalPair[], K: K3) {
+export function cstats<C = Comp>(P: CalPair<C>[], K: K3, see: (K: K3, c: C) => number = seeC as unknown as (K: K3, c: C) => number) {
   if (!P.length) return { r: NaN, b: NaN, q: NaN };
   const o = P.map((p) => p.m),
-    pr = P.map((p) => seeC(K, p.c));
+    pr = P.map((p) => see(K, p.c));
   return {
     r: corr(o, pr),
     b: pr.reduce((s, v, i) => s + v - o[i]!, 0) / o.length,

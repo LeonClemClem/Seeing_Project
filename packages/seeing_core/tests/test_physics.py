@@ -176,3 +176,11 @@ def test_seeing_from_integral_matches_integrate_seeing():
 def test_unknown_model_rejected():
     with pytest.raises(ValueError):
         compute_from_extracted(_synthetic_run(hours=(0,)), [SITE], forecast_hours=0, model="V9")
+
+
+def test_v2bd_terms_rebuild_the_integral_for_any_k():
+    run = _synthetic_run(hours=(0, 1))
+    for site in (SITE, SiteSpec("s", 44.0, 6.0, 0.2, 7.0, 11.0)):
+        for h in compute_from_extracted(run, [site], 1)["s"].hours:
+            rebuilt = site.k_tke * h.i_tke + site.k_tke_conv * h.i_conv + site.k_cis * h.i_cis
+            assert rebuilt == pytest.approx(h.integral_cn2, rel=1e-9)

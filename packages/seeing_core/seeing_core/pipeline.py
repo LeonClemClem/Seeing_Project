@@ -49,6 +49,11 @@ class HourResult:
     model_altitude_m: float
     heights_m: np.ndarray  # display grid [m AGL]
     cn2: np.ndarray  # Cn2 on heights_m [m^-2/3], NaN where undefined
+    # V2bd integrals of the three terms at K = 1 (weighted by the soft transition), so that the integral
+    # of Cn2 for any K is K_TKE * i_tke + K_conv * i_conv + K_CIS * i_cis (calibration). NaN for V2.
+    i_tke: float = np.nan
+    i_conv: float = np.nan
+    i_cis: float = np.nan
 
 
 @dataclass
@@ -100,7 +105,7 @@ def compute_hour(
     iso = build_isobaric_profile(hourly["IP1"][hour], hourly["IP4"].get(hour), surface_altitude)
 
     if model == "V2bd":
-        return _hour_v2bd(site, sp3, hour, h_coulim, hag, iso)
+        return _hour_v2bd(site, sp3, hour, h_coulim, hag, iso)[:6]
     if model != "V2":
         raise ValueError(f"unknown seeing model {model!r}")
 
@@ -135,6 +140,19 @@ def compute_hour(
     return integral, r0, seeing, h_coulim, heights, cn2_display
 
 
+def compute_hour_terms(site: SiteSpec, hourly: dict[str, dict], sp3: dict, hour: int, surface_altitude: float):
+    """V2bd compute_hour() plus the (i_tke, i_conv, i_cis) integrals at K = 1."""
+    for pkg in REQUIRED_HOURLY:
+        if hour not in hourly[pkg]:
+            raise MissingDataError(f"H+{hour} missing from {pkg}")
+    h_coulim = get_h_coulim(hourly["SP2"], hour)
+    if not np.isfinite(h_coulim):
+        raise MissingDataError(f"H_COULIM/blh unavailable at H+{hour}")
+    hag = build_hag_profile(hourly["HP1"][hour], hourly["HP2"].get(hour))
+    iso = build_isobaric_profile(hourly["IP1"][hour], hourly["IP4"].get(hour), surface_altitude)
+    return _hour_v2bd(site, sp3, hour, h_coulim, hag, iso)
+
+
 def _hour_v2bd(site: SiteSpec, sp3: dict, hour: int, h_coulim: float, hag: dict, iso: dict):
     """V2bd: the three terms at K = 1 on the whole profile, mixed by the soft transition at H_COULIM.
 
@@ -165,11 +183,17 @@ def _hour_v2bd(site: SiteSpec, sp3: dict, hour: int, h_coulim: float, hag: dict,
     cn2 = v2bd_blend(z, h_coulim, tke1, conv1, shear1, site.k_tke, site.k_cis, site.k_tke_conv)
     if z.size >= 2:
         integral, r0, seeing = seeing_from_integral(float(np.trapezoid(cn2, z)))
+        w = v2bd_blend(z, h_coulim, np.ones_like(z), np.zeros_like(z), np.zeros_like(z), 1.0, 0.0, 0.0)
+        terms = tuple(
+            float(np.trapezoid(a, z))
+            for a in (w * np.nan_to_num(tke1), w * conv1, (1.0 - w) * np.nan_to_num(shear1))
+        )
     else:
         integral, r0, seeing = np.nan, np.nan, np.nan
+        terms = (np.nan, np.nan, np.nan)
     cn2 = np.where(cn2 > 0, cn2, np.nan)
     heights, cn2_display = display_cn2_profile(display_profile_heights(hag, iso), z, cn2)
-    return integral, r0, seeing, h_coulim, heights, cn2_display
+    return integral, r0, seeing, h_coulim, heights, cn2_display, terms
 
 
 def compute_from_extracted(
@@ -192,9 +216,15 @@ def compute_from_extracted(
         hours: list[HourResult] = []
         for hour in range(forecast_hours + 1):
             try:
-                integral, r0, seeing, h_coulim, heights, cn2 = compute_hour(
-                    site, hourly, sp3, hour, surface_altitude, model=model
-                )
+                terms = (np.nan, np.nan, np.nan)
+                if model == "V2bd":
+                    integral, r0, seeing, h_coulim, heights, cn2, terms = compute_hour_terms(
+                        site, hourly, sp3, hour, surface_altitude
+                    )
+                else:
+                    integral, r0, seeing, h_coulim, heights, cn2 = compute_hour(
+                        site, hourly, sp3, hour, surface_altitude, model=model
+                    )
             except MissingDataError as exc:
                 logger.warning("%s: skipping H+%02d: %s", site.slug, hour, exc)
                 continue
@@ -209,6 +239,9 @@ def compute_from_extracted(
                     model_altitude_m=surface_altitude,
                     heights_m=heights,
                     cn2=cn2,
+                    i_tke=terms[0],
+                    i_conv=terms[1],
+                    i_cis=terms[2],
                 )
             )
         out[site.slug] = SiteForecast(slug=site.slug, run_time=run.run_time, hours=hours)

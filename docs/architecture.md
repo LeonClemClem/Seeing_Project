@@ -48,10 +48,12 @@ and created by Alembic (`database/migrations`; `seeing-migrate` = `alembic upgra
   started_at, finished_at NULL, error NULL)`
 - `forecasts(id, run_id → model_runs ON DELETE CASCADE, site_id → sites, valid_time, lead_hour,
   seeing_arcsec NULL, r0_m NULL, integral_cn2 NULL, h_coulim_m NULL, model_altitude_m NULL,
+  i_tke NULL, i_conv NULL, i_cis NULL (V2bd terms at K = 1: integral = K_TKE·i_tke + K_conv·i_conv + K_CIS·i_cis),
   UNIQUE(run_id, site_id, lead_hour))`
 - `cn2_profiles(id, run_id → model_runs ON DELETE CASCADE, site_id → sites, valid_time, lead_hour,
   heights_m REAL[], cn2 REAL[], UNIQUE(run_id, site_id, lead_hour))`. `heights_m` are metres above
   ground level, on a regular display grid (100 m steps up to the top of the profile).
+- `measurements(id, site_id → sites ON DELETE CASCADE, time, seeing_arcsec, created_at, UNIQUE(site_id, time))`.
 - `map_frames(id, run_id → model_runs ON DELETE CASCADE, valid_time, lead_hour, ny, nx, lat0, lon0, dlat,
   dlon, k_tke, k_cis, k_conv, data BYTEA, UNIQUE(run_id, lead_hour))`: global seeing map of every night
   lead hour (20h-04h UTC, from the night starting on the run's day), V2bd with the map K (2, 57, 0.1),
@@ -169,6 +171,12 @@ All responses are JSON; times are ISO 8601 UTC (`Z`).
   (name "Lieu partagé", position blurred 5–11 km, no altitude); other members' private places are never
   served. `k = [K_TKE, K_CIS, K_conv]` only for the owner, the administrator (curated sites) and the team
   account for its site.
+- Measurements and calibration terms (owner of a place, administrator, team account for its site; 404
+  otherwise): `POST /api/sites/{slug}/measurements {points: [[ISO time, seeing], ...]}` (JSON, ≤ 20 000 points,
+  seeing 0.05–20", same time replaced) → `{stored, rejected}`; `GET /api/sites/{slug}/measurements?from&to` →
+  `{times, seeing_arcsec}`; `DELETE /api/sites/{slug}/measurements?night=YYYY-MM-DD` (12h→12h UTC; all without
+  `night`); `GET /api/sites/{slug}/terms?from&to` (≤ 400 days) → `{valid_times, lead_hours, i_tke, i_conv, i_cis}`,
+  for each hour the latest successful run issued before it. The K fit runs in the browser.
 - `GET /api/map?run=latest|<ISO run_time>` → `{run_time, grid: {ny, nx, lat0, lon0, dlat, dlon}, see_min,
   see_max, frames: [{lead_hour, valid_time}]}` (`latest` = newest successful run with a map; 404 if none).
 - `GET /api/map/frame?lead=N&run=...` → `ny * nx` bytes, row-major (row r at lat0 + r * dlat), code c →
