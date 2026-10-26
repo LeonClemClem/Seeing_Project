@@ -1,6 +1,8 @@
 import math
 from datetime import timedelta
 
+import pytest
+
 from conftest import T0, add_run
 from seeing_db import RunStatus
 
@@ -133,3 +135,29 @@ def test_global_map(client, session):
     r = client.get("/api/map/frame", params={"lead": 21})
     assert r.status_code == 200 and r.content == codes
     assert client.get("/api/map/frame", params={"lead": 5}).status_code == 404
+
+
+def test_fisheye_from_the_map(client, session):
+    import math
+    import zlib
+
+    from seeing_api.fisheye import J_OF_CODE
+    from seeing_db import MapFrame
+
+    run = add_run(session, T0)
+    ny, nx = 40, 60
+    n = ny * nx
+    codes = bytes([127] * n)  # uniform seeing
+    extra = bytes([127] * n + [25] * n + [80] * n)  # half low (500 m), half high (8000 m)
+    session.add(MapFrame(run_id=run.id, valid_time=T0 + timedelta(hours=20), lead_hour=20, ny=ny, nx=nx,
+                         lat0=46.0, lon0=4.0, dlat=-0.05, dlon=0.05, k_tke=2.0, k_cis=57.0, k_conv=0.1,
+                         data=zlib.compress(codes), extra=zlib.compress(extra)))
+    session.commit()
+    body = client.get("/api/fisheye", params={"lat": 45.0, "lon": 5.5}).json()
+    assert body["k"] == [2.0, 57.0, 0.1] and body["elevations"][-1] == 90
+    f = body["frames"][0]
+    j = J_OF_CODE[127]
+    assert f["j_low"][-1][0] + f["j_high"][-1][0] == pytest.approx(j, rel=1e-3)  # zenith
+    el = body["elevations"].index(30)
+    assert f["j_high"][el][9] == pytest.approx(j / 2 / math.sin(math.radians(30)), rel=1e-3)
+    assert client.get("/api/fisheye", params={"lat": 30.0, "lon": 5.5}).status_code == 404

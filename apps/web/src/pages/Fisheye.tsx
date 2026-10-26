@@ -2,7 +2,10 @@
  * Seeing fisheye for the selected place, 19h–05h UTC. The seeing field is fictitious; stars, catalogue
  * objects, Sun and Moon are at their real positions for the place; planets are fictitious (mockup).
  */
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
+
+import { api, type Fisheye as FisheyeData } from "../api";
 
 import { Chip, ColorBar, Seg } from "../components/ui";
 import { useCurrentPlace } from "../data/places";
@@ -32,6 +35,30 @@ const FN = 520,
   ELMIN = 5;
 const OPT0 = { cons: ["Constellations", true], sol: ["Soleil et Lune", true], hor: ["Horizon", true], trk: ["Course des objets", true], nua: ["Nuages", false] } as const;
 type OptKey = keyof typeof OPT0;
+
+const LAMBDA = 500e-9;
+const seeOfJ = (J: number) => (J > 0 ? 0.98 * LAMBDA * Math.pow(0.423 * (2 * Math.PI / LAMBDA) ** 2 * J, 0.6) * 206265 : NaN);
+
+/** Seeing of one direction from the real fisheye frame (bilinear in elevation / azimuth), rescaled to K. */
+function realSee(d: FisheyeData, fr: FisheyeData["frames"][number], K: K3, alt: number, az: number): number {
+  const e = d.elevations,
+    a = d.azimuths,
+    de = e[1]! - e[0]!,
+    da = a[1]! - a[0]!;
+  const el = Math.max(e[0]!, Math.min(90, alt)),
+    i = Math.min(e.length - 2, Math.floor((el - e[0]!) / de)),
+    fi = (el - e[i]!) / de,
+    x = (((az % 360) + 360) % 360) / da,
+    j = Math.floor(x) % a.length,
+    j1 = (j + 1) % a.length,
+    fj = x - Math.floor(x);
+  const g = (m: (number | null)[][], r: number, c: number) => m[r]?.[c] ?? NaN;
+  const bil = (m: (number | null)[][]) =>
+    (1 - fi) * ((1 - fj) * g(m, i, j) + fj * g(m, i, j1)) + fi * ((1 - fj) * g(m, i + 1, j) + fj * g(m, i + 1, j1));
+  // below the lowest computed elevation: same direction, longer path (1 / sin)
+  const low = alt < e[0]! ? Math.sin(e[0]! * D2R) / Math.sin(Math.max(alt, 2) * D2R) : 1;
+  return seeOfJ(((K[0] / d.k[0]!) * bil(fr.j_low) + (K[1] / d.k[1]!) * bil(fr.j_high)) * low);
+}
 
 const fxy = (alt: number, az: number) => {
   const r = ((90 - alt) / 90) * FR;
@@ -70,15 +97,26 @@ export default function Fisheye() {
 
   const { lat, lon } = place;
   const tOf = (i: number) => T0 + (FNI * 24 + i) * 3600000;
-  const K: K3 = cal === "mine" ? place.K : KDEF;
+  // Real fisheye from the global maps of the latest run (any point of the AROME domain).
+  const fq = useQuery({ queryKey: ["fisheye", lat.toFixed(4), lon.toFixed(4), runTime ?? ""], queryFn: () => api.fisheye(lat, lon), retry: false, staleTime: 30 * 60 * 1000 });
+  const fe = fq.data;
+  const frameAt = (i: number) => {
+    if (!fe) return undefined;
+    const lead = Math.round((tOf(i) - Date.parse(fe.run_time)) / 3600000);
+    return fe.frames.find((f) => f.lead_hour === lead);
+  };
+  const K: K3 = cal === "mine" ? place.K : fe ? [fe.k[0]!, fe.k[1]!, fe.k[2]!] : KDEF;
   const SZ = (i: number) => {
     const f = Math.pow((K[0] * 0.6 + K[1] * 0.4) / (KDEF[0] * 0.6 + KDEF[1] * 0.4), 0.6),
       j = i + FNI * 3;
     return (1.1 + 0.45 * Math.cos(((j - 5) / 11) * Math.PI * 2) + 0.1 * Math.sin(j * 1.3)) * f * (1 + 0.15 * FNI);
   };
   const vis = (alt: number, az: number) => alt >= ELMIN && (!opt.hor || alt >= horizon(az));
-  const seeSky = (i: number, alt: number, az: number) =>
-    SZ(i) * Math.pow(airmass(alt), 0.6) * (1 + 0.15 * Math.cos((az - 250) * D2R) * (1 - alt / 90));
+  const seeSky = (i: number, alt: number, az: number) => {
+    const fr = frameAt(i);
+    if (fe && fr) return realSee(fe, fr, K, alt, az);
+    return SZ(i) * Math.pow(airmass(alt), 0.6) * (1 + 0.15 * Math.cos((az - 250) * D2R) * (1 - alt / 90));
+  };
   const best = (o: CatObj) => {
     let b: [number, number] | null = null;
     for (let k = 0; k <= 10; k++) {

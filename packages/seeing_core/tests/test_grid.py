@@ -69,9 +69,24 @@ def test_encode_roundtrip():
 
 def test_night_steps_and_order():
     steps = night_steps(datetime(2026, 10, 14, 0, tzinfo=UTC), 51)
-    assert steps[:9] == list(range(20, 29)) and steps[9:] == list(range(44, 52))
+    assert steps[:11] == list(range(19, 30)) and steps[11:] == list(range(43, 52))
     steps18 = night_steps(datetime(2026, 10, 14, 18, tzinfo=UTC), 51)
-    assert steps18[:9] == list(range(2, 11))
+    assert steps18[:11] == list(range(1, 12))
     urls = [("HP1", "x/arome__0025__HP1__07H12H__a.grib2"), ("SP2", "x/arome__0025__SP2__00H06H__a.grib2"),
             ("HP1", "x/arome__0025__HP1__00H06H__a.grib2"), ("SP2", "x/arome__0025__SP2__07H12H__a.grib2")]
     assert [u[1].split("__")[2:4] for u in order_by_group(urls)] == [["HP1", "00H06H"], ["SP2", "00H06H"], ["HP1", "07H12H"], ["SP2", "07H12H"]]
+
+
+def test_split_heights_and_roundtrip(extracted):
+    from seeing_core.grid import decode_split, encode_split, map_integrals, split
+
+    slugs = [s.slug for s in FIXTURE_SITES]
+    fields, now, prev, oro = fields_of_sites(extracted, slugs, 22)
+    i = map_integrals(fields, now, prev, oro)
+    share, h_low, h_high = split(i)
+    assert np.all((share >= 0) & (share <= 1))
+    assert np.all(h_low < h_high)  # boundary layer below the free-atmosphere turbulence
+    assert np.all((h_high > 1000) & (h_high < 20000))
+    d = decode_split(encode_split(i, MAP_K, oro.shape), oro.shape)
+    np.testing.assert_allclose(d[0][0], share, atol=0.003)
+    np.testing.assert_allclose(d[2][0], h_high, atol=60)

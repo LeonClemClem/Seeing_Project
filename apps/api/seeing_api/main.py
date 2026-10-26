@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from seeing_api.api import router
 from seeing_api.auth import router as auth_router
+from seeing_api.fisheye import router as fisheye_router
 from seeing_api.history import admin as history_admin_router
 from seeing_api.history import public as history_router
 from seeing_api.measurements import router as measurements_router
@@ -51,6 +52,7 @@ def create_app(static_dir: str | Path | None = None) -> FastAPI:
     app.include_router(measurements_router)
     app.include_router(history_router)
     app.include_router(history_admin_router)
+    app.include_router(fisheye_router)
 
     root = Path(static_dir if static_dir is not None else os.environ.get("STATIC_DIR", "/app/static"))
     if root.is_dir():
