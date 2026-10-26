@@ -106,6 +106,9 @@ class GridExtractor:
         self._sshf: dict[int, np.ndarray] = {}
         self._covered: dict[str, set[int]] = {p: set() for p in self.packages}
         self._done: set[int] = set()
+        # encoded seeing map (encode_seeing) of every computed lead hour
+        self.frames: dict[int, bytes] = {}
+        self.failed = False
 
     def _geometry(self, gid) -> GridGeometry:
         ni, nj = int(_get(gid, "Ni")), int(_get(gid, "Nj"))
@@ -181,6 +184,13 @@ class GridExtractor:
             if all(n <= self._covered[p] for p, n in need.items()):
                 out.append(s)
         return out
+
+    def compute_ready(self, k: tuple[float, float, float] = MAP_K) -> list[int]:
+        """Compute (and free) every complete lead hour; the encoded maps go to self.frames."""
+        done = self.complete_steps()
+        for s in done:
+            self.frames[s] = encode_seeing(self.compute(s, k))
+        return done
 
     def compute(self, step: int, k: tuple[float, float, float] = MAP_K) -> np.ndarray:
         """Seeing [arcsec] of one lead hour on the subsampled grid (ny, nx); frees its fields."""

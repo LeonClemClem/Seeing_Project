@@ -39,6 +39,23 @@ export interface Cn2 {
   cn2: (number | null)[][];
 }
 
+/** Global seeing map of a run (GET /api/map); each frame is fetched as ny * nx bytes. */
+export interface MapGrid {
+  ny: number;
+  nx: number;
+  lat0: number;
+  lon0: number;
+  dlat: number;
+  dlon: number;
+}
+export interface MapMeta {
+  run_time: string;
+  grid: MapGrid;
+  see_min: number;
+  see_max: number;
+  frames: { lead_hour: number; valid_time: string }[];
+}
+
 export type UserRole = "user" | "team" | "admin";
 
 export interface User {
@@ -100,6 +117,13 @@ export const api = {
     get<Forecast>(`/api/sites/${encodeURIComponent(slug)}/forecast?run=${encodeURIComponent(run)}`),
   cn2: (slug: string, run = "latest") =>
     get<Cn2>(`/api/sites/${encodeURIComponent(slug)}/cn2?run=${encodeURIComponent(run)}`),
+  map: () => get<MapMeta>("/api/map"),
+  /** Raw codes of one map frame (uint8, 255 = no value). */
+  mapFrame: async (run: string, lead: number): Promise<Uint8Array> => {
+    const res = await fetch(`/api/map/frame?run=${encodeURIComponent(run)}&lead=${lead}`, { credentials: "same-origin" });
+    if (!res.ok) throw new ApiError(res.status, res.statusText);
+    return new Uint8Array(await res.arrayBuffer());
+  },
 };
 
 /** Query keys include the run time so a new run invalidates everything naturally. */
@@ -109,4 +133,5 @@ export const queryKeys = {
   latestRun: ["runs", "latest"] as const,
   forecast: (slug: string, run: string) => ["forecast", slug, run] as const,
   cn2: (slug: string, run: string) => ["cn2", slug, run] as const,
+  map: (run: string) => ["map", run] as const,
 };

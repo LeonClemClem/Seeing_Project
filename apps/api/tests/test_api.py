@@ -109,3 +109,26 @@ def test_me_reads_iap_header(client):
 def test_me_env(client, monkeypatch):
     monkeypatch.setenv("ENV", "prod")
     assert client.get("/api/me").json() == {"email": None, "env": "prod", "user": None}
+
+
+def test_global_map(client, session):
+    import zlib
+
+    from seeing_db import MapFrame
+
+    assert client.get("/api/map").status_code == 404
+    run = add_run(session, T0)
+    add_run(session, T0 + timedelta(hours=6))  # newer run without a map
+    codes = bytes([0, 127, 254, 255, 10, 20])
+    for lead in (20, 21):
+        session.add(MapFrame(run_id=run.id, valid_time=T0 + timedelta(hours=lead), lead_hour=lead, ny=2, nx=3,
+                             lat0=51.0, lon0=-5.0, dlat=-0.05, dlon=0.05, k_tke=2.0, k_cis=57.0, k_conv=0.1,
+                             data=zlib.compress(codes)))
+    session.commit()
+    body = client.get("/api/map").json()
+    assert body["run_time"] == "2026-10-13T00:00:00Z"
+    assert body["grid"] == {"ny": 2, "nx": 3, "lat0": 51.0, "lon0": -5.0, "dlat": -0.05, "dlon": 0.05}
+    assert [f["lead_hour"] for f in body["frames"]] == [20, 21]
+    r = client.get("/api/map/frame", params={"lead": 21})
+    assert r.status_code == 200 and r.content == codes
+    assert client.get("/api/map/frame", params={"lead": 5}).status_code == 404

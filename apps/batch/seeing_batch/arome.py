@@ -4,6 +4,9 @@ A full run of the 6 packages is ~15 GB (HP1 ~6 GB, HP2 ~4.3 GB, IP1 ~3.5 GB), fa
 hold at once on Cloud Run's in-memory disk. Every file (one package x one lead-hour group, at
 most ~0.8 GB) is therefore downloaded, read for all sites by `seeing_core.RunExtractor`, and
 deleted, with one file downloaded ahead while the previous one is being read.
+
+With a `GridExtractor` (global map), files are read by lead-hour group, so that every night lead
+hour is computed and freed as soon as its packages are read. A map failure only disables the map.
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ from meteofetch import Arome0025
 from meteofetch._misc import are_downloadable
 
 from seeing_core import ExtractedRun, RunExtractor, SiteSpec
+from seeing_core.grid import GridExtractor, order_by_group
 
 logger = logging.getLogger(__name__)
 
@@ -92,12 +96,16 @@ def download_and_extract(
     keep_gribs: bool = False,
     packages: Sequence[str] = PACKAGES,
     num_retries: int = 3,
+    grid: GridExtractor | None = None,
 ) -> tuple[ExtractedRun, dict]:
-    """Download every file of the cycle, extract the site point data, delete the file."""
+    """Download every file of the cycle, extract the site point data (and the map fields when
+    `grid` is given), delete the file. If the map fails, `grid.failed` is set and the run goes on."""
     grib_dir.mkdir(parents=True, exist_ok=True)
     extractor = RunExtractor(sites, forecast_hours)
     urls = [(p, u) for p in packages for u in cycle_urls(run_time, p)]
-    stats = {"files": 0, "bytes": 0, "download_s": 0.0, "extract_s": 0.0, "max_file_bytes": 0}
+    if grid is not None:
+        urls = order_by_group(urls)
+    stats = {"files": 0, "bytes": 0, "download_s": 0.0, "extract_s": 0.0, "max_file_bytes": 0, "map_s": 0.0}
 
     with ThreadPoolExecutor(max_workers=1) as pool:
         # One download in flight while the previous file is read: at most 2 files on disk.
@@ -111,6 +119,16 @@ def download_and_extract(
                 t0 = time.monotonic()
                 extractor.add_file(path, package)
                 ex_s = time.monotonic() - t0
+                if grid is not None and not grid.failed:
+                    t1 = time.monotonic()
+                    try:
+                        grid.add_file(path, package)
+                        grid.compute_ready()
+                    except Exception:
+                        logger.exception("Global map failed, run continues without it")
+                        grid.failed = True
+                        grid.frames.clear()
+                    stats["map_s"] += time.monotonic() - t1
             except BaseException:
                 if not keep_gribs:
                     _cleanup(grib_dir, pending)

@@ -1,6 +1,7 @@
 /**
- * Global seeing map (canvas). The grid is fictitious until the batch computes the whole AROME domain;
- * public sites come from the API, personal places are mock.
+ * Global seeing map (canvas): the real maps of the latest run (GET /api/map, V2bd over the whole AROME
+ * grid, night hours 20h-04h UTC), or a fictitious field while there is none. Public sites come from
+ * the API, personal places are mock.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { useLocation } from "react-router-dom";
@@ -9,7 +10,8 @@ import { ColorBar, Seg } from "../components/ui";
 import { MOCK_PLACES, useCurrentPlace, usePlaces } from "../data/places";
 import { tr } from "../i18n";
 import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, parseCoord, relief, SARD, SHAREDV, ZONES, type Box, type Poly } from "../lib/geo";
-import { useLatestRunTime } from "../lib/hooks";
+import { useGlobalMap, useLatestRunTime } from "../lib/hooks";
+import type { MapGrid } from "../api";
 import { D2R, esc, fmt, pad2, runLabel, turbo, turboGradient } from "../lib/util";
 import { REF } from "../mock/engine";
 import { useUi } from "../store";
@@ -135,13 +137,44 @@ function viewCache(V: Box, prev: Cache | null): Cache {
 
 type ZoneHit = [x: number, y: number, w: number, h: number, i: number];
 
+/** Bilinear sampling of a map grid at (lat, lon), ignoring undefined corners; NaN outside. */
+function sampler(g: MapGrid, a: Float32Array) {
+  return (la: number, lo: number) => {
+    const r = (la - g.lat0) / g.dlat,
+      c = (lo - g.lon0) / g.dlon;
+    if (!(r >= 0 && c >= 0 && r <= g.ny - 1 && c <= g.nx - 1)) return NaN;
+    const r0 = Math.floor(r),
+      c0 = Math.floor(c),
+      r1 = Math.min(r0 + 1, g.ny - 1),
+      c1 = Math.min(c0 + 1, g.nx - 1),
+      fr = r - r0,
+      fc = c - c0;
+    let s = 0,
+      w = 0;
+    for (const [rr, cc, ww] of [
+      [r0, c0, (1 - fr) * (1 - fc)],
+      [r0, c1, (1 - fr) * fc],
+      [r1, c0, fr * (1 - fc)],
+      [r1, c1, fr * fc],
+    ] as const) {
+      const v = a[rr * g.nx + cc]!;
+      if (!isNaN(v) && ww > 0) {
+        s += v * ww;
+        w += ww;
+      }
+    }
+    return w > 0 ? s / w : NaN;
+  };
+}
+
 export default function Carte() {
   const role = useUi((s) => s.role);
   const lang = useUi((s) => s.lang);
   const place = useCurrentPlace();
   const { pub } = usePlaces();
   const { runTime } = useLatestRunTime();
-  const RUN0 = runTime ? Date.parse(runTime) : REF + 12 * 3600000;
+  const gmap = useGlobalMap();
+  const RUN0 = gmap ? Date.parse(gmap.meta.run_time) : runTime ? Date.parse(runTime) : REF + 12 * 3600000;
 
   const canvas = useRef<HTMLCanvasElement>(null);
   const cache = useRef<Cache | null>(null);
@@ -200,6 +233,31 @@ export default function Carte() {
     [mode, MI, night.i0, night.i1],
   );
 
+  /* Real map: the frame of the chosen hour, or the mean seeing of the night's frames. */
+  const sample = useMemo(() => {
+    if (!gmap) return null;
+    const idx = mode === "m" ? [...Array(night.i1 - night.i0 + 1)].map((_, k) => night.i0 + k) : [MI];
+    const arrs = idx
+      .map((i) => gmap.frames.get(Math.round((frameT(i).getTime() - RUN0) / 3600000)))
+      .filter((a): a is Float32Array => !!a);
+    if (!arrs.length) return null;
+    const n = arrs[0]!.length,
+      mean = new Float32Array(n);
+    for (let j = 0; j < n; j++) {
+      let s = 0,
+        c = 0;
+      for (const a of arrs) {
+        const v = a[j]!;
+        if (!isNaN(v)) {
+          s += v;
+          c++;
+        }
+      }
+      mean[j] = c ? s / c : NaN;
+    }
+    return sampler(gmap.meta.grid, mean);
+  }, [gmap, mode, MI, night.i0, night.i1, frameT, RUN0]);
+
   const toXY = useCallback(
     (la: number, lo: number) => [((lo - VW.lo0) / (VW.lo1 - VW.lo0)) * CW, ((VW.la1 - la) / (VW.la1 - VW.la0)) * CH] as const,
     [VW],
@@ -225,8 +283,15 @@ export default function Carte() {
         continue;
       }
       // Fixed colour stretch (0–6") so that maps stay comparable from one run to the next.
-      const s = C.base[j]! * frameFac(C.las[j]!, C.los[j]!),
-        c = LUT[Math.min(255, Math.round((s / 6) * 255))]!,
+      const s = sample ? sample(C.las[j]!, C.los[j]!) : C.base[j]! * frameFac(C.las[j]!, C.los[j]!);
+      if (isNaN(s)) {
+        D[p] = 60;
+        D[p + 1] = 66;
+        D[p + 2] = 80;
+        D[p + 3] = 255;
+        continue;
+      }
+      const c = LUT[Math.min(255, Math.round((s / 6) * 255))]!,
         d = C.iso[j] ? 0.45 : 1;
       D[p] = c[0] * d;
       D[p + 1] = c[1] * d;
@@ -360,7 +425,7 @@ export default function Carte() {
     const hkm = Math.round((VW.la1 - VW.la0) * 111.2),
       zmax = VW.la1 - VW.la0 <= ZMIN + 1e-6;
     label(tr(`${hkm} × ${km} km${zmax ? " · zoom maximal" : ""} · isolignes ${isoStep(VW)} m`), CW - (zmax ? 300 : 200), CH - 12);
-  }, [VW, frameFac, toXY, pub, MZH, newPt, role, lang]);
+  }, [VW, frameFac, sample, toXY, pub, MZH, newPt, role, lang]);
 
   /* ---------- animation ---------- */
   const last = NIGHTS[NIGHTS.length - 1]?.i1 ?? 8;

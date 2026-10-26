@@ -53,3 +53,28 @@ class MeOut(BaseModel):
 
 class Health(BaseModel):
     status: str
+
+
+class MapGridOut(BaseModel):
+    ny: int
+    nx: int
+    lat0: float
+    lon0: float
+    dlat: float
+    dlon: float
+
+
+class MapFrameOut(BaseModel):
+    lead_hour: int
+    valid_time: datetime
+
+
+class MapOut(BaseModel):
+    """Global seeing map of a run. A frame is GET /api/map/frame?run=...&lead=... : ny * nx bytes,
+    row-major, code c -> seeing = exp(ln(see_min) + c / 254 * (ln(see_max) - ln(see_min))), 255 = none."""
+
+    run_time: datetime
+    grid: MapGridOut
+    see_min: float
+    see_max: float
+    frames: list[MapFrameOut]

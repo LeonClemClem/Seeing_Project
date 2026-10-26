@@ -100,8 +100,13 @@ def test_retention_cascades(db):
 
 
 def _fake_fetch(calls):
-    def fetch(run_time, sites, grib_dir, forecast_hours, keep_gribs):
+    def fetch(run_time, sites, grib_dir, forecast_hours, keep_gribs, grid=None):
         calls.append(run_time)
+        if grid is not None:  # two fake map frames on a 2 x 3 grid
+            from seeing_core.grid import GridGeometry, encode_seeing
+
+            grid.geometry = GridGeometry(ny=2, nx=3, lat0=51.0, lon0=-5.0, dlat=-0.05, dlon=0.05)
+            grid.frames = {s: encode_seeing(np.full((2, 3), 1.0 + s / 10)) for s in grid.steps[:2]}
         return ExtractedRun(run_time=run_time, slugs=[s.slug for s in sites], data={}, surface_h={}, grid_points={}), {}
     return fetch
 
@@ -160,3 +165,16 @@ def test_parse_run_time():
     assert parse_run_time("2026-10-13T03") == RUN + timedelta(hours=3)
     with pytest.raises(Exception):
         parse_run_time("2026-10-13T04:00Z")
+
+
+def test_run_batch_stores_map_frames(db, monkeypatch, tmp_path):
+    from seeing_db import MapFrame
+
+    monkeypatch.setattr("seeing_batch.cli.compute_from_extracted",
+                        lambda run, sites, fh: fake_forecasts(sites, run_time=run.run_time))
+    assert run_batch(db, run_time=RUN, grib_dir=tmp_path, fetch=_fake_fetch([]), map_enabled=True) == 0
+    with db() as s:
+        frames = s.scalars(select(MapFrame).order_by(MapFrame.lead_hour)).all()
+        assert [f.lead_hour for f in frames] == [20, 21]
+        assert (frames[0].ny, frames[0].nx, frames[0].k_tke, frames[0].k_cis) == (2, 3, 2.0, 57.0)
+        assert frames[0].valid_time == RUN + timedelta(hours=20)

@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from seeing_core import compute_from_extracted
+from seeing_core.grid import DEFAULT_STRIDE, MAP_K, GridExtractor, night_steps
 from seeing_db import RunStatus, make_engine, make_session_factory
 from sqlalchemy.orm import sessionmaker
 
@@ -46,6 +47,7 @@ def run_batch(
     retention_days: int | None = None,
     find_cycle=None,
     fetch=None,
+    map_enabled: bool | None = None,
 ) -> int:
     """Whole job; returns the process exit code. `find_cycle` / `fetch` are injectable for tests."""
     from seeing_batch import arome
@@ -53,6 +55,8 @@ def run_batch(
     grib_dir = grib_dir or Path(os.environ.get("GRIB_DIR", "/tmp/arome"))
     forecast_hours = forecast_hours if forecast_hours is not None else int(os.environ.get("FORECAST_HOURS", "51"))
     retention_days = retention_days if retention_days is not None else int(os.environ.get("RETENTION_DAYS", "14"))
+    if map_enabled is None:
+        map_enabled = os.environ.get("MAP_ENABLED", "1") == "1"
     find_cycle = find_cycle or arome.latest_complete_cycle
     fetch = fetch or arome.download_and_extract
 
@@ -75,13 +79,19 @@ def run_batch(
     t_start = time.monotonic()
     try:
         sites = [spec for _, spec in site_rows]
-        extracted, stats = fetch(run_time, sites, grib_dir, forecast_hours=forecast_hours, keep_gribs=keep_gribs)
+        kw = {}
+        grid = None
+        if map_enabled:
+            grid = GridExtractor(night_steps(run_time, forecast_hours), stride=int(os.environ.get("MAP_STRIDE", DEFAULT_STRIDE)))
+            kw["grid"] = grid
+        extracted, stats = fetch(run_time, sites, grib_dir, forecast_hours=forecast_hours, keep_gribs=keep_gribs, **kw)
         t0 = time.monotonic()
         forecasts = compute_from_extracted(extracted, sites, forecast_hours)
         compute_s = time.monotonic() - t0
         if not any(fc.hours for fc in forecasts.values()):
             raise RuntimeError("No lead hour could be computed for any site")
-        n = persist.store_results(session_factory, run_id, forecasts, {spec.slug: sid for sid, spec in site_rows})
+        frames = persist.map_frame_rows(grid, run_time, MAP_K) if grid is not None and not grid.failed and grid.frames else []
+        n = persist.store_results(session_factory, run_id, forecasts, {spec.slug: sid for sid, spec in site_rows}, frames)
     except Exception as exc:
         logger.exception("Run %s failed", rt, extra={"run_time": rt})
         persist.mark_failed(session_factory, run_id, f"{type(exc).__name__}: {exc}")
@@ -96,6 +106,7 @@ def run_batch(
             "download_s": round(stats.get("download_s", 0.0), 1),
             "extract_s": round(stats.get("extract_s", 0.0), 1),
             "max_file_mb": round(stats.get("max_file_bytes", 0) / 1e6, 1),
+            "map_frames": len(frames), "map_s": round(stats.get("map_s", 0.0), 1),
             "peak_rss_mb": round(_peak_rss_mb(), 1),
         },
     )
