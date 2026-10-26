@@ -7,10 +7,12 @@ import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 
 import { api } from "../api";
 
+import { corrChart } from "../charts/lieuCharts";
 import { cn2Svg, corrMock } from "../charts/mockCharts";
 import { Cn2RealPanel, DataChips, HistPanel } from "../components/panels";
 import { Cn2Legend, LegMed, LegMes, Seg, Sw, SvgChart } from "../components/ui";
 import { useUser } from "../data/auth";
+import { useSiteHistory } from "../data/forecast";
 import { kHidden, MOCK_PLACES, selectPlace, TEAM_SITE, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { parseCsv, type CsvOpts, type DateFmt, type NightPt } from "../lib/csv";
@@ -207,8 +209,10 @@ export default function Calibrer() {
     return nightSvg(night, nights.get(night)!, K, cal.F.rm, pred, editable ? place.K : KDEF);
   }, [night, nightsKey, K, cal, realModel, editable]);
   const p2c = useLangMemo(() => (place.real ? "" : cn2Svg(K, KCAL, showObs, { mesf }, place.f)), [place, K, KCAL, showObs, mesf]);
+  const realHist = useSiteHistory(place);
   const corr = useLangMemo(() => corrMock(K, KCAL, place.f), [K, KCAL, place.f]);
-  const hist = useLangMemo(() => lieuData(place.nom, place.f, K, KCAL), [place, K, KCAL]);
+  const hist = useLangMemo(() => (place.real ? realHist : lieuData(place.nom, place.f, K, KCAL)), [place, K, KCAL, realHist]);
+  const corrR = useLangMemo(() => (realHist ? corrChart(realHist, { horaire: true, nuit: true, brut: false }) : null), [realHist]);
   useEffect(() => setSaved(""), [K]);
 
   const kb = (k: "L" | 0 | 1, f: number) => {
@@ -472,20 +476,25 @@ export default function Calibrer() {
           </div>
           <div className="panel">
             <h2>{tr("Historique (prévisions avec les K en service et mesures, nuit)")}</h2>
-            {place.real ? (
+            {hist ? (
+              <HistPanel data={hist} OB={showObs || place.real} inset={false} />
+            ) : (
               <SvgChart
                 html={`<text x="550" y="120" text-anchor="middle" font-size="13" fill="${C_TXT}">${tr("Historique : choisis un lieu avec seeing monitor.")}</text>`}
                 viewBox="0 0 1100 240"
                 label="Historique du lieu"
               />
-            ) : (
-              <HistPanel data={hist} OB={showObs} inset={false} />
             )}
           </div>
           <div className="panel grid2" style={{ gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr)" }}>
             <div>
               <h2>{tr("Corrélation prévu / mesuré")}</h2>
-              {place.real ? (
+              {place.real && corrR ? (
+                <>
+                  <p className="small muted mono">{corrR.ct}</p>
+                  <SvgChart html={corrR.svg} viewBox="0 0 340 320" label="Corrélation" />
+                </>
+              ) : place.real ? (
                 <SvgChart
                   html={`<text x="170" y="150" text-anchor="middle" font-size="12" fill="${C_TXT}">${tr("Corrélation : choisis un lieu avec seeing monitor.")}</text>`}
                   viewBox="0 0 340 300"
@@ -516,12 +525,12 @@ export default function Calibrer() {
               <div className="tiles">
                 <div className="tile">
                   <div className="l">{tr("r nuit")}</div>
-                  <div className="v">{place.real ? "–" : corr.rDayNight}</div>
+                  <div className="v">{place.real ? (corrR?.tiles.rn ?? "–") : corr.rDayNight}</div>
                 </div>
                 <div className="tile">
                   <div className="l">{tr("Biais · écart moyen")}</div>
                   <div className="v" style={{ fontSize: 16 }}>
-                    {place.real ? "–" : corr.bias}
+                    {place.real ? (corrR?.tiles.rj ?? "–") : corr.bias}
                   </div>
                 </div>
               </div>

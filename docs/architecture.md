@@ -177,6 +177,13 @@ All responses are JSON; times are ISO 8601 UTC (`Z`).
   `{times, seeing_arcsec}`; `DELETE /api/sites/{slug}/measurements?night=YYYY-MM-DD` (12h→12h UTC; all without
   `night`); `GET /api/sites/{slug}/terms?from&to` (≤ 400 days) → `{valid_times, lead_hours, i_tke, i_conv, i_cis}`,
   for each hour the latest successful run issued before it. The K fit runs in the browser.
+- Research history (`site_history(site_id PK, generated_at, data JSONB)`, migration 0010, which also adds the hidden
+  site `seeing-monitor-5`): `PUT /api/admin/sites/{slug}/history` (administrator; one site entry of
+  `research/export_lieux_site.py`), `POST /api/admin/sites/{slug}/forecasts {runs: [{run_time, hours: [[lead,
+  h_coulim, i_tke, i_conv, i_cis]]}]}` (administrator; research runs stored as model runs, seeing at the site's K,
+  existing rows kept, runs newer than every stored run skipped), `GET /api/sites/{slug}/history` (visible
+  sites; K, integrals and Cn2 panels only for those who may calibrate). Sent from the PC by
+  `research/envoi_site.py` (administrator login prompted). `/terms` prefers main runs (00/06/12/18Z).
 - `GET /api/map?run=latest|<ISO run_time>` → `{run_time, grid: {ny, nx, lat0, lon0, dlat, dlon}, see_min,
   see_max, frames: [{lead_hour, valid_time}]}` (`latest` = newest successful run with a map; 404 if none).
 - `GET /api/map/frame?lead=N&run=...` → `ny * nx` bytes, row-major (row r at lat0 + r * dlat), code c →
