@@ -6,8 +6,28 @@ export interface Site {
   lat: number;
   lon: number;
   altitude_m: number | null;
-  /** "public" (observatory), "shared" (by a team with the community) or "hidden" (sent to the admin only). */
-  visibility: "public" | "shared" | "hidden";
+  /** "public" (observatory), "shared" (by a team or a member with the community), "hidden" (sent to the
+   * admin only) or "private" (the account's own place). */
+  visibility: "public" | "shared" | "hidden" | "private";
+  /** Personal place of the logged-in account. */
+  owned?: boolean;
+  /** (K_TKE, K_CIS, K_conv), sent to the owner, the administrator and the team for its own site only. */
+  k?: number[] | null;
+}
+
+export interface PlaceIn {
+  name: string;
+  lat: number;
+  lon: number;
+  altitude_m?: number | null;
+  shared?: boolean;
+}
+export interface PlacePatch {
+  name?: string;
+  shared?: boolean;
+  k_tke?: number;
+  k_cis?: number;
+  k_conv?: number;
 }
 
 export interface Run {
@@ -103,8 +123,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 const get = <T>(path: string) => request<T>(path);
 /** JSON POST: the auth endpoints only accept application/json (CSRF guard). */
-const post = <T>(path: string, body: unknown = {}) =>
-  request<T>(path, { method: "POST", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } });
+const send = <T>(method: string, path: string, body: unknown = {}) =>
+  request<T>(path, { method, body: JSON.stringify(body), headers: { "Content-Type": "application/json" } });
+const post = <T>(path: string, body: unknown = {}) => send<T>("POST", path, body);
 
 export const api = {
   me: () => get<Me>("/api/me"),
@@ -112,6 +133,9 @@ export const api = {
   login: (b: { email: string; password: string }) => post<User>("/api/auth/login", b),
   logout: () => post<void>("/api/auth/logout"),
   sites: () => get<Site[]>("/api/sites"),
+  createPlace: (b: PlaceIn) => post<Site>("/api/places", b),
+  updatePlace: (slug: string, b: PlacePatch) => send<Site>("PATCH", `/api/places/${encodeURIComponent(slug)}`, b),
+  deletePlace: (slug: string) => send<void>("DELETE", `/api/places/${encodeURIComponent(slug)}`),
   latestRun: () => get<Run>("/api/runs/latest"),
   forecast: (slug: string, run = "latest") =>
     get<Forecast>(`/api/sites/${encodeURIComponent(slug)}/forecast?run=${encodeURIComponent(run)}`),

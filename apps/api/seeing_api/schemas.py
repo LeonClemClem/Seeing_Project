@@ -12,6 +12,10 @@ class SiteOut(BaseModel):
     lon: float
     altitude_m: float | None
     visibility: str
+    # Personal place of the logged-in account.
+    owned: bool = False
+    # (K_TKE, K_CIS, K_conv): only for the owner, the administrator and the team for its own site.
+    k: list[float] | None = None
 
 
 class RunOut(BaseModel):

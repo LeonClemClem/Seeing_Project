@@ -7,14 +7,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import { useLocation } from "react-router-dom";
 
 import { ColorBar, Seg } from "../components/ui";
-import { MOCK_PLACES, useCurrentPlace, usePlaces } from "../data/places";
+import { useUser } from "../data/auth";
+import { MAX_PLACES, selectPlace, siteToPlace, useCurrentPlace, usePlaceActions, usePlaces } from "../data/places";
 import { tr } from "../i18n";
 import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, parseCoord, relief, SARD, SHAREDV, ZONES, type Box, type Poly } from "../lib/geo";
 import { useGlobalMap, useLatestRunTime } from "../lib/hooks";
 import type { MapGrid } from "../api";
 import { D2R, esc, fmt, pad2, runLabel, turbo, turboGradient } from "../lib/util";
 import { REF } from "../mock/engine";
-import { useUi } from "../store";
+import { setState, useUi } from "../store";
 
 const CW = 720,
   CH = 700;
@@ -171,7 +172,9 @@ export default function Carte() {
   const role = useUi((s) => s.role);
   const lang = useUi((s) => s.lang);
   const place = useCurrentPlace();
-  const { pub } = usePlaces();
+  const { pub, mine } = usePlaces();
+  const user = useUser();
+  const { create: createPlace } = usePlaceActions();
   const { runTime } = useLatestRunTime();
   const gmap = useGlobalMap();
   const RUN0 = gmap ? Date.parse(gmap.meta.run_time) : runTime ? Date.parse(runTime) : REF + 12 * 3600000;
@@ -363,7 +366,7 @@ export default function Carte() {
       cx.lineWidth = 1.2;
       cx.stroke();
     };
-    MOCK_PLACES.forEach((p) => {
+    mine.forEach((p) => {
       const [x, y] = toXY(p.lat, p.lon);
       star(x, y, big ? 10 : 7);
       if (big) label(tr(p.nom), x + 12, y + 4);
@@ -425,7 +428,7 @@ export default function Carte() {
     const hkm = Math.round((VW.la1 - VW.la0) * 111.2),
       zmax = VW.la1 - VW.la0 <= ZMIN + 1e-6;
     label(tr(`${hkm} × ${km} km${zmax ? " · zoom maximal" : ""} · isolignes ${isoStep(VW)} m`), CW - (zmax ? 300 : 200), CH - 12);
-  }, [VW, frameFac, sample, toXY, pub, MZH, newPt, role, lang]);
+  }, [VW, frameFac, sample, toXY, pub, mine, MZH, newPt, role, lang]);
 
   /* ---------- animation ---------- */
   const last = NIGHTS[NIGHTS.length - 1]?.i1 ?? 8;
@@ -569,10 +572,22 @@ export default function Carte() {
     const n = nl.name.trim();
     if (!newPt) return setNlMsg({ ok: false, t: tr("Clique sur la carte ou saisis des coordonnées GPS valides.") });
     if (!n) return setNlMsg({ ok: false, t: tr("Donne un nom au lieu.") });
-    setNlMsg({
-      ok: true,
-      t: tr(`« ${n} » créé${nl.share ? ", partagé (position approchée)" : ", privé"}. K de départ : ceux des voisins.`),
-    });
+    if (!user) return setNlMsg({ ok: false, t: tr("Connecte-toi (onglet Compte) pour enregistrer tes lieux.") });
+    if (!inDomain(newPt[0], newPt[1])) return setNlMsg({ ok: false, t: tr("Hors du domaine AROME : pas encore possible.") });
+    if (role !== "admin" && mine.length >= MAX_PLACES) return setNlMsg({ ok: false, t: tr(`${MAX_PLACES} lieux au maximum par compte.`) });
+    createPlace.mutate(
+      { name: n, lat: newPt[0], lon: newPt[1], shared: nl.share },
+      {
+        onSuccess: (s) => {
+          setState(selectPlace(siteToPlace(s)));
+          setNlMsg({
+            ok: true,
+            t: tr(`« ${n} » créé${nl.share ? ", partagé (position approchée)" : ", privé"}. Prévisions dès le prochain run AROME.`),
+          });
+        },
+        onError: (e) => setNlMsg({ ok: false, t: e.message }),
+      },
+    );
   };
 
   const fd = frameT(MI),

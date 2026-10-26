@@ -1,5 +1,6 @@
 """JSON endpoints under /api (see docs/architecture.md, section API)."""
 
+import hashlib
 import math
 import os
 import zlib
@@ -7,7 +8,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from seeing_api.auth import NO_STORE, CurrentUser, user_out
@@ -34,19 +35,42 @@ def utc(dt: datetime) -> datetime:
     return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
 
 
-def site_out(site: Site) -> SiteOut:
+# Site of the shared "CosmoDrôme team" account: its team sees its K.
+TEAM_SITE = "cosmodrome"
+
+
+def blur(slug: str, lat: float, lon: float) -> tuple[float, float]:
+    """Position moved by 5-11 km in a direction fixed by the slug (shared personal places)."""
+    h = hashlib.sha256(slug.encode()).digest()
+    d = 5.0 + 6.0 * h[0] / 255.0
+    b = 2.0 * math.pi * int.from_bytes(h[1:3], "big") / 65536.0
+    return lat + d / 111.2 * math.cos(b), lon + d / (111.32 * math.cos(math.radians(lat))) * math.sin(b)
+
+
+def site_out(site: Site, user: User | None = None) -> SiteOut:
+    owned = user is not None and site.owner_id == user.id
+    admin = user is not None and user.role == UserRole.admin
+    team = user is not None and user.role == UserRole.team and site.slug == TEAM_SITE
+    lat, lon, name, alt = site.lat, site.lon, site.name, clean(site.altitude_m)
+    if site.owner_id is not None and not owned:
+        # Another member's shared place: no name, approximate position (also for the administrator).
+        lat, lon = blur(site.slug, site.lat, site.lon)
+        name, alt = "Lieu partagé", None
     return SiteOut(
-        slug=site.slug, name=site.name, lat=site.lat, lon=site.lon, altitude_m=clean(site.altitude_m),
-        visibility=site.visibility,
+        slug=site.slug, name=name, lat=lat, lon=lon, altitude_m=alt, visibility=site.visibility, owned=owned,
+        k=[site.k_tke, site.k_cis, site.k_tke_conv] if owned or team or (admin and site.owner_id is None) else None,
     )
 
 
 def site_filter(user: User | None) -> list:
-    """Active sites; hidden ones (computed, not offered) only for the administrator."""
-    conds = [Site.active.is_(True)]
-    if user is None or user.role != UserRole.admin:
-        conds.append(Site.visibility != "hidden")
-    return conds
+    """Active public and shared sites, the account's own places, and the hidden sites (computed, not
+    offered) for the administrator. Other members' private places are never served."""
+    allowed = Site.visibility.in_(["public", "shared"])
+    if user is not None:
+        allowed = or_(allowed, Site.owner_id == user.id)
+        if user.role == UserRole.admin:
+            allowed = or_(allowed, Site.visibility == "hidden")
+    return [Site.active.is_(True), allowed]
 
 
 def get_site(session: Session, slug: str, user: User | None = None) -> Site:
@@ -85,7 +109,7 @@ def me(request: Request, response: Response, user: CurrentUser) -> MeOut:
 @router.get("/sites", response_model=list[SiteOut])
 def list_sites(session: SessionDep, user: CurrentUser) -> list[SiteOut]:
     sites = session.scalars(select(Site).where(*site_filter(user)).order_by(Site.name))
-    return [site_out(s) for s in sites]
+    return [site_out(s, user) for s in sites]
 
 
 @router.get("/runs/latest", response_model=RunOut)
@@ -118,7 +142,7 @@ def site_forecast(slug: str, session: SessionDep, user: CurrentUser, run: RunPar
         )
         for f in rows
     ]
-    return ForecastOut(site=site_out(site), run_time=utc(model_run.run_time), points=points)
+    return ForecastOut(site=site_out(site, user), run_time=utc(model_run.run_time), points=points)
 
 
 def _height_key(h: float) -> float:
@@ -148,7 +172,7 @@ def site_cn2(slug: str, session: SessionDep, user: CurrentUser, run: RunParam = 
             row[index[_height_key(h)]] = clean(v)
         matrix.append(row)
     return Cn2Out(
-        site=site_out(site),
+        site=site_out(site, user),
         run_time=utc(model_run.run_time),
         valid_times=[utc(p.valid_time) for p in profiles],
         heights_m=heights,
