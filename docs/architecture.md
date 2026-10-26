@@ -52,6 +52,11 @@ and created by Alembic (`database/migrations`; `seeing-migrate` = `alembic upgra
 - `cn2_profiles(id, run_id → model_runs ON DELETE CASCADE, site_id → sites, valid_time, lead_hour,
   heights_m REAL[], cn2 REAL[], UNIQUE(run_id, site_id, lead_hour))`. `heights_m` are metres above
   ground level, on a regular display grid (100 m steps up to the top of the profile).
+- `map_frames(id, run_id → model_runs ON DELETE CASCADE, valid_time, lead_hour, ny, nx, lat0, lon0, dlat,
+  dlon, k_tke, k_cis, k_conv, data BYTEA, UNIQUE(run_id, lead_hour))`: global seeing map of every night
+  lead hour (20h-04h UTC, from the night starting on the run's day), V2bd with the map K (2, 57, 0.1),
+  AROME grid subsampled by `MAP_STRIDE`; `data` = zlib(uint8 codes, log scale 0.2"-10", 255 = none),
+  see `seeing_core.grid`.
 - `users(id, email UNIQUE (lower-cased, CHECK email = lower(email)), password_hash (Argon2id),
   display_name NULL, role ∈ {user, team, admin}, is_active, created_at, last_login_at NULL)`
 - `user_sessions(id = SHA-256 hex of the cookie token, user_id → users ON DELETE CASCADE, created_at,
@@ -80,6 +85,8 @@ Batch only:
 |---|---|---|
 | `GRIB_DIR` | `/tmp/arome` | Scratch folder for downloaded GRIB2 (Cloud Run: in-memory FS). |
 | `FORECAST_HOURS` | `51` | Last lead hour computed (0..51). |
+| `MAP_ENABLED` | `1` | `0` skips the global map (sites only). A map failure never fails the run. |
+| `MAP_STRIDE` | `2` | Map grid = every n-th AROME 0.025 point (2 -> 0.05 deg, ~200 000 columns, ~13 s per lead hour). |
 | `RETENTION_DAYS` | `14` (envs: `36500`) | Model runs older than this are deleted. 36500 = keep everything. |
 | `LOG_LEVEL` | `INFO` | |
 
@@ -153,6 +160,10 @@ All responses are JSON; times are ISO 8601 UTC (`Z`).
 - `GET /api/sites/{slug}/cn2?run=latest|<ISO run_time>` →
   `{site: {...}, run_time, valid_times: [...], heights_m: [...], cn2: [[...per height...] per valid_time]}`
   (`null` for missing values; heights are the union grid, padded with null).
+- `GET /api/map?run=latest|<ISO run_time>` → `{run_time, grid: {ny, nx, lat0, lon0, dlat, dlon}, see_min,
+  see_max, frames: [{lead_hour, valid_time}]}` (`latest` = newest successful run with a map; 404 if none).
+- `GET /api/map/frame?lead=N&run=...` → `ny * nx` bytes, row-major (row r at lat0 + r * dlat), code c →
+  seeing = exp(ln see_min + c / 254 * (ln see_max - ln see_min)), 255 = no value. Public, cached a day.
 - `GET /api/me` → `{email, env, user}`: IAP user (from `X-Goog-Authenticated-User-Email`, prefix
   stripped, `null` without IAP), `ENV`, and the logged-in app account
   `user: {id, email, display_name, role} | null`. `Cache-Control: no-store`.

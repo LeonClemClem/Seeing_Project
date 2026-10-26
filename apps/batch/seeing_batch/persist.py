@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import math
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, select
@@ -12,7 +12,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, sessionmaker
 
 from seeing_core import SiteForecast, SiteSpec
-from seeing_db import Cn2Profile, Forecast, ModelRun, RunStatus, Site
+from seeing_db import Cn2Profile, Forecast, MapFrame, ModelRun, RunStatus, Site
 
 logger = logging.getLogger(__name__)
 
@@ -58,13 +58,17 @@ def store_results(
     run_id: int,
     forecasts: Mapping[str, SiteForecast],
     site_ids: Mapping[str, int],
+    map_frames: Sequence[Mapping] = (),
 ) -> int:
-    """Replace all rows of the run and flip it to `success`, in one transaction.
-    Returns the number of forecast rows written."""
+    """Replace all rows of the run (and its map frames, MapFrame columns without run_id) and flip it
+    to `success`, in one transaction. Returns the number of forecast rows written."""
     n = 0
     with session_factory.begin() as session:
         session.execute(delete(Forecast).where(Forecast.run_id == run_id))
         session.execute(delete(Cn2Profile).where(Cn2Profile.run_id == run_id))
+        session.execute(delete(MapFrame).where(MapFrame.run_id == run_id))
+        if map_frames:
+            session.execute(pg_insert(MapFrame), [dict(f, run_id=run_id) for f in map_frames])
         forecast_rows, profile_rows = [], []
         for slug, fc in forecasts.items():
             site_id = site_ids[slug]
@@ -87,6 +91,16 @@ def store_results(
         run.finished_at = datetime.now(UTC)
         run.error = None
     return n
+
+
+def map_frame_rows(grid, run_time: datetime, k) -> list[dict]:
+    """MapFrame rows (without run_id) of a GridExtractor's computed frames."""
+    g = grid.geometry
+    return [
+        dict(valid_time=run_time + timedelta(hours=step), lead_hour=step, ny=g.ny, nx=g.nx, lat0=g.lat0,
+             lon0=g.lon0, dlat=g.dlat, dlon=g.dlon, k_tke=k[0], k_cis=k[1], k_conv=k[2], data=data)
+        for step, data in sorted(grid.frames.items())
+    ]
 
 
 def mark_failed(session_factory: sessionmaker, run_id: int, error: str) -> None:

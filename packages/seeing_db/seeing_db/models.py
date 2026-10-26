@@ -10,6 +10,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -66,6 +67,34 @@ class ModelRun(Base):
     cn2_profiles: Mapped[list["Cn2Profile"]] = relationship(
         back_populates="run", cascade="all, delete-orphan", passive_deletes=True
     )
+    map_frames: Mapped[list["MapFrame"]] = relationship(
+        back_populates="run", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class MapFrame(Base):
+    """Seeing map of one lead hour over the (subsampled) AROME grid: row r / column c is at
+    (lat0 + r * dlat, lon0 + c * dlon); `data` = zlib(uint8 log-scale codes), seeing_core.grid."""
+
+    __tablename__ = "map_frames"
+    __table_args__ = (UniqueConstraint("run_id", "lead_hour"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("model_runs.id", ondelete="CASCADE"), index=True)
+    valid_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    lead_hour: Mapped[int] = mapped_column(Integer)
+    ny: Mapped[int] = mapped_column(Integer)
+    nx: Mapped[int] = mapped_column(Integer)
+    lat0: Mapped[float] = mapped_column(Float)
+    lon0: Mapped[float] = mapped_column(Float)
+    dlat: Mapped[float] = mapped_column(Float)
+    dlon: Mapped[float] = mapped_column(Float)
+    k_tke: Mapped[float] = mapped_column(Float)
+    k_cis: Mapped[float] = mapped_column(Float)
+    k_conv: Mapped[float] = mapped_column(Float)
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+
+    run: Mapped[ModelRun] = relationship(back_populates="map_frames")
 
 
 class Forecast(Base):

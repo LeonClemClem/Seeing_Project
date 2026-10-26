@@ -2,6 +2,7 @@
 
 import math
 import os
+import zlib
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -11,8 +12,8 @@ from sqlalchemy.orm import Session
 
 from seeing_api.auth import NO_STORE, CurrentUser, user_out
 from seeing_api.db import get_session
-from seeing_api.schemas import Cn2Out, ForecastOut, ForecastPoint, MeOut, RunOut, SiteOut
-from seeing_db import Cn2Profile, Forecast, ModelRun, RunStatus, Site, User, UserRole
+from seeing_api.schemas import Cn2Out, ForecastOut, ForecastPoint, MapFrameOut, MapGridOut, MapOut, MeOut, RunOut, SiteOut
+from seeing_db import Cn2Profile, Forecast, MapFrame, ModelRun, RunStatus, Site, User, UserRole
 
 router = APIRouter(prefix="/api")
 
@@ -153,3 +154,54 @@ def site_cn2(slug: str, session: SessionDep, user: CurrentUser, run: RunParam = 
         heights_m=heights,
         cn2=matrix,
     )
+
+
+# Same scale as seeing_core.grid.SEE_MIN / SEE_MAX (the API does not depend on seeing_core).
+MAP_SEE_MIN, MAP_SEE_MAX = 0.2, 10.0
+
+
+def _map_run(session: Session, run: str) -> ModelRun:
+    """`latest` = the newest successful run that has a map."""
+    if run != "latest":
+        return resolve_run(session, run)
+    found = session.scalar(
+        select(ModelRun)
+        .where(ModelRun.status == RunStatus.success, ModelRun.id.in_(select(MapFrame.run_id)))
+        .order_by(ModelRun.run_time.desc())
+        .limit(1)
+    )
+    if found is None:
+        raise HTTPException(404, "No global map yet")
+    return found
+
+
+@router.get("/map", response_model=MapOut)
+def global_map(session: SessionDep, run: RunParam = "latest") -> MapOut:
+    model_run = _map_run(session, run)
+    rows = session.execute(
+        select(MapFrame.lead_hour, MapFrame.valid_time, MapFrame.ny, MapFrame.nx, MapFrame.lat0, MapFrame.lon0,
+               MapFrame.dlat, MapFrame.dlon)
+        .where(MapFrame.run_id == model_run.id)
+        .order_by(MapFrame.lead_hour)
+    ).all()
+    if not rows:
+        raise HTTPException(404, f"No global map for the run {utc(model_run.run_time).isoformat()}")
+    r = rows[0]
+    return MapOut(
+        run_time=utc(model_run.run_time),
+        grid=MapGridOut(ny=r.ny, nx=r.nx, lat0=r.lat0, lon0=r.lon0, dlat=r.dlat, dlon=r.dlon),
+        see_min=MAP_SEE_MIN,
+        see_max=MAP_SEE_MAX,
+        frames=[MapFrameOut(lead_hour=x.lead_hour, valid_time=utc(x.valid_time)) for x in rows],
+    )
+
+
+@router.get("/map/frame")
+def global_map_frame(session: SessionDep, lead: int, run: RunParam = "latest") -> Response:
+    model_run = _map_run(session, run)
+    data = session.scalar(select(MapFrame.data).where(MapFrame.run_id == model_run.id, MapFrame.lead_hour == lead))
+    if data is None:
+        raise HTTPException(404, f"No map frame at H+{lead}")
+    # A run's frames never change: cacheable for a day.
+    return Response(zlib.decompress(data), media_type="application/octet-stream",
+                    headers={"Cache-Control": "public, max-age=86400"})
