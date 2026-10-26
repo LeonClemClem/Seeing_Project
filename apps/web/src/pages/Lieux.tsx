@@ -9,7 +9,7 @@ import { corrChart, histSvg, mailleSvg, seeHist } from "../charts/lieuCharts";
 import { cn2Svg } from "../charts/mockCharts";
 import { Cn2RealPanel, HistPanel } from "../components/panels";
 import { Chip, Cn2Legend, LegBreak, LegDay, LegMed, LegMes, Sw, SvgChart } from "../components/ui";
-import { kHidden, kTxt, MOCK_PLACES, usePlaces, type Place } from "../data/places";
+import { kHidden, kTxt, MAX_PLACES, MOCK_PLACES, usePlaceActions, usePlaces, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { sharedPlace, SHAREDV } from "../lib/geo";
 import { C_TXT, ddmm, fmt, pd } from "../lib/util";
@@ -19,7 +19,8 @@ import { setState, useLangMemo, useUi } from "../store";
 type Sel = { t: "lx"; id: string } | { t: "sh"; k: number };
 
 export default function Lieux() {
-  const { pub, sh } = usePlaces();
+  const { pub, sh, mine } = usePlaces();
+  const { remove } = usePlaceActions();
   const role = useUi((s) => s.role);
   const current = useUi((s) => s.place);
   const mesf = useUi((s) => s.mesf);
@@ -27,8 +28,8 @@ export default function Lieux() {
   const [sel, setSel] = useState<Sel>({ t: "lx", id: current });
   const [open, setOpen] = useState({ pub: false, sh: false });
 
-  const all = [...MOCK_PLACES, ...pub, ...sh];
-  const l = sel.t === "lx" ? (all.find((p) => p.id === sel.id) ?? MOCK_PLACES[0]!) : null;
+  const all = [...mine, ...pub, ...sh];
+  const l = sel.t === "lx" ? (all.find((p) => p.id === sel.id) ?? mine[0] ?? pub[0] ?? MOCK_PLACES[0]!) : null;
   const toggleM = (k: "brut" | "horaire" | "courbe") => setState((s) => ({ mesf: { ...s.mesf, [k]: !s.mesf[k] } }));
 
   const tile = (on: boolean, key: string, onClick: () => void, body: JSX.Element) => (
@@ -65,7 +66,14 @@ export default function Lieux() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_PLACES.map((p) => (
+              {!mine.length && (
+                <tr>
+                  <td colSpan={5} className="muted">
+                    {tr("Aucun lieu pour l'instant : ajoute-le depuis la carte.")}
+                  </td>
+                </tr>
+              )}
+              {mine.map((p) => (
                 <tr
                   key={p.id}
                   style={{ cursor: "pointer", background: sel.t === "lx" && sel.id === p.id ? "#173257" : undefined }}
@@ -92,7 +100,21 @@ export default function Lieux() {
                     </span>
                   </td>
                   <td>
-                    <span className={"pill " + (p.prev?.startsWith("hors") ? "p-warn" : "p-ok")}>{tr(p.prev ?? "")}</span>
+                    <span className={"pill " + (p.prev?.startsWith("hors") ? "p-warn" : "p-ok")}>{tr(p.real ? "AROME, chaque run" : (p.prev ?? ""))}</span>
+                    {p.real && p.slug && (
+                      <button
+                        className="small"
+                        style={{ marginLeft: 8 }}
+                        aria-label={tr("Supprimer ce lieu")}
+                        title={tr("Supprimer ce lieu")}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(tr(`Supprimer « ${p.nom} » et ses prévisions ?`))) remove.mutate(p.slug!);
+                        }}
+                      >
+                        ✕
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -103,7 +125,7 @@ export default function Lieux() {
           <button className="primary" onClick={() => nav("/carte", { state: { newPlace: true } })}>
             {tr("Ajouter un lieu")}
           </button>{" "}
-          <span className="small muted">{tr(`${MOCK_PLACES.length} lieux sur 5`)}</span>
+          <span className="small muted">{tr(`${mine.length} lieux sur ${MAX_PLACES}`)}</span>
         </div>
       </div>
 

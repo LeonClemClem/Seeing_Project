@@ -160,6 +160,15 @@ All responses are JSON; times are ISO 8601 UTC (`Z`).
 - `GET /api/sites/{slug}/cn2?run=latest|<ISO run_time>` →
   `{site: {...}, run_time, valid_times: [...], heights_m: [...], cn2: [[...per height...] per valid_time]}`
   (`null` for missing values; heights are the union grid, padded with null).
+- `POST /api/places {name, lat, lon, altitude_m?, shared}` (logged in, JSON): a personal place = a `sites`
+  row with `owner_id`, visibility `private` or `shared`, starting K = map K (2, 57, 0.1); computed by the batch
+  from the next run. At most 5 per account (administrator unlimited), AROME domain only (lat 37.5–55.4,
+  lon −12–16). `PATCH /api/places/{slug} {name?, shared?, k_tke?, k_cis?, k_conv?}` (K ≤ 150) and
+  `DELETE /api/places/{slug}` (owner only, JSON content type; deletes its forecasts).
+- `/api/sites` also returns the account's own places (`owned: true`) and the places other members share
+  (name "Lieu partagé", position blurred 5–11 km, no altitude); other members' private places are never
+  served. `k = [K_TKE, K_CIS, K_conv]` only for the owner, the administrator (curated sites) and the team
+  account for its site.
 - `GET /api/map?run=latest|<ISO run_time>` → `{run_time, grid: {ny, nx, lat0, lon0, dlat, dlon}, see_min,
   see_max, frames: [{lead_hour, valid_time}]}` (`latest` = newest successful run with a map; 404 if none).
 - `GET /api/map/frame?lead=N&run=...` → `ny * nx` bytes, row-major (row r at lat0 + r * dlat), code c →

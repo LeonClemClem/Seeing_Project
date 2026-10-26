@@ -44,8 +44,11 @@ class Site(Base):
     k_tke: Mapped[float] = mapped_column(Float, default=3.0)
     k_cis: Mapped[float] = mapped_column(Float, default=30.0)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
-    # public (observatories), shared (by a team with the community) or hidden (computed, not offered).
+    # public (observatories), shared (by a team or a user with the community), hidden (computed, not
+    # offered) or private (a user's own place).
     visibility: Mapped[str] = mapped_column(String(16), default="public", server_default="public")
+    # Account owning a personal place (NULL for the curated sites).
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -103,7 +106,7 @@ class Forecast(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     run_id: Mapped[int] = mapped_column(ForeignKey("model_runs.id", ondelete="CASCADE"), index=True)
-    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id"), index=True)
+    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id", ondelete="CASCADE"), index=True)
     valid_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     lead_hour: Mapped[int] = mapped_column(Integer)
     seeing_arcsec: Mapped[float | None] = mapped_column(Float)
@@ -122,7 +125,7 @@ class Cn2Profile(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     run_id: Mapped[int] = mapped_column(ForeignKey("model_runs.id", ondelete="CASCADE"), index=True)
-    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id"), index=True)
+    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id", ondelete="CASCADE"), index=True)
     valid_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     lead_hour: Mapped[int] = mapped_column(Integer)
     heights_m: Mapped[list[float]] = mapped_column(ARRAY(REAL))

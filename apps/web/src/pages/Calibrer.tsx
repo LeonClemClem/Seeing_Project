@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, type DragEvent } from "react";
 import { cn2Svg, corrMock } from "../charts/mockCharts";
 import { Cn2RealPanel, DataChips, HistPanel } from "../components/panels";
 import { Cn2Legend, LegMed, LegMes, Seg, Sw, SvgChart } from "../components/ui";
-import { kHidden, MOCK_PLACES, selectPlace, useCurrentPlace, type Place } from "../data/places";
+import { kHidden, MOCK_PLACES, selectPlace, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { parseCsv, type CsvOpts, type DateFmt, type NightPt } from "../lib/csv";
 import { C_AR, C_DAY, C_LINE, C_OBS, C_OBSD, C_TXT, dnText, fmt, pl, yaxis } from "../lib/util";
@@ -102,6 +102,7 @@ export default function Calibrer() {
   const showObs = useUi((s) => s.showObs);
   const mesf = useUi((s) => s.mesf);
   const lock = kHidden(place, role);
+  const { mine } = usePlaces();
 
   const [st, setSt] = useState(initialStore);
   const [, bump] = useState(0);
@@ -198,7 +199,7 @@ export default function Calibrer() {
               "Ce site est calibré par l'administrateur : tu vois les résultats (courbes, Cn², historique, corrélation, qualité du calage), mais les outils de calibration (import CSV, réglage des K, calibration auto) ne fonctionnent que sur tes lieux personnels.",
             )}
           </p>
-          <button className="primary" onClick={() => setState(selectPlace(MOCK_PLACES[0]!))}>
+          <button className="primary" onClick={() => setState(selectPlace(mine[0] ?? MOCK_PLACES[0]!))}>
             {tr("Passer à mon lieu")}
           </button>
         </div>
@@ -481,6 +482,15 @@ function KPanel(p: {
 }) {
   const K = useUi((s) => s.K);
   const { r, b, q } = p.stats;
+  const { update } = usePlaceActions();
+  const save = () => {
+    const done = tr(`Enregistré : K_TKE = ${fmt(K[0])}, K_CIS = ${fmt(K[1])}, K_conv = 0.1.`);
+    if (p.place.kind !== "mine" || !p.place.real || !p.place.slug) return p.setSaved(done);
+    update.mutate(
+      { slug: p.place.slug, k_tke: K[0], k_cis: K[1], k_conv: 0.1 },
+      { onSuccess: () => p.setSaved(done + tr(" Utilisés dès le prochain run.")), onError: (e) => p.setSaved(e.message) },
+    );
+  };
   return (
     <div className="panel" id="kpanel">
       <h2 style={{ margin: "0 0 8px" }}>{tr("Réglage des coefficients")}</h2>
@@ -518,7 +528,7 @@ function KPanel(p: {
               {p.krow("Cisaillement · K_CIS", 1)}
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
-              <button onClick={() => p.setSaved(tr(`Enregistré : K_TKE = ${fmt(K[0])}, K_CIS = ${fmt(K[1])}, K_conv = 0.1.`))}>
+              <button onClick={save}>
                 {tr("Enregistrer pour ce lieu")}
               </button>
               <span className="small muted">{tr("K_conv figé")}</span>

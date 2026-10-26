@@ -1,11 +1,13 @@
 /**
- * Places shown in the selector: public observing sites from the API (real forecasts) and the
- * user's personal places, which are mock data until places CRUD exists on the backend.
+ * Places shown in the selector: public and shared sites from the API, and the user's personal places
+ * (API places of the logged-in account; example places when logged out). All API places have real
+ * forecasts, computed by the batch at every run.
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { api, queryKeys, type Site } from "../api";
+import { api, queryKeys, type PlaceIn, type PlacePatch, type Site } from "../api";
+import { useUser } from "./auth";
 import { KDEF } from "../mock/engine";
 import { useUi, type K3, type Role, type UiState } from "../store";
 
@@ -42,33 +44,54 @@ export const MOCK_PLACES: Place[] = [
 ];
 
 export const siteToPlace = (s: Site): Place => ({
-  id: "pub:" + s.slug,
+  id: (s.owned ? "own:" : "pub:") + s.slug,
   nom: s.name,
   lat: s.lat,
   lon: s.lon,
   alt: s.altitude_m,
-  kind: "pub",
+  kind: s.owned ? "mine" : "pub",
   slug: s.slug,
   shared: s.visibility === "shared",
   hidden: s.visibility === "hidden",
-  K: [...KDEF],
+  K: s.k && s.k.length === 3 ? [s.k[0]!, s.k[1]!, s.k[2]!] : [...KDEF],
   real: true,
   f: 1,
+  vis: !s.owned ? undefined : s.visibility === "shared" ? "partagé · position approchée" : "privé",
+  mesures: s.owned ? "" : undefined,
 });
 
 export function useSites() {
-  return useQuery({ queryKey: queryKeys.sites, queryFn: api.sites });
+  const user = useUser();
+  return useQuery({ queryKey: [...queryKeys.sites, user?.id ?? 0], queryFn: api.sites });
 }
 
 export function usePlaces(): { pub: Place[]; sh: Place[]; hid: Place[]; mine: Place[]; all: Place[] } {
   const sites = useSites();
+  const user = useUser();
   return useMemo(() => {
     const api = (sites.data ?? []).map(siteToPlace);
-    const pub = api.filter((p) => !p.shared && !p.hidden),
-      sh = api.filter((p) => p.shared),
-      hid = api.filter((p) => p.hidden);
-    return { pub, sh, hid, mine: MOCK_PLACES, all: [...api, ...MOCK_PLACES] };
-  }, [sites.data]);
+    const own = api.filter((p) => p.kind === "mine"),
+      others = api.filter((p) => p.kind !== "mine");
+    const pub = others.filter((p) => !p.shared && !p.hidden),
+      sh = others.filter((p) => p.shared),
+      hid = others.filter((p) => p.hidden);
+    // Logged out: the example places show what an account gives.
+    const mine = user ? own : MOCK_PLACES;
+    return { pub, sh, hid, mine, all: [...others, ...mine] };
+  }, [sites.data, user]);
+}
+
+export const MAX_PLACES = 5;
+
+/** Create / update / delete the account's places; every change reloads the site list. */
+export function usePlaceActions() {
+  const qc = useQueryClient();
+  const refresh = () => qc.invalidateQueries({ queryKey: queryKeys.sites });
+  return {
+    create: useMutation({ mutationFn: (b: PlaceIn) => api.createPlace(b), onSuccess: refresh }),
+    update: useMutation({ mutationFn: ({ slug, ...b }: PlacePatch & { slug: string }) => api.updatePlace(slug, b), onSuccess: refresh }),
+    remove: useMutation({ mutationFn: (slug: string) => api.deletePlace(slug), onSuccess: refresh }),
+  };
 }
 
 /** Site of the shared "CosmoDrôme team" account: its team sees and sets its K. */
