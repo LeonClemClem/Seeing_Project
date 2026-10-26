@@ -2,16 +2,21 @@
  * Calibrate K with your own seeing measurements. CSV parsing and the K fit run in the browser on the
  * fictitious model until measurement upload and calibration exist on the backend.
  */
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+
+import { api } from "../api";
 
 import { cn2Svg, corrMock } from "../charts/mockCharts";
 import { Cn2RealPanel, DataChips, HistPanel } from "../components/panels";
 import { Cn2Legend, LegMed, LegMes, Seg, Sw, SvgChart } from "../components/ui";
-import { kHidden, MOCK_PLACES, selectPlace, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
+import { useUser } from "../data/auth";
+import { kHidden, MOCK_PLACES, selectPlace, TEAM_SITE, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { parseCsv, type CsvOpts, type DateFmt, type NightPt } from "../lib/csv";
 import { C_AR, C_DAY, C_LINE, C_OBS, C_OBSD, C_TXT, dnText, fmt, pl, yaxis } from "../lib/util";
-import { calib, chourly, comp, cstats, exampleCsv, hourKey, NO_FILTER, seeC, type CalFilters } from "../mock/calibration";
+import { calib, chourly, comp, cstats, exampleCsv, hourKey, NO_FILTER, seeC, type CalFilters, type CalPair } from "../mock/calibration";
+import { nightPointsToIso, nightsFromTimes, seeTerms, termsModel, type Terms } from "../lib/realCalib";
 import { KDEF, lieuData } from "../mock/engine";
 import { getState, setK, setState, useLangMemo, useUi, type K3 } from "../store";
 
@@ -54,9 +59,12 @@ function addTo(st: NonNullable<typeof STORE>, txt: string, o: CsvOpts) {
   return true;
 }
 
-function nightSvg(key: string, pts: NightPt[], K: K3, rm: Set<string>) {
-  const C = comp(key),
-    H = chourly(pts);
+/** pred(K, i): model seeing at hour index i (0 = 12h UTC) for K, NaN when unknown; K0 = dashed curve. */
+function nightSvg(key: string, pts: NightPt[], K: K3, rm: Set<string>, pred: (K: K3, i: number) => number, K0: K3) {
+  const idx = [...Array(25).keys()],
+    H = chourly(pts),
+    P0 = idx.map((i) => pred(K0, i)),
+    P1 = idx.map((i) => pred(K, i));
   const W = 700,
     Hh = 220,
     L = 36,
@@ -65,7 +73,7 @@ function nightSvg(key: string, pts: NightPt[], K: K3, rm: Set<string>) {
     B = 30,
     pw = W - L - R,
     ph = Hh - T - B;
-  const ymax = Math.max(3, Math.ceil(Math.max(...C.map((c) => Math.max(seeC(KDEF, c), seeC(K, c))), ...H.map((p) => p.m)) * 1.2));
+  const ymax = Math.max(3, Math.ceil(Math.max(...[...P0, ...P1].filter((v) => !isNaN(v)), ...H.map((p) => p.m)) * 1.2));
   const X = (x: number) => L + (x * pw) / 24,
     Y = (v: number) => T + ph - (Math.min(v, ymax) / ymax) * ph;
   let g = `<rect x="${X(0)}" y="${T}" width="${X(5.5) - X(0)}" height="${ph}" fill="${C_DAY}"/><rect x="${X(18)}" y="${T}" width="${X(24) - X(18)}" height="${ph}" fill="${C_DAY}"/>`;
@@ -79,14 +87,9 @@ function nightSvg(key: string, pts: NightPt[], K: K3, rm: Set<string>) {
     if (hh % 2 === 0)
       g += `<text x="${X(i)}" y="${T + ph + 16}" text-anchor="middle" font-size="11" fill="${hh === 0 ? "#e6ebf6" : C_TXT}" ${hh === 0 ? 'font-weight="500"' : ""}>${hh === 0 ? lb : hh}</text>`;
   }
-  g += pl(
-    C.map((c, i) => [X(i), Y(seeC(KDEF, c))]),
-    `stroke="${C_AR}" stroke-width="1.5" stroke-dasharray="5 4"`,
-  );
-  g += pl(
-    C.map((c, i) => [X(i), Y(seeC(K, c))]),
-    `stroke="${C_AR}" stroke-width="2.2"`,
-  );
+  const line = (P: number[]) => idx.filter((i) => !isNaN(P[i]!)).map((i) => [X(i), Y(P[i]!)] as [number, number]);
+  g += pl(line(P0), `stroke="${C_AR}" stroke-width="1.5" stroke-dasharray="5 4"`);
+  g += pl(line(P1), `stroke="${C_AR}" stroke-width="2.2"`);
   pts.forEach((p) => (g += `<circle cx="${X(p.x)}" cy="${Y(p.v)}" r="1.9" fill="${C_OBS}"/>`));
   H.forEach((p) => (g += `<rect x="${X(p.h) - 3.5}" y="${Y(p.m) - 3.5}" width="7" height="7" fill="${rm.has(hourKey(key, p.h)) ? C_RM : C_OBSD}"/>`));
   g += `<text x="${W - R}" y="${Hh - 2}" text-anchor="end" font-size="11" fill="${C_TXT}">${tr("heure TU")}</text>`;
@@ -103,6 +106,29 @@ export default function Calibrer() {
   const mesf = useUi((s) => s.mesf);
   const lock = kHidden(place, role);
   const { mine } = usePlaces();
+  const user = useUser();
+  const qc = useQueryClient();
+  // Real place the account may calibrate: measurements and model terms come from the API.
+  const editable =
+    place.real &&
+    !!place.slug &&
+    !!user &&
+    (place.kind === "mine" || user.role === "admin" || (user.role === "team" && place.slug === TEAM_SITE));
+  const slug = place.slug ?? "";
+  const mq = useQuery({ queryKey: ["measurements", slug], queryFn: () => api.measurements(slug), enabled: editable });
+  const srvNights = useMemo(() => (mq.data ? nightsFromTimes(mq.data.times, mq.data.seeing_arcsec) : new Map<string, NightPt[]>()), [mq.data]);
+  const srvKeys = [...srvNights.keys()].sort();
+  const tq = useQuery({
+    queryKey: ["terms", slug, srvKeys[0], srvKeys[srvKeys.length - 1]],
+    queryFn: () => {
+      const end = new Date(Date.parse(srvKeys[srvKeys.length - 1]! + "T12:00:00Z") + 86400000).toISOString();
+      return api.terms(slug, srvKeys[0]! + "T12:00:00Z", end);
+    },
+    enabled: editable && srvKeys.length > 0,
+  });
+  const realModel = useMemo(() => (tq.data ? termsModel(tq.data, place.K) : null), [tq.data, place.K]);
+  const [selR, setSelR] = useState<string | null>(null);
+  const reloadMeasurements = () => qc.invalidateQueries({ queryKey: ["measurements", slug] });
 
   const [st, setSt] = useState(initialStore);
   const [, bump] = useState(0);
@@ -119,6 +145,20 @@ export default function Calibrer() {
     bump((n) => n + 1);
   };
   const add = (txt: string, name: string) => {
+    if (editable) {
+      const r = parseCsv(txt, opts);
+      if (r.n < 3)
+        return setErr(`${name}${tr(" : moins de 3 mesures lisibles. Vérifie le séparateur, le format de date et l'heure (TU ou locale).")}`);
+      api
+        .addMeasurements(slug, nightPointsToIso(r.nights))
+        .then(() => {
+          setErr("");
+          setSelR(r.last);
+          return reloadMeasurements();
+        })
+        .catch((e: Error) => setErr(`${name} : ${e.message}`));
+      return;
+    }
     if (!addTo(st, txt, opts))
       return setErr(`${name}${tr(" : moins de 3 mesures lisibles. Vérifie le séparateur, le format de date et l'heure (TU ou locale).")}`);
     setErr("");
@@ -135,8 +175,17 @@ export default function Calibrer() {
     refresh();
   };
 
-  const nightsKey = [...st.nights.entries()].map(([k, v]) => k + v.length).join();
-  const cal = useLangMemo(() => calib(st.nights, filters), [nightsKey, filters]);
+  const nights = editable ? srvNights : st.nights;
+  const nightsKey = (editable ? "srv" : "") + [...nights.entries()].map(([k, v]) => k + v.length).join();
+  const cal = useLangMemo(
+    () =>
+      editable
+        ? realModel
+          ? calib(nights, filters, realModel)
+          : { P: [] as CalPair<Terms>[], K: place.K, mode: srvKeys.length ? "pas encore de prévision pour ces nuits" : "aucune mesure", F: { pics: 0, courtes: 0, top: 0, rm: new Set<string>() } }
+        : calib(nights, filters),
+    [nightsKey, filters, realModel, editable],
+  );
   const fnote = [
     filters.pics ? `${cal.F.pics} h peu fournie(s) retirée(s)` : "",
     filters.courtes ? `${cal.F.courtes} nuit(s) courte(s) retirée(s)` : "",
@@ -144,9 +193,19 @@ export default function Calibrer() {
   ]
     .filter(Boolean)
     .join(" · ");
-  const s = cstats(cal.P, K);
-  const night = st.sel && st.nights.has(st.sel) ? st.sel : null;
-  const cch = useLangMemo(() => (night ? nightSvg(night, st.nights.get(night)!, K, cal.F.rm) : ""), [night, nightsKey, K, cal]);
+  const s = editable ? cstats(cal.P as CalPair<Terms>[], K, seeTerms) : cstats(cal.P as CalPair[], K);
+  const selKey = editable ? selR : st.sel;
+  const night = selKey && nights.has(selKey) ? selKey : editable ? (srvKeys[srvKeys.length - 1] ?? null) : null;
+  const cch = useLangMemo(() => {
+    if (!night) return "";
+    const pred = editable
+      ? (k: K3, i: number) => {
+          const c = realModel?.comp(night, i);
+          return c ? seeTerms(k, c) : NaN;
+        }
+      : (k: K3, i: number) => seeC(k, comp(night)[i]!);
+    return nightSvg(night, nights.get(night)!, K, cal.F.rm, pred, editable ? place.K : KDEF);
+  }, [night, nightsKey, K, cal, realModel, editable]);
   const p2c = useLangMemo(() => (place.real ? "" : cn2Svg(K, KCAL, showObs, { mesf }, place.f)), [place, K, KCAL, showObs, mesf]);
   const corr = useLangMemo(() => corrMock(K, KCAL, place.f), [K, KCAL, place.f]);
   const hist = useLangMemo(() => lieuData(place.nom, place.f, K, KCAL), [place, K, KCAL]);
@@ -209,7 +268,7 @@ export default function Calibrer() {
           <div id="copts">
             <DataChips id="copts" />
           </div>
-          {!place.real && (
+          {(!place.real || editable) && (
             <div className="panel">
               {!lock && (
                 <>
@@ -289,7 +348,7 @@ export default function Calibrer() {
                       }}
                     />
                   </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }} hidden={editable}>
                     <button onClick={example}>{tr("+ Nuit d'exemple")}</button>
                     <button
                       onClick={() => {
@@ -304,22 +363,29 @@ export default function Calibrer() {
                 </>
               )}
               <div style={{ marginTop: 8 }}>
-                {[...st.nights.keys()].sort().map((k) => (
+                {editable && <span className="small muted">{tr(mq.isLoading ? "Chargement des mesures…" : "Mesures enregistrées sur le serveur :")} </span>}
+                {[...nights.keys()].sort().map((k) => (
                   <span
                     key={k}
                     className={"chip" + (k === night ? " on" : "")}
                     tabIndex={0}
                     onClick={() => {
+                      if (editable) return setSelR(k);
                       st.sel = k;
                       refresh();
                     }}
                   >
-                    {tr(`Nuit du ${k.slice(8)}/${k.slice(5, 7)}`)} · {st.nights.get(k)!.length} pts{" "}
+                    {tr(`Nuit du ${k.slice(8)}/${k.slice(5, 7)}`)} · {nights.get(k)!.length} pts{" "}
                     <span
                       role="button"
                       aria-label={tr("Retirer cette nuit")}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (editable) {
+                          if (window.confirm(tr(`Supprimer les mesures de la nuit du ${k.slice(8)}/${k.slice(5, 7)} ?`)))
+                            api.deleteMeasurements(slug, k).then(reloadMeasurements, (er: Error) => setErr(er.message));
+                          return;
+                        }
                         st.nights.delete(k);
                         st.sel = [...st.nights.keys()].sort().pop() ?? null;
                         refresh();
@@ -381,7 +447,7 @@ export default function Calibrer() {
               <div className="legend">
                 <span>
                   <Sw style={{ width: 16, borderTop: "2px dashed var(--arome)" }} />
-                  {tr("K par défaut (voisins)")}
+                  {tr(editable ? "K en service" : "K par défaut (voisins)")}
                 </span>
                 <span>
                   <Sw style={{ width: 16, height: 3, background: "var(--arome)" }} />

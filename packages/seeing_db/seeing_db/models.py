@@ -114,6 +114,10 @@ class Forecast(Base):
     integral_cn2: Mapped[float | None] = mapped_column(Float)
     h_coulim_m: Mapped[float | None] = mapped_column(Float)
     model_altitude_m: Mapped[float | None] = mapped_column(Float)
+    # V2bd terms at K = 1: integral of Cn2 = K_TKE * i_tke + K_conv * i_conv + K_CIS * i_cis.
+    i_tke: Mapped[float | None] = mapped_column(Float)
+    i_conv: Mapped[float | None] = mapped_column(Float)
+    i_cis: Mapped[float | None] = mapped_column(Float)
 
     run: Mapped[ModelRun] = relationship(back_populates="forecasts")
     site: Mapped[Site] = relationship()
@@ -133,6 +137,19 @@ class Cn2Profile(Base):
 
     run: Mapped[ModelRun] = relationship(back_populates="cn2_profiles")
     site: Mapped[Site] = relationship()
+
+
+class Measurement(Base):
+    """A seeing measurement of a site (seeing monitor, CSV upload), time in UTC."""
+
+    __tablename__ = "measurements"
+    __table_args__ = (UniqueConstraint("site_id", "time"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id", ondelete="CASCADE"), index=True)
+    time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    seeing_arcsec: Mapped[float] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class UserRole(enum.StrEnum):

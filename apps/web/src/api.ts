@@ -15,6 +15,19 @@ export interface Site {
   k?: number[] | null;
 }
 
+export interface Measurements {
+  times: string[];
+  seeing_arcsec: number[];
+}
+/** V2bd terms at K = 1 of each valid hour (latest run issued before it). */
+export interface Terms {
+  valid_times: string[];
+  lead_hours: number[];
+  i_tke: (number | null)[];
+  i_conv: (number | null)[];
+  i_cis: (number | null)[];
+}
+
 export interface PlaceIn {
   name: string;
   lat: number;
@@ -136,6 +149,13 @@ export const api = {
   createPlace: (b: PlaceIn) => post<Site>("/api/places", b),
   updatePlace: (slug: string, b: PlacePatch) => send<Site>("PATCH", `/api/places/${encodeURIComponent(slug)}`, b),
   deletePlace: (slug: string) => send<void>("DELETE", `/api/places/${encodeURIComponent(slug)}`),
+  measurements: (slug: string) => get<Measurements>(`/api/sites/${encodeURIComponent(slug)}/measurements`),
+  addMeasurements: (slug: string, points: [string, number][]) =>
+    post<{ stored: number; rejected: number }>(`/api/sites/${encodeURIComponent(slug)}/measurements`, { points }),
+  deleteMeasurements: (slug: string, night?: string) =>
+    send<void>("DELETE", `/api/sites/${encodeURIComponent(slug)}/measurements${night ? `?night=${night}` : ""}`),
+  terms: (slug: string, from: string, to: string) =>
+    get<Terms>(`/api/sites/${encodeURIComponent(slug)}/terms?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   latestRun: () => get<Run>("/api/runs/latest"),
   forecast: (slug: string, run = "latest") =>
     get<Forecast>(`/api/sites/${encodeURIComponent(slug)}/forecast?run=${encodeURIComponent(run)}`),
