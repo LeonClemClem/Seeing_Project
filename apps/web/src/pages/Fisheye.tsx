@@ -114,7 +114,7 @@ export default function Fisheye() {
   const vis = (alt: number, az: number) => alt >= ELMIN && (!opt.hor || alt >= horizon(az));
   const seeSky = (i: number, alt: number, az: number) => {
     const fr = frameAt(i);
-    if (fe && fr) return realSee(fe, fr, K, alt, az);
+    if (fe) return fr ? realSee(fe, fr, K, alt, az) : NaN; // hour not covered by the run: no value
     return SZ(i) * Math.pow(airmass(alt), 0.6) * (1 + 0.15 * Math.cos((az - 250) * D2R) * (1 - alt / 90));
   };
   const best = (o: CatObj) => {
@@ -156,7 +156,8 @@ export default function Fisheye() {
         }
         const alt = 90 - (r / FR) * 90,
           az = (Math.atan2(-dx, dy) / D2R + 360) % 360;
-        let col: number[] = vis(alt, az) ? turbo(seeSky(fcur, alt, az) / 8) : [55, 62, 80];
+        const s = vis(alt, az) ? seeSky(fcur, alt, az) : NaN;
+        let col: number[] = isNaN(s) ? [55, 62, 80] : turbo(s / 8);
         if (opt.nua && vis(alt, az)) {
           const d = Math.hypot((((az - 60 - fcur * 8 + 540) % 360) - 180) * Math.cos(alt * D2R), alt - 30),
             f = Math.max(0, 1 - d / 30) * 0.75;
@@ -373,6 +374,7 @@ export default function Fisheye() {
             />
             <span className="mono" style={{ minWidth: 76, textAlign: "right", fontWeight: 500 }}>
               {`${pad2(d.getUTCDate())}/${pad2(d.getUTCMonth() + 1)} · ${pad2(d.getUTCHours())}h00 ${tr("TU")}`}
+              {fe && !frameAt(fcur) ? tr(" · pas de prévision à cette heure") : ""}
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>

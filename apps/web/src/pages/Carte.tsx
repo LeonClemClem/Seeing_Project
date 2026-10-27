@@ -245,14 +245,15 @@ export default function Carte() {
     [mode, MI, night.i0, night.i1],
   );
 
-  /* Real map: the frame of the chosen hour, or the mean seeing of the night's frames. */
-  const sample = useMemo(() => {
+  /* Real map: the frame of the chosen hour, or the mean seeing of the night's frames. Hours the run
+     does not cover are left out (no interpolation, no fictitious field): no value at all for a
+     missing hour, and the mean says which hours it really uses. */
+  const real = useMemo(() => {
     if (!gmap) return null;
     const idx = mode === "m" ? [...Array(night.i1 - night.i0 + 1)].map((_, k) => night.i0 + k).filter(inMean) : [MI];
-    const arrs = idx
-      .map((i) => gmap.frames.get(Math.round((frameT(i).getTime() - RUN0) / 3600000)))
-      .filter((a): a is Float32Array => !!a);
-    if (!arrs.length) return null;
+    const used = idx.filter((i) => gmap.frames.has(Math.round((frameT(i).getTime() - RUN0) / 3600000)));
+    const arrs = used.map((i) => gmap.frames.get(Math.round((frameT(i).getTime() - RUN0) / 3600000))!);
+    if (!arrs.length) return { sample: (): number => NaN, hours: [] as number[], expected: idx.length };
     const n = arrs[0]!.length,
       mean = new Float32Array(n);
     for (let j = 0; j < n; j++) {
@@ -267,8 +268,9 @@ export default function Carte() {
       }
       mean[j] = c ? s / c : NaN;
     }
-    return sampler(gmap.meta.grid, mean);
+    return { sample: sampler(gmap.meta.grid, mean), hours: used.map((i) => MAPH[i]!), expected: idx.length };
   }, [gmap, mode, MI, night.i0, night.i1, frameT, RUN0]);
+  const sample = real?.sample ?? null;
 
   const toXY = useCallback(
     (la: number, lo: number) => [((lo - VW.lo0) / (VW.lo1 - VW.lo0)) * CW, ((VW.la1 - la) / (VW.la1 - VW.la0)) * CH] as const,
@@ -601,10 +603,19 @@ export default function Carte() {
 
   const fd = frameT(MI),
     lead = Math.round((fd.getTime() - RUN0) / 3600000);
+  // Hour range really averaged (the run may stop before the end of the night).
+  const meanRange = (() => {
+    const h = real?.hours ?? [];
+    if (!real) return "20h–04h TU";
+    if (!h.length) return "aucune heure couverte par le run";
+    const txt = `${pad2(h[0]!)}h–${pad2(h[h.length - 1]!)}h TU`;
+    return h.length < real.expected ? `${txt}, run incomplet : ${h.length} h sur ${real.expected}` : txt;
+  })();
   const hourLabel =
     mode === "m"
-      ? tr(`moyenne nuit du ${night.lab} (20h–04h TU)`)
-      : tr(`${JS[fd.getUTCDay()]} ${pad2(fd.getUTCDate())}/${pad2(fd.getUTCMonth() + 1)} · ${pad2(fd.getUTCHours())}h TU · +${lead} h`);
+      ? tr(`moyenne nuit du ${night.lab} (${meanRange})`)
+      : tr(`${JS[fd.getUTCDay()]} ${pad2(fd.getUTCDate())}/${pad2(fd.getUTCMonth() + 1)} · ${pad2(fd.getUTCHours())}h TU · +${lead} h`) +
+        (real && !real.hours.length ? tr(" · pas de prévision à cette heure") : "");
   const runL = runLabel(RUN0),
     endL = new Date(RUN0 + LEADMAX * 3600000);
   const nextRun = pad2(new Date(RUN0 + 6 * 3600000).getUTCHours()) + "Z";
