@@ -5,6 +5,8 @@
 - `POST /api/admin/sites/{slug}/forecasts` (administrator): forecast runs computed by the research scripts
   (V2bd terms at K = 1 per lead hour), stored as model runs so that calibration uses them. Rows that the
   batch already computed are never replaced.
+- `POST /api/admin/sites/{slug}/cn2` (administrator): Cn2 profiles of research runs (display grid), so
+  that the week view of the Cn2 panel goes back to the research runs. Existing profiles are kept.
 - `GET /api/sites/{slug}/history`: the stored history; K and integrals only for those who may calibrate.
 """
 
@@ -19,7 +21,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from seeing_api.api import TEAM_SITE, SessionDep, get_site
 from seeing_api.auth import CurrentUser, require_json, require_role
-from seeing_db import Forecast, ModelRun, RunStatus, Site, SiteHistory, User, UserRole
+from seeing_db import Cn2Profile, Forecast, ModelRun, RunStatus, Site, SiteHistory, User, UserRole
 
 admin = APIRouter(prefix="/api/admin", dependencies=[Depends(require_json)])
 public = APIRouter(prefix="/api/sites")
@@ -93,6 +95,46 @@ def post_forecasts(slug: str, body: RunsIn, session: SessionDep, user: Admin) ->
             skipped += len(values) - inserted
     session.commit()
     return {"site": slug, "new_runs": added_runs, "rows": rows, "kept_existing": skipped, "too_recent_runs": too_recent}
+
+
+class Cn2RunIn(BaseModel):
+    run_time: datetime
+    # [lead_hour, [Cn2 on heights_m, null where undefined]]
+    hours: list[tuple[int, list[float | None]]] = Field(max_length=200)
+
+
+class Cn2In(BaseModel):
+    heights_m: list[float] = Field(min_length=2, max_length=400)
+    runs: list[Cn2RunIn] = Field(min_length=1, max_length=50)
+
+
+@admin.post("/sites/{slug}/cn2")
+def post_cn2(slug: str, body: Cn2In, session: SessionDep, user: Admin) -> dict:
+    site = _site(session, slug)
+    newest = session.scalar(select(func.max(ModelRun.run_time)))
+    rows = skipped = too_recent = 0
+    for r in body.runs:
+        rt = r.run_time.replace(tzinfo=UTC) if r.run_time.tzinfo is None else r.run_time.astimezone(UTC)
+        run = session.scalar(select(ModelRun).where(ModelRun.run_time == rt))
+        if run is None and newest is not None and rt > newest:
+            too_recent += 1
+            continue
+        if run is None:
+            run = ModelRun(run_time=rt, status=RunStatus.success, started_at=rt, finished_at=rt)
+            session.add(run)
+            session.flush()
+        values = [
+            dict(run_id=run.id, site_id=site.id, valid_time=rt + timedelta(hours=lead), lead_hour=lead,
+                 heights_m=body.heights_m, cn2=[v if v is None or math.isfinite(v) else None for v in cn2])
+            for lead, cn2 in r.hours if len(cn2) == len(body.heights_m)
+        ]
+        if values:
+            inserted = len(session.execute(pg_insert(Cn2Profile).values(values).on_conflict_do_nothing(
+                index_elements=["run_id", "site_id", "lead_hour"]).returning(Cn2Profile.id)).all())
+            rows += inserted
+            skipped += len(values) - inserted
+    session.commit()
+    return {"site": slug, "profiles": rows, "kept_existing": skipped, "too_recent_runs": too_recent}
 
 
 @public.get("/{slug}/history")

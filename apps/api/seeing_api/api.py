@@ -2,13 +2,14 @@
 
 import hashlib
 import math
+from datetime import timedelta
 import os
 import zlib
 from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from seeing_api.auth import NO_STORE, CurrentUser, user_out
@@ -20,6 +21,30 @@ router = APIRouter(prefix="/api")
 
 SessionDep = Annotated[Session, Depends(get_session)]
 RunParam = Annotated[str, Query(description="`latest` or an ISO 8601 run time, e.g. 2026-10-13T12:00Z")]
+ViewParam = Annotated[
+    str,
+    Query(pattern="^(run|week)$", description="`run`: the run only; `week`: up to 7 days of main runs stitched, then the run"),
+]
+WEEK = timedelta(days=7)
+
+
+def stitched(session: Session, model, site_id: int, run: ModelRun):
+    """Rows of `model` (Forecast or Cn2Profile) for every valid hour from 7 days before `run` to the end
+    of `run`: for each hour, the main run (00/06/12/18Z) issued last before it, i.e. the shortest lead,
+    other runs only to fill gaps; runs after `run` are ignored."""
+    ranked = (
+        select(model.id, func.row_number().over(
+            partition_by=model.valid_time,
+            order_by=(func.mod(func.extract("hour", ModelRun.run_time), 6) != 0, model.lead_hour),
+        ).label("rk"))
+        .join(ModelRun, ModelRun.id == model.run_id)
+        .where(model.site_id == site_id, ModelRun.status == RunStatus.success, ModelRun.run_time <= run.run_time,
+               model.valid_time >= run.run_time - WEEK)
+        .subquery()
+    )
+    return session.scalars(
+        select(model).join(ranked, ranked.c.id == model.id).where(ranked.c.rk == 1).order_by(model.valid_time)
+    ).all()
 
 IAP_EMAIL_HEADER = "X-Goog-Authenticated-User-Email"
 
@@ -123,14 +148,19 @@ def latest_run(session: SessionDep) -> RunOut:
 
 
 @router.get("/sites/{slug}/forecast", response_model=ForecastOut)
-def site_forecast(slug: str, session: SessionDep, user: CurrentUser, run: RunParam = "latest") -> ForecastOut:
+def site_forecast(
+    slug: str, session: SessionDep, user: CurrentUser, run: RunParam = "latest", view: ViewParam = "run"
+) -> ForecastOut:
     site = get_site(session, slug, user)
     model_run = resolve_run(session, run)
-    rows = session.scalars(
-        select(Forecast)
-        .where(Forecast.run_id == model_run.id, Forecast.site_id == site.id)
-        .order_by(Forecast.lead_hour)
-    )
+    if view == "week":
+        rows = stitched(session, Forecast, site.id, model_run)
+    else:
+        rows = session.scalars(
+            select(Forecast)
+            .where(Forecast.run_id == model_run.id, Forecast.site_id == site.id)
+            .order_by(Forecast.lead_hour)
+        )
     points = [
         ForecastPoint(
             lead_hour=f.lead_hour,
@@ -139,6 +169,7 @@ def site_forecast(slug: str, session: SessionDep, user: CurrentUser, run: RunPar
             r0_m=clean(f.r0_m),
             integral_cn2=clean(f.integral_cn2),
             h_coulim_m=clean(f.h_coulim_m),
+            model_altitude_m=clean(f.model_altitude_m),
             variables=f.variables,
         )
         for f in rows
@@ -152,16 +183,21 @@ def _height_key(h: float) -> float:
 
 
 @router.get("/sites/{slug}/cn2", response_model=Cn2Out)
-def site_cn2(slug: str, session: SessionDep, user: CurrentUser, run: RunParam = "latest") -> Cn2Out:
+def site_cn2(
+    slug: str, session: SessionDep, user: CurrentUser, run: RunParam = "latest", view: ViewParam = "run"
+) -> Cn2Out:
     site = get_site(session, slug, user)
     model_run = resolve_run(session, run)
-    profiles = list(
-        session.scalars(
-            select(Cn2Profile)
-            .where(Cn2Profile.run_id == model_run.id, Cn2Profile.site_id == site.id)
-            .order_by(Cn2Profile.lead_hour)
+    if view == "week":
+        profiles = list(stitched(session, Cn2Profile, site.id, model_run))
+    else:
+        profiles = list(
+            session.scalars(
+                select(Cn2Profile)
+                .where(Cn2Profile.run_id == model_run.id, Cn2Profile.site_id == site.id)
+                .order_by(Cn2Profile.lead_hour)
+            )
         )
-    )
     heights = sorted({_height_key(h) for p in profiles for h in p.heights_m if h is not None and math.isfinite(h)})
     index = {h: i for i, h in enumerate(heights)}
     matrix: list[list[float | None]] = []

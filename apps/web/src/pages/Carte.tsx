@@ -289,7 +289,8 @@ export default function Carte() {
       D = img.data;
     for (let j = 0; j < CW * CH; j++) {
       const p = j * 4;
-      if (C.sea[j]) {
+      // The real map covers the whole AROME domain, sea included; the fictitious field is land only.
+      if (C.sea[j] && !sample) {
         D[p] = 27;
         D[p + 1] = 39;
         D[p + 2] = 64;
@@ -800,8 +801,8 @@ export default function Carte() {
                 {tr("Relief AROME, isolignes tous les 1000 m (500 m en zoom)")}
               </span>
               <span>
-                <span className="sw" style={{ width: 14, height: 12, background: "#1b2740" }} />
-                {tr("Mer, hors bande côtière : non calculée")}
+                <span className="sw" style={{ width: 14, height: 12, background: "rgb(60,66,80)" }} />
+                {tr("Pas de prévision à cette heure (run incomplet)")}
               </span>
             </div>
           </div>
@@ -816,7 +817,7 @@ export default function Carte() {
             </p>
             <p className="note">
               {tr(
-                "Calcul global sur tout le domaine AROME (terres et bande côtière de 106 km) toutes les 6 heures, à chaque run principal : 00Z, 06Z, 12Z, 18Z ; les runs secondaires ne sont pas utilisés. La carte est calibrée une fois pour toutes par l'administrateur : elle ne change pas avec la calibration des lieux. Hors du domaine, ou en mer au-delà de la bande côtière, un lieu passe par la file d'attente.",
+                "Calcul global sur tout le domaine AROME, terre et mer, toutes les 6 heures, à chaque run principal : 00Z, 06Z, 12Z, 18Z ; les runs secondaires ne sont pas utilisés. La carte est calibrée une fois pour toutes par l'administrateur : elle ne change pas avec la calibration des lieux. Hors du domaine AROME, un lieu passe par la file d'attente.",
               )}
             </p>
           </div>

@@ -8,7 +8,9 @@ Pour chaque site de historique_sites.SITES, envoie au site :
   2. les previsions V2bd calculees par la recherche, run par run, avec les integrales a K = 1
      (caches cache_validation, comme les figures) -> historique et calage. Les heures deja
      calculees par le serveur ne sont jamais remplacees ;
-  3. l'historique tel qu'affiche par la maquette (export_lieux_site.py : periodes, paires horaires).
+  3. l'historique tel qu'affiche par la maquette (export_lieux_site.py : periodes, paires horaires) ;
+  4. les profils Cn2 des runs de recherche (pickles cache_validation/panneaux, V2bd aux K du site),
+     sur la grille d'affichage du serveur (10 m puis tous les 100 m) -> vue "Semaine" du panneau Cn2.
 
 Il faut un compte ADMINISTRATEUR du site : e-mail et mot de passe sont demandes au lancement
 (le mot de passe n'est ni affiche ni enregistre).
@@ -28,6 +30,7 @@ import argparse, getpass, importlib.util, json, math, os, shutil, subprocess
 import pandas as pd
 
 URL_PROD = "https://seeing-web-prod-62naw3atjq-uc.a.run.app"
+WEEK_Z = None   # grille des zones Cn2 de export_lieux_site (chargee au lancement)
 # Passage d'IAP : compte de service autorise et identifiant OAuth d'IAP du site de production (pas des secrets).
 COMPTE_IAP = "seeing-uploader@project-astrarome.iam.gserviceaccount.com"
 CLIENT_IAP = "5123733464-g1cleua3a3djp1s5ajrvmlj0916dnle8.apps.googleusercontent.com"
@@ -56,6 +59,70 @@ def propre(x):
     if isinstance(x, (list, tuple)):
         return [propre(v) for v in x]
     return x
+
+
+GRILLE_CN2 = [10.0] + [110.0 + 100.0 * k for k in range(159)]   # grille d'affichage du serveur, jusqu'a 15 910 m
+MAILLES = {"Copernic": ("ancienne", "nouvelle")}                 # Copernic : moyenne des deux mailles (comme la maquette)
+
+
+# K des pickles du 09/10, qui ne les enregistrent pas (figure_cn2_sites.K_CALCUL_09_10)
+K_ANCIENS = {"Drôme": (15.8, 11.2, 0.1), "Copernic": (1, 30, 0.1), "Saint-Veran": (6, 12, 0.1),
+             "OHP": (0.53, 32.6, 0.515), "Seeing monitor 5": (2.32, 65.5, 0.002)}
+
+
+def heures_run(ex, nom, maille, run):
+    """export_lieux_site.Exporter.week_hours, y compris pour les anciens pickles sans "K"."""
+    try:
+        return ex.week_hours(nom, maille, run)
+    except KeyError:
+        k = K_ANCIENS.get(nom)
+        if not k:
+            return {}
+        import pickle
+        orig = pickle.load
+
+        def load(fh):
+            p = orig(fh)
+            p.setdefault("K", k)
+            return p
+        pickle.load = load
+        try:
+            return ex.week_hours(nom, maille, run)
+        except KeyError:   # pickles plus anciens, sans les termes V2bd : non utilisables
+            return {}
+        finally:
+            pickle.load = orig
+
+
+def runs_cn2(ex, nom, K):
+    """Profils Cn2 V2bd aux K du site, run par run, depuis les pickles des panneaux : [{run_time, hours}]."""
+    import numpy as np
+    mailles = MAILLES.get(nom, ("site",))
+    runs = sorted({f.stem.rsplit("_", 2)[-2] + "_" + f.stem.rsplit("_", 1)[-1]
+                   for f in ex.panels.glob(f"pan_{nom}_{mailles[-1]}_*.pkl")})
+    out = []
+    for run in runs:
+        par_maille = [heures_run(ex, nom, m, run) for m in mailles]
+        if not all(par_maille):
+            continue
+        rt = pd.Timestamp(run[:10]) + pd.Timedelta(hours=int(run[11:13]))
+        heures = []
+        for t in sorted(set.intersection(*(set(d) for d in par_maille))):
+            recs = [d[t] for d in par_maille]
+            if not all(r["ok"] for r in recs):
+                continue
+            cn2 = np.mean([K[0] * r["zones"][0] + K[2] * r["zones"][1] + K[1] * r["zones"][2] for r in recs], axis=0)
+            zz = np.asarray(WEEK_Z, float)
+            ok = np.isfinite(cn2) & (cn2 > 0)
+            if ok.sum() < 2:
+                continue
+            # interpolation en log sur la grille du serveur, rien au-dessus du dernier niveau calcule
+            v = np.interp(GRILLE_CN2, zz[ok], np.log10(cn2[ok]), left=np.nan, right=np.nan)
+            heures.append([int(round((t - rt) / pd.Timedelta(hours=1))),
+                           [None if not np.isfinite(x) else float(f"{10 ** x:.4g}") for x in v]])
+        if heures:
+            out.append({"run_time": rt.strftime("%Y-%m-%dT%H:%M:00Z"), "hours": heures})
+    return out
 
 
 def runs_recherche(h, tag):
@@ -146,7 +213,7 @@ def main(argv=None):
     p = argparse.ArgumentParser(description="Envoi des donnees des seeing monitors sur le site web.")
     p.add_argument("--url", default=URL_PROD)
     p.add_argument("--sites", default="", help="noms separes par des virgules (defaut : tous)")
-    p.add_argument("--sans", default="", help="parmi mesures,previsions,historique")
+    p.add_argument("--sans", default="", help="parmi mesures,previsions,historique,cn2")
     p.add_argument("--essai", action="store_true", help="lire et compter sans rien envoyer")
     p.add_argument("--sans-iap", action="store_true", help="ne pas demander de jeton IAP (site public)")
     p.add_argument("--mdp-coffre", action="store_true",
@@ -155,7 +222,10 @@ def main(argv=None):
     sans = {x.strip() for x in a.sans.split(",") if x.strip()}
 
     h = charge("historique_sites", "historique_sites.py")
-    ex = charge("export_lieux_site", "export_lieux_site.py").Exporter() if "historique" not in sans else None
+    mod_ex = charge("export_lieux_site", "export_lieux_site.py")
+    global WEEK_Z
+    WEEK_Z = mod_ex.WEEK_Z
+    ex = mod_ex.Exporter() if not {"historique", "cn2"} <= sans else None
     noms = [n for n in h.SITES if not a.sites or n in {x.strip() for x in a.sites.split(",")}]
     site = None
     if not a.essai:
@@ -186,7 +256,16 @@ def main(argv=None):
                     res = {k: res[k] + r[k] for k in res}
             ligne.append(f"runs {len(runs)}" + (f" (heures ajoutees {res['rows']}, deja sur le serveur {res['kept_existing']}, "
                                                 f"runs plus recents que le serveur {res['too_recent_runs']})" if site else ""))
-        if ex is not None:
+        if ex is not None and "cn2" not in sans:
+            K = tuple(h.SITES[nom]["K_new"]) if not h.est_jour_nuit(h.SITES[nom]["K_new"]) else tuple(h.SITES[nom]["K_new"]["nuit"])
+            runs = runs_cn2(ex, nom, K)
+            n = 0
+            for run in runs:
+                if site:
+                    r = site.envoie("POST", f"/api/admin/sites/{slug}/cn2", {"heights_m": GRILLE_CN2, "runs": [run]})
+                    n += r["profiles"]
+            ligne.append(f"cn2 {len(runs)} runs" + (f" ({n} profils ajoutes)" if site else ""))
+        if ex is not None and "historique" not in sans:
             item = propre(ex.site(nom, h.SITES[nom]))
             taille = len(json.dumps(item)) // 1024
             if site:

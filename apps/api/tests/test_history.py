@@ -66,3 +66,13 @@ def test_forecast_import_keeps_batch_rows():
     assert terms["i_tke"] == [0.0, 1e-13]
     late = {"run_time": "2026-10-20T00:00:00Z", "hours": [[0, 100.0, 0.0, 0.0, 1e-14]]}
     assert adm.post("/api/admin/sites/ohp/forecasts", json={"runs": [late]}).json()["too_recent_runs"] == 1  # newer than every stored run: skipped
+
+
+def test_cn2_import_for_the_week_view():
+    adm = client_for("adm@example.org", UserRole.admin)
+    body = {"heights_m": [10.0, 110.0, 210.0], "runs": [{"run_time": "2026-10-14T00:00:00Z",
+            "hours": [[1, [1e-15, None, 1e-17]], [2, [2e-15, 1e-16, None]], [3, [1e-15]]]}]}
+    r = adm.post("/api/admin/sites/ohp/cn2", json=body).json()
+    assert r == {"site": "ohp", "profiles": 2, "kept_existing": 0, "too_recent_runs": 0}  # wrong length skipped
+    cn = adm.get("/api/sites/ohp/cn2", params={"run": "2026-10-14T00:00Z"}).json()
+    assert cn["heights_m"] == [10.0, 110.0, 210.0] and cn["cn2"][0] == [1e-15, None, 1e-17]

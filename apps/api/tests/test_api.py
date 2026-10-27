@@ -161,3 +161,18 @@ def test_fisheye_from_the_map(client, session):
     el = body["elevations"].index(30)
     assert f["j_high"][el][9] == pytest.approx(j / 2 / math.sin(math.radians(30)), rel=1e-3)
     assert client.get("/api/fisheye", params={"lat": 30.0, "lon": 5.5}).status_code == 404
+
+
+def test_week_view_stitches_main_runs(client, session):
+    # 00Z (3 h), 03Z secondary (3 h), 06Z (3 h): week view = 00Z, 01Z, 02Z from 00Z, 03Z-05Z from 03Z
+    # (fills the gap), 06Z-08Z from 06Z; the run view keeps the 06Z run only.
+    add_run(session, T0, seeing=[1.0, 1.1, 1.2])
+    add_run(session, T0 + timedelta(hours=3), seeing=[2.0, 2.1, 2.2])
+    add_run(session, T0 + timedelta(hours=6), seeing=[3.0, 3.1, 3.2])
+    wk = client.get("/api/sites/saint-veran/forecast", params={"view": "week"}).json()
+    assert [p["seeing_arcsec"] for p in wk["points"]] == [1.0, 1.1, 1.2, 2.0, 2.1, 2.2, 3.0, 3.1, 3.2]
+    run = client.get("/api/sites/saint-veran/forecast").json()
+    assert [p["seeing_arcsec"] for p in run["points"]] == [3.0, 3.1, 3.2]
+    cn = client.get("/api/sites/saint-veran/cn2", params={"view": "week"}).json()
+    assert len(cn["valid_times"]) == 9 and cn["run_time"] == "2026-10-13T06:00:00Z"
+    assert client.get("/api/sites/saint-veran/cn2", params={"view": "x"}).status_code == 422
