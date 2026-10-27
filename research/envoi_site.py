@@ -12,6 +12,8 @@ Pour chaque site de historique_sites.SITES, envoie au site :
 
 Il faut un compte ADMINISTRATEUR du site : e-mail et mot de passe sont demandes au lancement
 (le mot de passe n'est ni affiche ni enregistre).
+Tant que le site est derriere IAP (connexion Google), le script demande a gcloud un jeton d'identite
+de ton compte Google (gcloud auth print-identity-token) et l'envoie dans l'en-tete Authorization (le site, lui, utilise un cookie).
 
 Usage : python envoi_site.py [--url URL] [--sites "OHP,Drôme"] [--sans mesures,previsions,historique] [--essai]
         --essai : lit et compte tout, sans rien envoyer (pas de connexion).
@@ -19,7 +21,7 @@ Usage : python envoi_site.py [--url URL] [--sites "OHP,Drôme"] [--sans mesures,
 from pathlib import Path
 import sys as _sys; _sys.path.insert(0, str(Path(__file__).resolve().parent))  # chemins.py est a cote
 from chemins import CACHE
-import argparse, getpass, importlib.util, json, math
+import argparse, getpass, importlib.util, json, math, os, shutil, subprocess
 
 import pandas as pd
 
@@ -72,10 +74,38 @@ def runs_recherche(h, tag):
     return out
 
 
+def gcloud():
+    """Chemin de gcloud (installation Windows par defaut si absent du PATH)."""
+    g = shutil.which("gcloud")
+    if g:
+        return g
+    base = Path(os.environ.get("LOCALAPPDATA", "")) / "Google/Cloud SDK/google-cloud-sdk"
+    py = base / "platform/bundledpython/python.exe"
+    if py.exists():
+        os.environ.setdefault("CLOUDSDK_PYTHON", str(py))
+    g = base / "bin/gcloud.cmd"
+    return str(g) if g.exists() else None
+
+
+def jeton_iap():
+    """Jeton d'identite Google du compte gcloud (pour passer IAP), ou None."""
+    g = gcloud()
+    if not g:
+        return None
+    r = subprocess.run([g, "auth", "print-identity-token"], capture_output=True, text=True)
+    return r.stdout.strip() or None
+
+
 class Site:
-    def __init__(self, url):
+    def __init__(self, url, iap=True):
         import requests
         self.url, self.s = url.rstrip("/"), requests.Session()
+        if iap:
+            jeton = jeton_iap()
+            if jeton:
+                self.s.headers["Authorization"] = "Bearer " + jeton
+            else:
+                print("gcloud introuvable ou non connecte : pas de jeton IAP (lance 'gcloud auth login').")
 
     def connexion(self):
         email = input("E-mail du compte administrateur : ").strip()
@@ -83,6 +113,9 @@ class Site:
         r = self.s.post(self.url + "/api/auth/login", json={"email": email, "password": mdp})
         del mdp
         if r.status_code != 200:
+            if "IAP" in r.text:
+                raise SystemExit("Refuse par IAP (protection Google du site) : le compte gcloud n'est pas autorise "
+                                 "ou le jeton n'est pas accepte. " + r.text[:200])
             raise SystemExit(f"Connexion refusee ({r.status_code}) : {r.text[:200]}")
         if r.json().get("role") != "admin":
             raise SystemExit("Ce compte n'est pas administrateur.")
@@ -100,6 +133,7 @@ def main(argv=None):
     p.add_argument("--sites", default="", help="noms separes par des virgules (defaut : tous)")
     p.add_argument("--sans", default="", help="parmi mesures,previsions,historique")
     p.add_argument("--essai", action="store_true", help="lire et compter sans rien envoyer")
+    p.add_argument("--sans-iap", action="store_true", help="ne pas demander de jeton IAP (site public)")
     a = p.parse_args(argv)
     sans = {x.strip() for x in a.sans.split(",") if x.strip()}
 
@@ -108,7 +142,7 @@ def main(argv=None):
     noms = [n for n in h.SITES if not a.sites or n in {x.strip() for x in a.sites.split(",")}]
     site = None
     if not a.essai:
-        site = Site(a.url)
+        site = Site(a.url, iap=not a.sans_iap)
         site.connexion()
 
     for nom in noms:
