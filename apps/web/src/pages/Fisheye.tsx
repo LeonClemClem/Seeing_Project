@@ -105,6 +105,8 @@ export default function Fisheye() {
     return fe.frames.find((f) => f.lead_hour === lead);
   };
   const K: K3 = cal === "mine" ? place.K : fe ? [fe.k[0]!, fe.k[1]!, fe.k[2]!] : KDEF;
+  // az kept so that every caller can pass (alt, az): there is no horizon profile (it was fictitious)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const vis = (alt: number, _az: number) => alt >= ELMIN;
   const seeSky = (i: number, alt: number, az: number) => {
     const fr = frameAt(i);
