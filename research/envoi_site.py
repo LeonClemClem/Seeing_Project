@@ -12,18 +12,25 @@ Pour chaque site de historique_sites.SITES, envoie au site :
 
 Il faut un compte ADMINISTRATEUR du site : e-mail et mot de passe sont demandes au lancement
 (le mot de passe n'est ni affiche ni enregistre).
+Tant que le site est derriere IAP (connexion Google), le script demande a gcloud un jeton d'identite
+du compte de service seeing-uploader (autorise a passer IAP, rien d'autre), au nom de ton compte gcloud,
+et l'envoie dans l'en-tete Authorization (le site, lui, utilise un cookie).
 
 Usage : python envoi_site.py [--url URL] [--sites "OHP,Drôme"] [--sans mesures,previsions,historique] [--essai]
+                              [--mdp-coffre]
         --essai : lit et compte tout, sans rien envoyer (pas de connexion).
 """
 from pathlib import Path
 import sys as _sys; _sys.path.insert(0, str(Path(__file__).resolve().parent))  # chemins.py est a cote
 from chemins import CACHE
-import argparse, getpass, importlib.util, json, math
+import argparse, getpass, importlib.util, json, math, os, shutil, subprocess
 
 import pandas as pd
 
 URL_PROD = "https://seeing-web-prod-62naw3atjq-uc.a.run.app"
+# Passage d'IAP : compte de service autorise et identifiant OAuth d'IAP du site de production (pas des secrets).
+COMPTE_IAP = "seeing-uploader@project-astrarome.iam.gserviceaccount.com"
+CLIENT_IAP = "5123733464-g1cleua3a3djp1s5ajrvmlj0916dnle8.apps.googleusercontent.com"
 # nom dans historique_sites -> site du serveur
 SLUGS = {"Drôme": "verclause", "Copernic": "copernic-gap", "Saint-Veran": "saint-veran", "OHP": "ohp",
          "Seeing monitor 5": "seeing-monitor-5", "Pic du Midi": "pic-du-midi", "Cosmodrome": "cosmodrome"}
@@ -72,17 +79,58 @@ def runs_recherche(h, tag):
     return out
 
 
+def gcloud():
+    """Chemin de gcloud (installation Windows par defaut si absent du PATH)."""
+    g = shutil.which("gcloud")
+    if g:
+        return g
+    base = Path(os.environ.get("LOCALAPPDATA", "")) / "Google/Cloud SDK/google-cloud-sdk"
+    py = base / "platform/bundledpython/python.exe"
+    if py.exists():
+        os.environ.setdefault("CLOUDSDK_PYTHON", str(py))
+    g = base / "bin/gcloud.cmd"
+    return str(g) if g.exists() else None
+
+
+def jeton_iap():
+    """Jeton d'identite Google du compte gcloud (pour passer IAP), ou None."""
+    g = gcloud()
+    if not g:
+        return None
+    r = subprocess.run([g, "auth", "print-identity-token", f"--impersonate-service-account={COMPTE_IAP}",
+                        f"--audiences={CLIENT_IAP}", "--include-email"], capture_output=True, text=True)
+    if not r.stdout.strip():
+        print("Pas de jeton IAP :", r.stderr.strip()[-300:])
+    return r.stdout.strip() or None
+
+
 class Site:
-    def __init__(self, url):
+    def __init__(self, url, iap=True):
         import requests
         self.url, self.s = url.rstrip("/"), requests.Session()
+        if iap:
+            jeton = jeton_iap()
+            if jeton:
+                self.s.headers["Authorization"] = "Bearer " + jeton
+            else:
+                print("gcloud introuvable ou non connecte : pas de jeton IAP (lance 'gcloud auth login').")
 
-    def connexion(self):
+    def connexion(self, coffre=False):
         email = input("E-mail du compte administrateur : ").strip()
-        mdp = getpass.getpass("Mot de passe (non affiche) : ")
+        if coffre:   # mot de passe lu par gcloud dans le coffre (Secret Manager), jamais affiche
+            r = subprocess.run([gcloud(), "secrets", "versions", "access", "latest", "--secret=user-bootstrap-password-prod",
+                                "--project=project-astrarome"], capture_output=True, text=True)
+            mdp = r.stdout
+            if not mdp:
+                raise SystemExit("Mot de passe introuvable dans le coffre : " + r.stderr.strip()[-200:])
+        else:
+            mdp = getpass.getpass("Mot de passe (non affiche ; coller avec un clic droit) : ").strip()
         r = self.s.post(self.url + "/api/auth/login", json={"email": email, "password": mdp})
         del mdp
         if r.status_code != 200:
+            if "IAP" in r.text:
+                raise SystemExit("Refuse par IAP (protection Google du site) : le compte gcloud n'est pas autorise "
+                                 "ou le jeton n'est pas accepte. " + r.text[:200])
             raise SystemExit(f"Connexion refusee ({r.status_code}) : {r.text[:200]}")
         if r.json().get("role") != "admin":
             raise SystemExit("Ce compte n'est pas administrateur.")
@@ -100,6 +148,9 @@ def main(argv=None):
     p.add_argument("--sites", default="", help="noms separes par des virgules (defaut : tous)")
     p.add_argument("--sans", default="", help="parmi mesures,previsions,historique")
     p.add_argument("--essai", action="store_true", help="lire et compter sans rien envoyer")
+    p.add_argument("--sans-iap", action="store_true", help="ne pas demander de jeton IAP (site public)")
+    p.add_argument("--mdp-coffre", action="store_true",
+                   help="lire le mot de passe dans le coffre Google (user-bootstrap-password-prod) au lieu de le taper")
     a = p.parse_args(argv)
     sans = {x.strip() for x in a.sans.split(",") if x.strip()}
 
@@ -108,8 +159,8 @@ def main(argv=None):
     noms = [n for n in h.SITES if not a.sites or n in {x.strip() for x in a.sites.split(",")}]
     site = None
     if not a.essai:
-        site = Site(a.url)
-        site.connexion()
+        site = Site(a.url, iap=not a.sans_iap)
+        site.connexion(coffre=a.mdp_coffre)
 
     for nom in noms:
         slug = SLUGS.get(nom)
