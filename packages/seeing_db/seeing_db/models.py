@@ -121,6 +121,8 @@ class Forecast(Base):
     i_tke: Mapped[float | None] = mapped_column(Float)
     i_conv: Mapped[float | None] = mapped_column(Float)
     i_cis: Mapped[float | None] = mapped_column(Float)
+    # Model variables of the hour {t2, dth, u10, u100, u500, shl, shj, tke} (seeing_core.variables).
+    variables: Mapped[dict | None] = mapped_column(JSONB)
 
     run: Mapped[ModelRun] = relationship(back_populates="forecasts")
     site: Mapped[Site] = relationship()

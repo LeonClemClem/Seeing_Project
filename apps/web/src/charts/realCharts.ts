@@ -310,24 +310,27 @@ export function cn2ProfileSvg(c: Cn2Ctx, i: number, pfW: number) {
 /* ---------- model variables ---------- */
 export const PVDEF: [id: string, label: string, unit: string, color: string, real: boolean][] = [
   ["see", "Seeing", '"', "#8fd0ff", true],
-  ["dth", "Stabilité (dθ/dz, 10–100 m)", " K/100 m", "#ff9f6b", false],
+  ["dth", "Stabilité (dθ/dz, 10–100 m)", " K/100 m", "#ff9f6b", true],
   ["hc", "BL", " m", "#ff3cf0", true],
-  ["u10", "Vent à 10 m", " km/h", "#9be89b", false],
-  ["u100", "Vent à 100 m", " km/h", "#4fc06a", false],
-  ["u500", "Vent à 500 m", " km/h", "#1f8f45", false],
-  ["shl", "Cisaillement (10 m – 500 m)", " m/s/km", "#f2c14e", false],
-  ["shj", "Cisaillement jetstream", " m/s/km", "#e8743b", false],
-  ["tke", "TKE", " m²/s²", "#c79bff", false],
-  ["t2", "Température", " °C", "#ff6b6b", false],
+  ["u10", "Vent à 10 m", " km/h", "#9be89b", true],
+  ["u100", "Vent à 100 m", " km/h", "#4fc06a", true],
+  ["u500", "Vent à 500 m", " km/h", "#1f8f45", true],
+  ["shl", "Cisaillement (10 m – 500 m)", " m/s/km", "#f2c14e", true],
+  ["shj", "Cisaillement jetstream", " m/s/km", "#e8743b", true],
+  ["tke", "TKE", " m²/s²", "#c79bff", true],
+  ["t2", "Température", " °C", "#ff6b6b", true],
 ];
 export const PVGRP = [
   ["see", "dth", "hc", "tke", "t2"],
   ["u10", "u100", "u500", "shl", "shj"],
 ];
 
-/** Value of variable `id` at time t; seeing and BL are real, the others fictitious (not in the export yet). */
+/** Value of variable `id` at time t: from the forecast (batch), or a fictitious value for forecasts
+ * computed before the variables were stored. */
 function pvValue(t: number, id: string, s: number, byT: Map<number, Forecast["points"][number]>) {
-  const p = byT.get(t),
+  const p = byT.get(t);
+  if (p?.variables && id in p.variables) return p.variables[id] ?? null;
+  const
     d = new Date(t),
     i = t / HOUR,
     hr = d.getUTCHours() + d.getUTCMinutes() / 60,

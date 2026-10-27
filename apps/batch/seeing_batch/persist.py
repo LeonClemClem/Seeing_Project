@@ -79,6 +79,7 @@ def store_results(
                     h_coulim_m=_num(h.h_coulim_m), model_altitude_m=_num(h.model_altitude_m),
                     i_tke=_num(getattr(h, "i_tke", None)), i_conv=_num(getattr(h, "i_conv", None)),
                     i_cis=_num(getattr(h, "i_cis", None)),
+                    variables=getattr(h, "variables", None),
                 ))
                 profile_rows.append(dict(
                     run_id=run_id, site_id=site_id, valid_time=h.valid_time, lead_hour=h.lead_hour,

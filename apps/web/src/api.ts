@@ -74,6 +74,8 @@ export interface ForecastPoint {
   r0_m: number | null;
   integral_cn2: number | null;
   h_coulim_m: number | null;
+  /** Model variables {t2, dth, u10, u100, u500, shl, shj, tke}, absent for older forecasts. */
+  variables?: Record<string, number | null> | null;
 }
 
 export interface Forecast {

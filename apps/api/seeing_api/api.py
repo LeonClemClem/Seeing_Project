@@ -139,6 +139,7 @@ def site_forecast(slug: str, session: SessionDep, user: CurrentUser, run: RunPar
             r0_m=clean(f.r0_m),
             integral_cn2=clean(f.integral_cn2),
             h_coulim_m=clean(f.h_coulim_m),
+            variables=f.variables,
         )
         for f in rows
     ]

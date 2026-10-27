@@ -31,6 +31,8 @@ class ForecastPoint(BaseModel):
     r0_m: float | None
     integral_cn2: float | None
     h_coulim_m: float | None
+    # Model variables {t2, dth, u10, u100, u500, shl, shj, tke}, null for older forecasts.
+    variables: dict[str, float | None] | None = None
 
 
 class ForecastOut(BaseModel):

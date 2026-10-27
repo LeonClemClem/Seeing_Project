@@ -9,7 +9,7 @@ import { corrChart } from "../charts/lieuCharts";
 import { cn2Svg, prevSvg } from "../charts/mockCharts";
 import { PVDEF, PVGRP, prevRealSvg, pvPanel } from "../charts/realCharts";
 import { Cn2RealPanel, DataChips, HistPanel } from "../components/panels";
-import { useRealForecast } from "../data/forecast";
+import { useRealForecast, useSiteHistory } from "../data/forecast";
 import { Cn2Legend, LegArome, LegBreak, LegDay, LegMed, LegMes, Sw, SvgChart } from "../components/ui";
 import { kHidden, kTxt, useCurrentPlace, type Place } from "../data/places";
 import { tr } from "../i18n";
@@ -69,12 +69,12 @@ export default function Prevision() {
             {OB && <LegMed />}
             <LegBreak />
           </div>
-          {place.real ? <NoData text="Pas de période avec prévision et mesures pour ce lieu." /> : <MockHistory place={place} OB={OB} />}
+          {place.real ? <RealHistory place={place} OB={OB} /> : <MockHistory place={place} OB={OB} />}
         </div>
         <div className="grid2" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1.5fr)", alignItems: "start" }}>
           <div className="panel">
             <h2>{tr("Corrélation prévu / mesuré (nuit)")}</h2>
-            {place.real ? <NoData text="Corrélation : choisis un lieu avec seeing monitor." /> : <MockCorr place={place} />}
+            {place.real ? <RealCorr place={place} /> : <MockCorr place={place} />}
           </div>
           <div className="panel">
             <h2>{tr("Variables du modèle (passées et prévues)")}</h2>
@@ -83,6 +83,28 @@ export default function Prevision() {
         </div>
       </div>
     </section>
+  );
+}
+
+/** Research history of a real site (sent by research/envoi_site.py). */
+function RealHistory({ place, OB }: { place: Place; OB: boolean }) {
+  const data = useSiteHistory(place);
+  if (!data || !data.episodes.length) return <NoData text="Pas de période avec prévision et mesures pour ce lieu." />;
+  return <HistPanel data={data} OB={OB} />;
+}
+
+function RealCorr({ place }: { place: Place }) {
+  const data = useSiteHistory(place);
+  const corrf = useUi((s) => s.corrf);
+  const c = useLangMemo(() => (data && data.paires.length ? corrChart(data, corrf) : null), [data, corrf]);
+  if (!c) return <NoData text="Corrélation : choisis un lieu avec seeing monitor." />;
+  return (
+    <>
+      <p className="small muted mono" style={{ margin: "0 0 2px" }}>
+        {c.ct}
+      </p>
+      <SvgChart html={c.svg} viewBox="0 0 340 320" label="Corrélation du lieu" style={{ maxWidth: 520 }} />
+    </>
   );
 }
 
@@ -224,7 +246,7 @@ function ModelVars({ place }: { place: Place }) {
         </div>
       ))}
       <p className="small muted" style={{ margin: 0 }}>
-        {tr("* fictif dans la maquette (pas encore dans l'export) ; seeing et BL : données réelles du modèle.")}
+        {tr("Variables du modèle AROME au point du lieu : vent et température au-dessus du sol (10 m, 100 m, 500 m), stabilité 10–100 m, cisaillement du jet-stream (6–14 km).")}
       </p>
     </>
   );

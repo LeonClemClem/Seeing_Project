@@ -34,14 +34,15 @@ class PackageSpec:
 
 
 # What is read from each AROME 0.025 package (identical to the V2 script).
-#   HP1: T, U, V, P on heightAboveGround levels 10-3000 m
+#   HP1: T, U, V, P on heightAboveGround levels 10-3000 m (+ 10 m wind 10u / 10v, model variables only)
 #   HP2: TKE on heightAboveGround levels
 #   IP1: T, U, V, Z on isobaric levels 1000-100 hPa (above 3000 m AGL)
 #   IP4: TKE on the same isobaric levels (TKE model above 3000 m when H_COULIM > 3000 m)
 #   SP2: H_COULIM (boundary-layer height) + h (model orography, read separately)
 #   SP3: sshf (accumulated sensible heat flux, convective closure)
 PACKAGES: dict[str, PackageSpec] = {
-    "HP1": PackageSpec(frozenset({"t", "u", "v", "pres"})),
+    # 10u / 10v (10 m wind) only feed the model variables, not the seeing physics.
+    "HP1": PackageSpec(frozenset({"t", "u", "v", "pres", "10u", "10v"})),
     "HP2": PackageSpec(frozenset({"tke"})),
     "IP1": PackageSpec(frozenset({"t", "u", "v", "z"}), frozenset({"isobaricInhPa"})),
     "IP4": PackageSpec(frozenset({"tke"}), frozenset({"isobaricInhPa"})),
