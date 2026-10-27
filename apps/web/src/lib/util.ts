@@ -100,11 +100,10 @@ export const dnText = (x: number, y: number, night: boolean) =>
   `<text x="${x}" y="${y}" text-anchor="middle" font-size="11" font-weight="500" fill="${night ? "#9cc7ff" : "#f2c14e"}" stroke="#0a0f1d" stroke-width="3" paint-order="stroke">${tr(night ? "Nuit" : "Jour")}</text>`;
 
 /** Hourly median curve: polyline broken where consecutive hours are more than one hour apart. q = [x, y, hour]. */
-export function medCurve(q: [number, number, number][]) {
+export function medCurve(q: [number, number, number][], st = `stroke="${C_OBSD}" stroke-width="1.4"`) {
   let s: number[][] = [],
     o = "",
     pv: number | null = null;
-  const st = `stroke="${C_OBSD}" stroke-width="1.4"`;
   q.forEach(([x, y, h]) => {
     if (pv != null && h - pv > 1.01) {
       if (s.length > 1) o += pl(s, st);

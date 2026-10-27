@@ -322,11 +322,17 @@ export const seeHist = (l: LieuData) => {
 
 /** Histogram of measured night seeing with a log-normal fit, median and P5/P95. */
 export function histSvg(v: number[], W: number, H: number, small: boolean) {
+  // axis bounds: the 5th and 95th percentiles, on whole 0.25" classes (values beyond are not drawn)
   const bw = 0.25,
-    xmax = Math.max(1, ...v),
-    nb = Math.ceil(xmax / bw + 1e-9),
+    sv = [...v].sort((a, b) => a - b),
+    pq = (p: number) => (sv.length ? sv[Math.min(sv.length - 1, Math.floor(p * (sv.length - 1)))]! : 0),
+    x0 = Math.floor(pq(0.05) / bw) * bw,
+    nb = Math.max(1, Math.ceil((pq(0.95) - x0) / bw + 1e-9)),
+    x1 = x0 + nb * bw,
     c = new Array<number>(nb).fill(0);
-  v.forEach((x) => c[Math.min(nb - 1, Math.floor(x / bw))]!++);
+  v.forEach((x) => {
+    if (x >= x0 && x <= x1) c[Math.min(nb - 1, Math.floor((x - x0) / bw))]!++;
+  });
   const mx = Math.max(...c, 1),
     L = small ? 4 : 34,
     R = small ? 4 : 8,
@@ -349,33 +355,33 @@ export function histSvg(v: number[], W: number, H: number, small: boolean) {
   if (isFinite(mu) && sg > 0) {
     const pdf = (x: number) => Math.exp(-((Math.log(x) - mu) ** 2) / (2 * sg * sg)) / (x * sg * Math.sqrt(2 * Math.PI)),
       pts: number[][] = [];
-    for (let k = 1; k <= nb * 4; k++) {
-      const x = (k * bw) / 4,
-        y = pdf(x) * v.length * bw;
-      pts.push([L + (x / bw) * cw, T + ph - Math.min(y / mx, 1.05) * ph]);
+    for (let k = 0; k <= nb * 4; k++) {
+      const x = x0 + (k * bw) / 4,
+        y = x > 0 ? pdf(x) * v.length * bw : 0;
+      pts.push([L + ((x - x0) / bw) * cw, T + ph - Math.min(y / mx, 1.05) * ph]);
     }
     g += pl(pts, `stroke="#000" stroke-width="${small ? 2.6 : 3.4}"`) + pl(pts, `stroke="#ff9f6b" stroke-width="${small ? 1.4 : 2}"`);
   }
   if (isFinite(md)) {
-    const x = L + Math.min(md / bw, nb) * cw;
+    const x = L + Math.max(0, Math.min((md - x0) / bw, nb)) * cw;
     g += `<line x1="${x}" x2="${x}" y1="${T - 2}" y2="${T + ph}" stroke="#f2c14e" stroke-width="1.4"/>`;
     if (!small) {
       g += `<text x="${x + 8}" y="${T + 26}" font-size="24" font-weight="700" fill="#f2c14e" stroke="#0a0f1d" stroke-width="4" paint-order="stroke">${md.toFixed(2)}″</text><text x="${x + 9}" y="${T + 40}" font-size="11" fill="#f2c14e" stroke="#0a0f1d" stroke-width="3" paint-order="stroke">${tr("médiane")}</text>`;
       const mn = q(0.05),
         mxv = q(0.95),
-        xp = (v2: number) => L + Math.min(v2 / bw, nb) * cw;
+        xp = (v2: number) => L + Math.max(0, Math.min((v2 - x0) / bw, nb)) * cw;
       g +=
         `<line x1="${xp(mn)}" x2="${xp(mn)}" y1="${T}" y2="${T + ph}" stroke="#9cc7ff" stroke-width="1.2" stroke-dasharray="4 3"/><line x1="${xp(mxv)}" x2="${xp(mxv)}" y1="${T}" y2="${T + ph}" stroke="#ff8a8a" stroke-width="1.2" stroke-dasharray="4 3"/>` +
         `<text x="${W - R}" y="${T + 16}" text-anchor="end" font-size="17" font-weight="700" fill="#9cc7ff" stroke="#0a0f1d" stroke-width="4" paint-order="stroke">min ${mn.toFixed(2)}″ <tspan font-size="11" font-weight="500">(P5)</tspan></text><text x="${W - R}" y="${T + 36}" text-anchor="end" font-size="17" font-weight="700" fill="#ff8a8a" stroke="#0a0f1d" stroke-width="4" paint-order="stroke">max ${mxv.toFixed(2)}″ <tspan font-size="11" font-weight="500">(P95)</tspan></text>`;
     }
   }
   if (small)
-    g += `<text x="${L}" y="10" font-size="10" fill="#e6ebf6" font-weight="600">${tr("Seeing mesuré")}</text><text x="${W - R}" y="10" text-anchor="end" font-size="10" fill="#f2c14e">${tr("méd.")} ${isFinite(md) ? md.toFixed(2) : "–"}″</text><text x="${L}" y="${H - 2}" font-size="9" fill="${C_TXT}">0″</text><text x="${W - R}" y="${H - 2}" text-anchor="end" font-size="9" fill="${C_TXT}">${(nb * bw).toFixed((nb * bw) % 1 ? 2 : 0)}″</text>`;
+    g += `<text x="${L}" y="10" font-size="10" fill="#e6ebf6" font-weight="600">${tr("Seeing mesuré")}</text><text x="${W - R}" y="10" text-anchor="end" font-size="10" fill="#f2c14e">${tr("méd.")} ${isFinite(md) ? md.toFixed(2) : "–"}″</text><text x="${L}" y="${H - 2}" font-size="9" fill="${C_TXT}">${+x0.toFixed(2)}″</text><text x="${W - R}" y="${H - 2}" text-anchor="end" font-size="9" fill="${C_TXT}">${+x1.toFixed(2)}″</text>`;
   else {
-    const xs = nb * bw > 12 ? 2 : 1;
-    for (let x = 0; x <= nb * bw + 1e-9; x += xs)
-      g += `<text x="${L + (x / bw) * cw}" y="${T + ph + 14}" text-anchor="middle" font-size="11" fill="${C_TXT}">${x}<tspan font-weight="700">″</tspan></text>`;
-    g += `<text x="${L - 4}" y="${T + 8}" text-anchor="end" font-size="10" fill="${C_TXT}">${mx}</text><text x="${L - 4}" y="${T + ph}" text-anchor="end" font-size="10" fill="${C_TXT}">0</text><text x="${L + pw / 2}" y="${H - 2}" text-anchor="middle" font-size="11" fill="${C_TXT}">${tr("seeing mesuré (nuit), classes de 0,25″")}</text>`;
+    const xs = x1 - x0 > 12 ? 2 : x1 - x0 > 3 ? 1 : 0.5;
+    for (let x = Math.ceil(x0 / xs) * xs; x <= x1 + 1e-9; x += xs)
+      g += `<text x="${L + ((x - x0) / bw) * cw}" y="${T + ph + 14}" text-anchor="middle" font-size="11" fill="${C_TXT}">${+x.toFixed(2)}<tspan font-weight="700">″</tspan></text>`;
+    g += `<text x="${L - 4}" y="${T + 8}" text-anchor="end" font-size="10" fill="${C_TXT}">${mx}</text><text x="${L - 4}" y="${T + ph}" text-anchor="end" font-size="10" fill="${C_TXT}">0</text><text x="${L + pw / 2}" y="${H - 2}" text-anchor="middle" font-size="11" fill="${C_TXT}">${tr("seeing mesuré (nuit), classes de 0,25″, du percentile 5 au 95")}</text>`;
   }
   return { svg: g, md, q1: q(0.25), q3: q(0.75), n: v.length, mu, sg };
 }

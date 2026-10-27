@@ -1,4 +1,4 @@
-"""`seeing-batch run [--run-time ISO] [--keep-gribs]`"""
+"""`seeing-batch run [--run-time ISO] [--keep-gribs]` | `seeing-batch monitors [--days N]`"""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from seeing_core.grid import DEFAULT_STRIDE, MAP_K, GridExtractor, night_steps
 from seeing_db import RunStatus, make_engine, make_session_factory
 from sqlalchemy.orm import sessionmaker
 
-from seeing_batch import persist
+from seeing_batch import monitors, persist
 from seeing_batch.logs import setup_logging
 
 logger = logging.getLogger("seeing_batch")
@@ -116,6 +116,19 @@ def run_batch(
     return 0
 
 
+def monitors_days() -> int:
+    return int(os.environ.get("MONITORS_DAYS", "30"))  # Miratlas keeps ~30 days: a missed day is caught up
+
+
+def monitors_due(now: datetime | None = None) -> bool:
+    """Once a day: the scheduled firing of MONITORS_UTC_HOUR (default 11 UTC, after the night; the scheduler
+    fires once in that hour). MONITORS_ENABLED=0 turns the collection off."""
+    if os.environ.get("MONITORS_ENABLED", "1") != "1":
+        return False
+    now = now or datetime.now(UTC)
+    return now.hour == int(os.environ.get("MONITORS_UTC_HOUR", "11"))
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="seeing-batch", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -123,12 +136,21 @@ def main(argv: list[str] | None = None) -> None:
     run.add_argument("--run-time", type=parse_run_time, default=None,
                      help="AROME cycle, ISO 8601 UTC (e.g. 2026-10-13T00:00Z). Default: latest complete cycle.")
     run.add_argument("--keep-gribs", action="store_true", help="Keep the downloaded GRIB files in GRIB_DIR.")
+    mon = sub.add_parser("monitors", help="Fetch the online seeing monitors now and store their measurements.")
+    mon.add_argument("--days", type=int, default=None, help="Days fetched where the source keeps them (default MONITORS_DAYS).")
     args = parser.parse_args(argv)
 
     setup_logging(os.environ.get("LOG_LEVEL", "INFO"))
     engine = make_engine()
     try:
-        code = run_batch(make_session_factory(engine), run_time=args.run_time, keep_gribs=args.keep_gribs)
+        session_factory = make_session_factory(engine)
+        if args.command == "monitors":
+            monitors.collect(session_factory, days=args.days or monitors_days())
+            code = 0
+        else:
+            if monitors_due():
+                monitors.collect(session_factory, days=monitors_days())
+            code = run_batch(session_factory, run_time=args.run_time, keep_gribs=args.keep_gribs)
     except Exception:
         logger.exception("seeing-batch failed")
         code = 1

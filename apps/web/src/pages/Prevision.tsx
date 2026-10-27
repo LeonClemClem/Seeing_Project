@@ -2,14 +2,14 @@
  * Per-place forecast. API sites show the real latest run (seeing, Cn², boundary layer); personal places
  * use the fictitious model with the K in use, plus mock measurements.
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { corrChart } from "../charts/lieuCharts";
 import { cn2Svg, prevSvg } from "../charts/mockCharts";
 import { PVDEF, PVGRP, prevRealSvg, pvPanel } from "../charts/realCharts";
 import { Cn2RealPanel, DataChips, HistPanel } from "../components/panels";
-import { useHourlyMedians, useRealForecast, useSiteHistory, type View } from "../data/forecast";
+import { hourlyMedians, useHourlyMedians, useRawMeasurements, useRealForecast, useSiteHistory, type View } from "../data/forecast";
 import { Cn2Legend, LegArome, LegBreak, LegDay, LegMed, LegMes, Seg, Sw, SvgChart } from "../components/ui";
 import { kHidden, kTxt, useCurrentPlace, type Place } from "../data/places";
 import { tr } from "../i18n";
@@ -138,10 +138,16 @@ function RealSeeing({ place }: { place: Place }) {
   const role = useUi((s) => s.role);
   const showObs = useUi((s) => s.showObs);
   const { forecast } = useRealForecast(place);
-  const obs = useHourlyMedians(place);
+  const histMed = useHourlyMedians(place);
+  const raw = useRawMeasurements(place);
+  const mesf = useUi((s) => s.mesf);
+  const obs = useMemo(() => new Map([...hourlyMedians(raw), ...histMed]), [raw, histMed]);
   const svg = useLangMemo(
-    () => (forecast.data ? prevRealSvg(forecast.data, kTxt(place.K, kHidden(place, role), fmt), showObs ? obs : undefined) : ""),
-    [forecast.data, place, role, obs, showObs],
+    () =>
+      forecast.data
+        ? prevRealSvg(forecast.data, kTxt(place.K, kHidden(place, role), fmt), showObs ? obs : undefined, showObs ? raw : [], mesf)
+        : "",
+    [forecast.data, place, role, obs, raw, showObs, mesf],
   );
   if (forecast.isLoading) return <p className="muted small">{tr("Chargement…")}</p>;
   if (forecast.isError || !forecast.data) return <NoData text="Pas de prévision enregistrée pour ce lieu." />;

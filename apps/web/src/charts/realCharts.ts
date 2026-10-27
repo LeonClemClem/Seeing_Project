@@ -5,11 +5,14 @@ import {
   C_AR,
   C_DAY,
   C_LINE,
+  C_OBS,
+  C_OBSD,
   C_TXT,
   ddmm,
   dnText,
   HOUR,
   isNightDate,
+  medCurve,
   pad2,
   pl,
   runLabel,
@@ -20,8 +23,15 @@ import {
 const ms = (s: string) => Date.parse(s);
 
 /** Forecast seeing of the latest run (night only, daytime drawn at half width). viewBox 0 0 900 220. */
-/** Real seeing forecast; `obs` = measured hourly medians by UTC hour [ms], drawn as squares. */
-export function prevRealSvg(fc: Forecast, kLabel: string, obs?: Map<number, number>) {
+/** Real seeing forecast; `obs` = measured hourly medians by UTC hour [ms] (squares), `raw` = raw measurements
+ * [ms, arcsec] (dots), drawn as the mock-up following the measurement chips. */
+export function prevRealSvg(
+  fc: Forecast,
+  kLabel: string,
+  obs?: Map<number, number>,
+  raw: [number, number][] = [],
+  mesf = { brut: true, horaire: true, courbe: true },
+) {
   const pts = fc.points.filter((p) => p.lead_hour > 0).sort((a, b) => a.lead_hour - b.lead_hour);
   if (!pts.length)
     return `<text x="450" y="110" text-anchor="middle" font-size="13" fill="${C_TXT}">${tr("Pas de prévision enregistrée pour ce lieu.")}</text>`;
@@ -51,8 +61,12 @@ export function prevRealSvg(fc: Forecast, kLabel: string, obs?: Map<number, numb
   const ob: [number, number][] = [];
   obs?.forEach((v, t) => {
     const i = Math.round((t - t0) / HOUR);
-    if (i >= 0 && i < n) ob.push([i, v]);
+    if (i >= 0 && i < n && isNightDate(tt(i))) ob.push([i, v]);
   });
+  ob.sort((a, b) => a[0] - b[0]);
+  const rw = raw
+    .map(([t, v]): [number, number] => [(t - t0) / HOUR, v])
+    .filter(([x, v]) => v > 0 && x >= -0.5 && x < n - 0.5 && isNightDate(new Date(t0 + x * HOUR)));
   const ymax = Math.max(3, Math.ceil(Math.max(...sv.map((p) => p[1]), ...ob.map((p) => p[1]), 0) * 1.15)),
     Y = (v: number) => T + ph - (Math.min(v, ymax) / ymax) * ph;
   let g = "",
@@ -90,7 +104,10 @@ export function prevRealSvg(fc: Forecast, kLabel: string, obs?: Map<number, numb
     prev = i;
   });
   fl();
-  ob.forEach(([i, v]) => (g += `<rect x="${X(i + 0.5) - 3.5}" y="${Y(v) - 3.5}" width="7" height="7" fill="#fff" stroke="#000" stroke-width="1"/>`));
+  if (mesf.brut) rw.forEach(([x, v]) => (g += `<circle cx="${X(x + 0.5)}" cy="${Y(v)}" r="1.7" fill="${C_OBS}"/>`));
+  if (mesf.courbe) g += medCurve(ob.map(([i, v]): [number, number, number] => [X(i + 0.5), Y(v), i]));
+  if (mesf.horaire)
+    ob.forEach(([i, v]) => (g += `<rect x="${X(i + 0.5) - 5.5}" y="${Y(v) - 5.5}" width="11" height="11" fill="${C_OBSD}" stroke="#0a0f1d" stroke-width="1"/>`));
   if (sv.length) {
     const [li, lv] = sv.reduce((m, q) => (q[1] > m[1] ? q : m));
     g += `<text x="${X(li + 0.5)}" y="${Y(lv) - 9}" text-anchor="middle" font-size="13" font-weight="700" fill="${C_AR}" stroke="#0a0f1d" stroke-width="3.5" paint-order="stroke">Seeing AROME</text>`;
@@ -119,15 +136,27 @@ export interface Cn2Ctx {
   lg: (number | null)[][];
   hc: (number | null)[];
   see: (number | null)[];
-  /** Measured hourly median seeing at each time (research history), null when none. */
+  /** Measured hourly median seeing at each time, null when none. */
   obs: (number | null)[];
+  /** Raw measurements in the panel: [position in hours from the first time, arcsec]. */
+  raw: [number, number][];
+  /** Which measurements are drawn (chips "brutes / médianes horaires / courbe médiane horaire"). */
+  mesf: { brut: boolean; horaire: boolean; courbe: boolean };
   /** Ground altitude of the AROME grid point [m] (the jet stream is at 8-16 km of real altitude). */
   sol: number;
 }
 
 /** Prepare the Cn² matrix once per (data, altitude range). The "jet" range is 8-16 km of real altitude,
  * i.e. above the ground of the grid point. */
-export function cn2Ctx(cn: Cn2, fc: Forecast | undefined, alt: string, obs?: Map<number, number>, zoom = 1): Cn2Ctx {
+export function cn2Ctx(
+  cn: Cn2,
+  fc: Forecast | undefined,
+  alt: string,
+  obs?: Map<number, number>,
+  zoom = 1,
+  raw: [number, number][] = [],
+  mesf = { brut: true, horaire: true, courbe: true },
+): Cn2Ctx {
   // zoom: the panel gets wider (same height), the page scrolls it horizontally, as in the mock-up
   const W = Math.round(900 * zoom);
   const sol = fc?.points.find((p) => p.model_altitude_m != null)?.model_altitude_m ?? 0;
@@ -165,6 +194,11 @@ export function cn2Ctx(cn: Cn2, fc: Forecast | undefined, alt: string, obs?: Map
       return s != null && s > 0 && isNightDate(new Date(t)) ? s : null;
     }),
     obs: times.map((t) => obs?.get(t) ?? null),
+    // night only, as everywhere on the site
+    raw: raw
+      .filter(([t, v]) => v > 0 && t >= (times[0] ?? 0) - HOUR / 2 && t < (times[times.length - 1] ?? 0) + HOUR / 2 && isNightDate(new Date(t)))
+      .map(([t, v]): [number, number] => [(t - (times[0] ?? 0)) / HOUR, v]),
+    mesf,
     sol,
   };
 }
@@ -275,8 +309,16 @@ export function cn2RealSvg(c: Cn2Ctx, runMs: number) {
     prev = i;
   });
   fl();
-  // measured hourly median seeing (white, black outline), on the same right axis
-  OBS.forEach(([i, s]) => (g += `<circle cx="${X(i + 0.5)}" cy="${YS(s)}" r="3.4" fill="#fff" stroke="#000" stroke-width="1"/>`));
+  // measurements on the same right axis, white with a black outline (legend): raw points, hourly median curve,
+  // hourly medians
+  if (c.mesf.brut)
+    c.raw.forEach(([x, s]) => (g += `<circle cx="${X(x + 0.5)}" cy="${YS(s)}" r="1.7" fill="#fff" stroke="#000" stroke-width="0.5"/>`));
+  if (c.mesf.courbe) {
+    const q = OBS.map(([i, s]): [number, number, number] => [X(i + 0.5), YS(s), i]);
+    g += medCurve(q, 'stroke="#000" stroke-width="4"') + medCurve(q, 'stroke="#fff" stroke-width="2"');
+  }
+  if (c.mesf.horaire)
+    OBS.forEach(([i, s]) => (g += `<circle cx="${X(i + 0.5)}" cy="${YS(s)}" r="3.4" fill="#fff" stroke="#000" stroke-width="1"/>`));
   {
     const cand = SEE.map(([i, s]) => [X(i + 0.5), YS(s)] as const).filter(([x, y]) => x > L + 20 && x < L + pw - 120 && y > T + 22),
       p = cand.length ? cand.reduce((m, q) => (q[1] < m[1] ? q : m)) : null;

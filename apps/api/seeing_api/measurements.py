@@ -1,7 +1,7 @@
 """Seeing measurements of a site and the V2bd terms used to calibrate its K.
 
-Reading and writing: the owner of a personal place, the administrator for every site, and the team
-account for its site. Calibration itself runs in the browser (the K fit is a small grid search).
+Writing: the owner of a personal place, the administrator for every site, and the team account for its
+site. Reading: the same, plus every logged-in user for the public sites (their monitors are public). Calibration itself runs in the browser (the K fit is a small grid search).
 """
 
 from datetime import UTC, datetime, timedelta
@@ -33,6 +33,14 @@ def editable_site(session, slug: str, user: User) -> Site:
     if not ok:
         raise HTTPException(404, f"Unknown site '{slug}'")
     return site
+
+
+def readable_site(session, slug: str, user: User) -> Site:
+    """Public sites (no owner) are readable by everyone logged in; other sites as `editable_site`."""
+    site = session.scalar(select(Site).where(Site.slug == slug, Site.active.is_(True)))
+    if site is not None and site.owner_id is None:
+        return site
+    return editable_site(session, slug, user)
 
 
 class MeasurementsIn(BaseModel):
@@ -75,7 +83,7 @@ def get_measurements(
     slug: str, session: SessionDep, user: LoggedIn,
     start: Annotated[datetime | None, Query(alias="from")] = None, end: Annotated[datetime | None, Query(alias="to")] = None,
 ) -> MeasurementsOut:
-    site = editable_site(session, slug, user)
+    site = readable_site(session, slug, user)
     q = select(Measurement.time, Measurement.seeing_arcsec).where(Measurement.site_id == site.id)
     if start:
         q = q.where(Measurement.time >= start)
