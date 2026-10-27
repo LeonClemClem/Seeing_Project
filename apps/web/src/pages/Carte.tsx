@@ -603,7 +603,7 @@ export default function Carte() {
     lead = Math.round((fd.getTime() - RUN0) / 3600000);
   const hourLabel =
     mode === "m"
-      ? tr(`moyenne nuit du ${night.lab}`)
+      ? tr(`moyenne nuit du ${night.lab} (20h–04h TU)`)
       : tr(`${JS[fd.getUTCDay()]} ${pad2(fd.getUTCDate())}/${pad2(fd.getUTCMonth() + 1)} · ${pad2(fd.getUTCHours())}h TU · +${lead} h`);
   const runL = runLabel(RUN0),
     endL = new Date(RUN0 + LEADMAX * 3600000);
@@ -695,7 +695,7 @@ export default function Carte() {
                   setMode(m);
                 }}
                 options={[
-                  ["m", tr("Moyenne de la nuit")],
+                  ["m", tr("Moyenne de la nuit (20h–04h TU)")],
                   ["h", tr("Heure par heure")],
                 ]}
               />
