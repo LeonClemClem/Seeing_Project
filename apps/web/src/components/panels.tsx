@@ -147,8 +147,25 @@ export function Cn2RealPanel({
   const svgRef = useRef<HTMLDivElement>(null);
   const scRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; s: number } | null>(null);
+  // as the mock-up: zoomed, the drawing is (frame width x zoom) px wide at the same height, and the
+  // profile on its right takes the height of the drawing
+  const [scw, setScw] = useState(900);
+  const [hp, setHp] = useState(400);
+  useEffect(() => {
+    const sc = scRef.current,
+      el = svgRef.current;
+    if (!sc || !el) return;
+    const ro = new ResizeObserver(() => {
+      setScw(sc.clientWidth || 900);
+      setHp(el.getBoundingClientRect().height || 400);
+    });
+    ro.observe(sc);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ctx]);
+  const pfW = Math.max(90, Math.round((130 * 400) / hp));
   const hi = hover ?? (ctx ? Math.min(ctx.n - 1, 6) : 0);
-  const pf = useLangMemo(() => (ctx && profile ? cn2ProfileSvg(ctx, hi, 130) : ""), [ctx, hi, profile]);
+  const pf = useLangMemo(() => (ctx && profile ? cn2ProfileSvg(ctx, hi, pfW) : ""), [ctx, hi, profile, pfW]);
   /** Zoom keeping the centre of the visible part in place (as the mock-up). */
   const setZoomC = (f: number) => {
     const sc = scRef.current,
@@ -223,7 +240,7 @@ export function Cn2RealPanel({
       <div style={{ display: "flex", gap: 2, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div
           ref={scRef}
-          style={{ flex: "1 1 520px", minWidth: 0, overflowX: zoom > 1 ? "auto" : "visible", cursor: zoom > 1 ? "grab" : undefined }}
+          style={{ flex: "1 1 520px", minWidth: 0, overflowX: "auto", cursor: zoom > 1 ? "grab" : undefined }}
           onMouseDown={(e) => {
             if (zoom > 1 && scRef.current) drag.current = { x: e.clientX, s: scRef.current.scrollLeft };
           }}
@@ -233,12 +250,25 @@ export function Cn2RealPanel({
           onMouseUp={() => (drag.current = null)}
           onMouseLeave={() => (drag.current = null)}
         >
-          <div ref={svgRef} style={{ width: `${zoom * 100}%` }} onMouseMove={profile ? mm : undefined}>
-            <SvgChart html={svg} viewBox={`0 0 ${ctx.W} ${ctx.H}`} label="Panneau Cn2" />
+          <div
+            ref={svgRef}
+            style={
+              zoom > 1
+                ? { width: scw * zoom, minWidth: 0, maxWidth: "none" }
+                : { width: "100%", minWidth: 520, maxWidth: "100%" }
+            }
+            onMouseMove={profile ? mm : undefined}
+          >
+            <SvgChart html={svg} viewBox={`0 0 ${ctx.W} ${ctx.H}`} label="Panneau Cn2" style={{ width: "100%", maxWidth: "none" }} />
           </div>
         </div>
         {profile && (
-          <SvgChart html={pf} viewBox="0 0 130 400" label="Profil de Cn2 à l'heure survolée" style={{ flex: "0 0 130px", width: 130 }} />
+          <SvgChart
+            html={pf}
+            viewBox={`0 0 ${pfW} 400`}
+            label="Profil de Cn2 à l'heure survolée"
+            style={{ flex: "0 0 130px", width: 130, height: hp }}
+          />
         )}
       </div>
       {t0 != null && t1 != null && cn2.data && (
