@@ -17,6 +17,7 @@ du compte de service seeing-uploader (autorise a passer IAP, rien d'autre), au n
 et l'envoie dans l'en-tete Authorization (le site, lui, utilise un cookie).
 
 Usage : python envoi_site.py [--url URL] [--sites "OHP,Drôme"] [--sans mesures,previsions,historique] [--essai]
+                              [--mdp-coffre]
         --essai : lit et compte tout, sans rien envoyer (pas de connexion).
 """
 from pathlib import Path
@@ -114,9 +115,16 @@ class Site:
             else:
                 print("gcloud introuvable ou non connecte : pas de jeton IAP (lance 'gcloud auth login').")
 
-    def connexion(self):
+    def connexion(self, coffre=False):
         email = input("E-mail du compte administrateur : ").strip()
-        mdp = getpass.getpass("Mot de passe (non affiche) : ")
+        if coffre:   # mot de passe lu par gcloud dans le coffre (Secret Manager), jamais affiche
+            r = subprocess.run([gcloud(), "secrets", "versions", "access", "latest", "--secret=user-bootstrap-password-prod",
+                                "--project=project-astrarome"], capture_output=True, text=True)
+            mdp = r.stdout
+            if not mdp:
+                raise SystemExit("Mot de passe introuvable dans le coffre : " + r.stderr.strip()[-200:])
+        else:
+            mdp = getpass.getpass("Mot de passe (non affiche ; coller avec un clic droit) : ").strip()
         r = self.s.post(self.url + "/api/auth/login", json={"email": email, "password": mdp})
         del mdp
         if r.status_code != 200:
@@ -141,6 +149,8 @@ def main(argv=None):
     p.add_argument("--sans", default="", help="parmi mesures,previsions,historique")
     p.add_argument("--essai", action="store_true", help="lire et compter sans rien envoyer")
     p.add_argument("--sans-iap", action="store_true", help="ne pas demander de jeton IAP (site public)")
+    p.add_argument("--mdp-coffre", action="store_true",
+                   help="lire le mot de passe dans le coffre Google (user-bootstrap-password-prod) au lieu de le taper")
     a = p.parse_args(argv)
     sans = {x.strip() for x in a.sans.split(",") if x.strip()}
 
@@ -150,7 +160,7 @@ def main(argv=None):
     site = None
     if not a.essai:
         site = Site(a.url, iap=not a.sans_iap)
-        site.connexion()
+        site.connexion(coffre=a.mdp_coffre)
 
     for nom in noms:
         slug = SLUGS.get(nom)
