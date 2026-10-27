@@ -40,7 +40,7 @@ from seeing_core.grib import PACKAGES, REQUIRED_PACKAGES, _get, _message_step, p
 logger = logging.getLogger(__name__)
 
 # K of the global map (one set for every grid point and every run, until the global calibration).
-MAP_K = (2.0, 57.0, 0.1)  # K_TKE, K_CIS, K_conv
+MAP_K = (2.0, 35.0, 0.1)  # K_TKE, K_CIS, K_conv (same as research/carte_seeing.py)
 # Map hours: the night from 19h to 05h UTC (the map's night mean uses 20h-04h, the fisheye 19h-05h).
 NIGHT_HOURS_UTC = (19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5)
 DEFAULT_STRIDE = 2
