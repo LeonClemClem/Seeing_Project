@@ -65,9 +65,6 @@ interface Cache {
   key: string;
   las: Float32Array;
   los: Float32Array;
-  /** 0 none, 1 coastline, 2 major contour (white), 3 250 m contour (black) */
-  iso: Uint8Array;
-  labels: [x: number, y: number, text: string][];
   /** invisible land mask, only for the zone hit test of the domain view */
   mask: Uint8ClampedArray;
 }
@@ -95,68 +92,59 @@ function landMask(V: Box): Uint8ClampedArray {
   return g.getImageData(0, 0, CW, CH).data;
 }
 
-function viewCache(
-  V: Box,
-  prev: Cache | null,
-  rel0: ((la: number, lo: number) => number) | null,
-  coast0: ((la: number, lo: number) => number) | null,
-): Cache {
-  const key = [V.la0, V.la1, V.lo0, V.lo1].map((v) => v.toFixed(5)).join(",") + (rel0 ? "|r" : "") + (coast0 ? "|c" : "");
+function viewCache(V: Box, prev: Cache | null): Cache {
+  const key = [V.la0, V.la1, V.lo0, V.lo1].map((v) => v.toFixed(5)).join(",");
   if (prev?.key === key) return prev;
   const n = CW * CH,
-    mask = landMask(V),
     las = new Float32Array(n),
-    los = new Float32Array(n),
-    rel = new Float32Array(n),
-    med = new Float32Array(n),
-    iso = new Uint8Array(n),
-    fine = V.la1 - V.la0 <= FINE_VIEW_DEG,
-    cand: [number, number, number][] = [];
+    los = new Float32Array(n);
   for (let y = 0; y < CH; y++)
     for (let x = 0; x < CW; x++) {
-      const j = y * CW + x,
-        la = V.la1 - (y / CH) * (V.la1 - V.la0),
-        lo = V.lo0 + (x / CW) * (V.lo1 - V.lo0);
-      las[j] = la;
-      los[j] = lo;
-      rel[j] = rel0 ? rel0(la, lo) : NaN;
-      med[j] = coast0 ? coast0(la, lo) : NaN;
+      las[y * CW + x] = V.la1 - (y / CH) * (V.la1 - V.la0);
+      los[y * CW + x] = V.lo0 + (x / CW) * (V.lo1 - V.lo0);
     }
-  const step = fine ? 250 : 1000;
-  for (let y = 1; y < CH; y++)
-    for (let x = 1; x < CW; x++) {
-      const j = y * CW + x;
-      // coastline: 1 m contour of the 5x5-median relief (the raw relief is noisy at sea)
-      const m = med[j]!,
-        mL = med[j - 1]!,
-        mU = med[j - CW]!;
-      if (!isNaN(m) && !isNaN(mL) && !isNaN(mU) && (m >= 1 !== mL >= 1 || m >= 1 !== mU >= 1)) {
-        iso[j] = 1;
-        continue;
+  return { key, las, los, mask: landMask(V) };
+}
+
+/** Contour segments of a grid at `level`, flat [lat1, lon1, lat2, lon2, ...]: marching squares with linear
+ * interpolation along the cell edges, as matplotlib's `contour` (saddles split with the cell centre). */
+function contourSegs(g: MapGrid, a: Float32Array, level: number): Float32Array {
+  const out: number[] = [];
+  const { nx, ny, lat0, lon0, dlat, dlon } = g;
+  // corners 0 (r, c), 1 (r, c+1), 2 (r+1, c+1), 3 (r+1, c); edges as corner pairs
+  const EDGES = [[0, 1], [1, 2], [3, 2], [0, 3]] as const;
+  const v = [0, 0, 0, 0],
+    rc = [[0, 0], [0, 1], [1, 1], [1, 0]] as const;
+  for (let r = 0; r < ny - 1; r++)
+    for (let c = 0; c < nx - 1; c++) {
+      v[0] = a[r * nx + c]!;
+      v[1] = a[r * nx + c + 1]!;
+      v[2] = a[(r + 1) * nx + c + 1]!;
+      v[3] = a[(r + 1) * nx + c]!;
+      if (v.some((x) => isNaN(x))) continue;
+      const up = v.map((x) => x >= level);
+      if (up.every((u) => u) || up.every((u) => !u)) continue;
+      const pts: [number, number][] = [];
+      EDGES.forEach(([p, q], e) => {
+        if (up[p] === up[q]) return;
+        const f = (level - v[p]!) / (v[q]! - v[p]!);
+        pts[e] = [r + rc[p]![0] + f * (rc[q]![0] - rc[p]![0]), c + rc[p]![1] + f * (rc[q]![1] - rc[p]![1])];
+      });
+      const ks = pts.map((_, e) => e).filter((e) => pts[e]);
+      let pairs: [number, number][];
+      if (ks.length === 2) pairs = [[ks[0]!, ks[1]!]];
+      else {
+        // saddle: corners 0 and 2 on one side, 1 and 3 on the other
+        const centreUp = (v[0]! + v[1]! + v[2]! + v[3]!) / 4 >= level;
+        pairs = centreUp === up[0] ? [[0, 1], [2, 3]] : [[3, 0], [1, 2]];
       }
-      const r = rel[j]!,
-        rL = rel[j - 1]!,
-        rU = rel[j - CW]!;
-      if (isNaN(r) || isNaN(rL) || isNaN(rU)) continue;
-      const b = Math.floor(r / step),
-        bo = Math.max(Math.floor(rL / step), Math.floor(rU / step)),
-        lv = Math.max(b, bo, Math.floor(Math.min(rL, rU) / step) + 1) * step;
-      if (b === Math.floor(rL / step) && b === Math.floor(rU / step)) continue;
-      if (fine) {
-        if (lv >= 250 && lv <= 2750) {
-          iso[j] = 3;
-          cand.push([x, y, lv]);
-        }
-      } else if (lv === 1000 || lv === 2000) iso[j] = 2;
+      for (const [e1, e2] of pairs) {
+        const A = pts[e1]!,
+          B = pts[e2]!;
+        out.push(lat0 + A[0] * dlat, lon0 + A[1] * dlon, lat0 + B[0] * dlat, lon0 + B[1] * dlon);
+      }
     }
-  // contour labels (zoomed views, like clabel "%d m"): spread out, at most 30
-  const labels: Cache["labels"] = [];
-  for (let k = 0; k < cand.length && labels.length < 30; k += 23) {
-    const [x, y, lv] = cand[k]!;
-    if (x < 30 || x > CW - 60 || y < 20 || y > CH - 30) continue;
-    if (labels.every(([a, b2]) => (a - x) ** 2 + (b2 - y) ** 2 > 130 ** 2)) labels.push([x, y, `${lv} m`]);
-  }
-  return { key, las, los, iso, labels, mask };
+  return Float32Array.from(out);
 }
 
 /** 5x5 median of a grid (NaN ignored), as scipy.ndimage.median_filter(relief, 5) for the coastline. */
@@ -297,7 +285,18 @@ export default function Carte() {
   const sample = real?.sample ?? null;
   /** Real AROME orography of the map grid, when the run has it, and its 5x5 median (coastline). */
   const relReal = useMemo(() => (gmap?.relief ? sampler(gmap.meta.grid, gmap.relief) : null), [gmap]);
-  const coast = useMemo(() => (gmap?.relief ? sampler(gmap.meta.grid, median5(gmap.meta.grid, gmap.relief)) : null), [gmap]);
+  /** Contours as research/carte_seeing.py, once per map: domain views = coastline (1 m contour of the 5x5-median
+   * relief, black 0.6) + 1000 / 2000 m (white 0.3, alpha 0.6); zoomed views = every 250 m (black 0.4, alpha
+   * 0.5) with "… m" labels and no coastline. */
+  const contours = useMemo(() => {
+    if (!gmap?.relief) return null;
+    const g = gmap.meta.grid;
+    return {
+      coast: contourSegs(g, median5(g, gmap.relief), 1),
+      major: [1000, 2000].map((lv) => contourSegs(g, gmap.relief!, lv)),
+      fine: Array.from({ length: 11 }, (_, k) => 250 * (k + 1)).map((lv) => [lv, contourSegs(g, gmap.relief!, lv)] as const),
+    };
+  }, [gmap]);
 
   const toXY = useCallback(
     (la: number, lo: number) => [((lo - VW.lo0) / (VW.lo1 - VW.lo0)) * CW, ((VW.la1 - la) / (VW.la1 - VW.la0)) * CH] as const,
@@ -311,30 +310,51 @@ export default function Carte() {
     const cv = canvas.current;
     if (!cv) return;
     const cx = cv.getContext("2d")!;
-    const C = (cache.current = viewCache(VW, cache.current, relReal, coast));
+    const C = (cache.current = viewCache(VW, cache.current));
     const img = cx.createImageData(CW, CH),
       D = img.data;
     for (let j = 0; j < CW * CH; j++) {
       const p = j * 4,
         s = sample ? sample(C.las[j]!, C.los[j]!) : NaN;
       // no map yet, or hour not covered by the run: neutral grey (no fictitious field)
-      const c = isNaN(s) ? [60, 66, 80] : seeColor(s),
-        k = C.iso[j];
-      let r = c[0]!,
-        g2 = c[1]!,
-        b = c[2]!;
-      if (k === 1) r = g2 = b = 0;
-      else if (k === 2) [r, g2, b] = [r * 0.4 + 255 * 0.6, g2 * 0.4 + 255 * 0.6, b * 0.4 + 255 * 0.6];
-      else if (k === 3) [r, g2, b] = [r * 0.5, g2 * 0.5, b * 0.5];
-      D[p] = r;
-      D[p + 1] = g2;
-      D[p + 2] = b;
+      const c = isNaN(s) ? [60, 66, 80] : seeColor(s);
+      D[p] = c[0]!;
+      D[p + 1] = c[1]!;
+      D[p + 2] = c[2]!;
       D[p + 3] = 255;
     }
     cx.putImageData(img, 0, 0);
+    // contours as smooth anti-aliased lines (matplotlib widths in points, the canvas is ~1.3 px per point)
+    const fineView = VW.la1 - VW.la0 <= FINE_VIEW_DEG,
+      labels: [number, number, string][] = [];
+    const stroke = (s: Float32Array, style: string, w: number, lv?: number) => {
+      cx.beginPath();
+      let k = 0;
+      for (let i = 0; i < s.length; i += 4) {
+        const [x1, y1] = toXY(s[i]!, s[i + 1]!),
+          [x2, y2] = toXY(s[i + 2]!, s[i + 3]!);
+        if ((x1 < 0 && x2 < 0) || (x1 > CW && x2 > CW) || (y1 < 0 && y2 < 0) || (y1 > CH && y2 > CH)) continue;
+        cx.moveTo(x1, y1);
+        cx.lineTo(x2, y2);
+        // clabel-like labels: spread out, at most 30
+        if (lv != null && k++ % 40 === 0 && labels.length < 30 && x1 > 30 && x1 < CW - 60 && y1 > 20 && y1 < CH - 30)
+          if (labels.every(([a, b2]) => (a - x1) ** 2 + (b2 - y1) ** 2 > 130 ** 2)) labels.push([x1, y1, `${lv} m`]);
+      }
+      cx.strokeStyle = style;
+      cx.lineWidth = w;
+      cx.lineCap = "round";
+      cx.stroke();
+    };
+    if (contours) {
+      if (fineView) contours.fine.forEach(([lv, s]) => stroke(s, "rgba(0,0,0,.5)", 0.55, lv));
+      else {
+        contours.major.forEach((s) => stroke(s, "rgba(255,255,255,.6)", 0.45));
+        stroke(contours.coast, "#000", 0.8);
+      }
+    }
     const big = VW.la1 - VW.la0 < 3.2;
     cx.font = "9px 'IBM Plex Sans',sans-serif";
-    C.labels.forEach(([x, y, txt]) => {
+    labels.forEach(([x, y, txt]) => {
       cx.lineWidth = 2.5;
       cx.strokeStyle = "rgba(255,255,255,.55)";
       cx.strokeText(txt, x + 2, y - 2);
@@ -479,7 +499,7 @@ export default function Carte() {
     const hkm = Math.round((VW.la1 - VW.la0) * 111.2),
       zmax = VW.la1 - VW.la0 <= ZMIN + 1e-6;
     label(tr(`${hkm} × ${km} km${zmax ? " · zoom maximal" : ""} · isolignes ${VW.la1 - VW.la0 <= FINE_VIEW_DEG ? "250" : "1000 / 2000"} m`), CW - (zmax ? 300 : 200), CH - 12);
-  }, [VW, sample, relReal, coast, gmap, toXY, pub, sh, mine, MZH, newPt, role, lang]);
+  }, [VW, sample, contours, gmap, toXY, pub, sh, mine, MZH, newPt, role, lang]);
 
   /* ---------- animation ---------- */
   const last = NIGHTS[NIGHTS.length - 1]?.i1 ?? NH - 1;

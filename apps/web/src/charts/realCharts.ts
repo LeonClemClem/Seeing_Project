@@ -193,7 +193,8 @@ export function cn2Ctx(
       const s = byT.get(t)?.seeing_arcsec;
       return s != null && s > 0 && isNightDate(new Date(t)) ? s : null;
     }),
-    obs: times.map((t) => obs?.get(t) ?? null),
+    // night only (17h30-06h UTC): no daytime measurement anywhere on the site
+    obs: times.map((t) => (isNightDate(new Date(t)) ? (obs?.get(t) ?? null) : null)),
     // night only, as everywhere on the site
     raw: raw
       .filter(([t, v]) => v > 0 && t >= (times[0] ?? 0) - HOUR / 2 && t < (times[times.length - 1] ?? 0) + HOUR / 2 && isNightDate(new Date(t)))
