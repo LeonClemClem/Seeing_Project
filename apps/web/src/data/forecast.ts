@@ -6,20 +6,37 @@ import type { LieuData } from "../mock/engine";
 import type { K3 } from "../store";
 import type { Place } from "./places";
 
-/** Latest-run forecast and Cn² of an API site (disabled for mock places). */
-export function useRealForecast(place: Place) {
+export type View = "run" | "week";
+
+/** Forecast and Cn² of an API site (disabled for mock places): the latest run, or ("week") up to 7 days of
+ * main runs stitched then the latest run. */
+export function useRealForecast(place: Place, view: View = "run") {
   const slug = place.slug ?? "";
   const forecast = useQuery({
-    queryKey: queryKeys.forecast(slug, "latest"),
-    queryFn: () => api.forecast(slug),
+    queryKey: queryKeys.forecast(slug, "latest", view),
+    queryFn: () => api.forecast(slug, "latest", view),
     enabled: place.real && !!slug,
   });
   const cn2 = useQuery({
-    queryKey: queryKeys.cn2(slug, "latest"),
-    queryFn: () => api.cn2(slug),
+    queryKey: queryKeys.cn2(slug, "latest", view),
+    queryFn: () => api.cn2(slug, "latest", view),
     enabled: place.real && !!slug,
   });
   return { forecast, cn2 };
+}
+
+/** Measured hourly medians of a real site (research history), by UTC hour [ms]. */
+export function useHourlyMedians(place: Place): Map<number, number> {
+  const h = useSiteHistory(place);
+  return useMemo(() => {
+    const m = new Map<number, number>();
+    h?.episodes.forEach((e) =>
+      e.mediane.forEach(([t, v]) => {
+        if (v != null) m.set(Date.parse(t.length <= 16 ? t + ":00Z" : t), v);
+      }),
+    );
+    return m;
+  }, [h]);
 }
 
 /** History of a real site (research periods with forecast and measurements), as the charts expect it.

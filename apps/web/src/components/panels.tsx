@@ -3,12 +3,13 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 
 import { histChart, histSvg, seeHist } from "../charts/lieuCharts";
 import { cn2Ctx, cn2ProfileSvg, cn2RealSvg } from "../charts/realCharts";
-import { useRealForecast } from "../data/forecast";
+import { useHourlyMedians, useRealForecast, type View } from "../data/forecast";
 import type { Place } from "../data/places";
 import { tr } from "../i18n";
 import type { LieuData } from "../mock/engine";
 import { setState, useLangMemo, useUi, type UiState } from "../store";
-import { Chip, SvgChart } from "./ui";
+import { pad2 } from "../lib/util";
+import { Chip, Seg, SvgChart } from "./ui";
 
 /** Measurement display chips ("Données : brutes / médianes horaires / courbe / ☾ médianes nocturnes"). */
 export function DataChips({ id }: { id: string }) {
@@ -118,25 +119,75 @@ export function HistPanel({ data, OB, inset = true }: { data: LieuData; OB: bool
   );
 }
 
-/** Real Cn² panel (latest run) with altitude range and the profile under the cursor. */
-export function Cn2RealPanel({ place, profile = true, style }: { place: Place; profile?: boolean; style?: CSSProperties }) {
+/** Real Cn² panel: week (up to 7 days of main runs stitched) or latest forecasts, altitude range, zoom,
+ * measured hourly medians, and the profile under the cursor (with the jet stream). */
+export function Cn2RealPanel({
+  place,
+  profile = true,
+  style,
+  defaultView = "week",
+}: {
+  place: Place;
+  profile?: boolean;
+  style?: CSSProperties;
+  defaultView?: View;
+}) {
   const [alt, setAlt] = useState("4");
-  const { forecast, cn2 } = useRealForecast(place);
-  const ctx = useMemo(() => (cn2.data ? cn2Ctx(cn2.data, forecast.data, alt) : null), [cn2.data, forecast.data, alt]);
+  const [view, setView] = useState<View>(defaultView);
+  const [zoom, setZoom] = useState(1);
+  const { forecast, cn2 } = useRealForecast(place, view);
+  const obs = useHourlyMedians(place);
+  const showObs = useUi((s) => s.showObs);
+  const ctx = useMemo(
+    () => (cn2.data ? cn2Ctx(cn2.data, forecast.data, alt, showObs ? obs : undefined) : null),
+    [cn2.data, forecast.data, alt, obs, showObs],
+  );
   const svg = useLangMemo(() => (ctx && cn2.data ? cn2RealSvg(ctx, Date.parse(cn2.data.run_time)) : ""), [ctx, cn2.data]);
   const [hover, setHover] = useState<number | null>(null);
   const svgRef = useRef<HTMLDivElement>(null);
   const hi = hover ?? (ctx ? Math.min(ctx.n - 1, 6) : 0);
   const pf = useLangMemo(() => (ctx && profile ? cn2ProfileSvg(ctx, hi, 130) : ""), [ctx, hi, profile]);
 
-  if (cn2.isLoading) return <p className="muted small">{tr("Chargement…")}</p>;
+  const controls = (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "4px 0 6px" }}>
+      <Seg
+        value={view}
+        onChange={(v) => {
+          setView(v);
+          setHover(null);
+        }}
+        options={[
+          ["week", tr("Semaine (7 j max)")],
+          ["run", tr("Dernières prévisions")],
+        ]}
+      />
+      <label className="small muted" htmlFor={"alt-" + place.id}>
+        {tr("Altitude")}
+      </label>
+      <select id={"alt-" + place.id} value={alt} onChange={(e) => setAlt(e.target.value)}>
+        <option value="bl">{tr("0–1 km (couche limite)")}</option>
+        <option value="4">{tr("0–4 km")}</option>
+        <option value="jet">{tr("jet stream (8–16 km d'altitude)")}</option>
+        <option value="tout">{tr("jusqu'en haut (16 km)")}</option>
+      </select>
+      <span className="small muted">{tr("Zoom :")}</span>
+      <button onClick={() => setZoom((z) => Math.max(1, z / 2))}>−</button>
+      <button onClick={() => setZoom((z) => Math.min(16, z * 2))}>+</button>
+      <button onClick={() => setZoom(1)}>{tr("tout voir")}</button>
+      {profile && <span className="small muted">{tr("survole le panneau : profil à l'heure choisie")}</span>}
+    </div>
+  );
+  if (cn2.isLoading) return <div style={style}>{controls}<p className="muted small">{tr("Chargement…")}</p></div>;
   if (cn2.isError || !ctx)
     return (
-      <SvgChart
-        html={`<text x="450" y="190" text-anchor="middle" font-size="13" fill="#97a2bd">${tr("Pas de panneau Cn² enregistré pour ce lieu.")}</text>`}
-        viewBox="0 0 900 400"
-        label="Panneau Cn2"
-      />
+      <div style={style}>
+        {controls}
+        <SvgChart
+          html={`<text x="450" y="190" text-anchor="middle" font-size="13" fill="#97a2bd">${tr("Pas de panneau Cn² enregistré pour ce lieu.")}</text>`}
+          viewBox="0 0 900 400"
+          label="Panneau Cn2"
+        />
+      </div>
     );
   const mm = (e: React.MouseEvent) => {
     const el = svgRef.current;
@@ -146,28 +197,33 @@ export function Cn2RealPanel({ place, profile = true, style }: { place: Place; p
       i = Math.floor(((x - ctx.L) / ctx.pw) * ctx.n);
     if (i >= 0 && i < ctx.n) setHover(i);
   };
+  const t0 = ctx.times[0],
+    t1 = ctx.times[ctx.n - 1],
+    holes = ctx.lg.filter((row) => row.every((v) => v == null)).length,
+    fmtT = (t: number) => {
+      const d = new Date(t);
+      return `${pad2(d.getUTCDate())}/${pad2(d.getUTCMonth() + 1)} ${pad2(d.getUTCHours())}h`;
+    };
   return (
     <div style={style}>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "4px 0 6px" }}>
-        <label className="small muted" htmlFor={"alt-" + place.id}>
-          {tr("Altitude")}
-        </label>
-        <select id={"alt-" + place.id} value={alt} onChange={(e) => setAlt(e.target.value)}>
-          <option value="bl">{tr("0–1 km (couche limite)")}</option>
-          <option value="4">{tr("0–4 km")}</option>
-          <option value="jet">{tr("jet stream (8–16 km d'altitude)")}</option>
-          <option value="tout">{tr("jusqu'en haut (16 km)")}</option>
-        </select>
-        {profile && <span className="small muted">{tr("survole le panneau : profil à l'heure choisie")}</span>}
-      </div>
+      {controls}
       <div style={{ display: "flex", gap: 2, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div ref={svgRef} style={{ flex: "1 1 520px", minWidth: 0 }} onMouseMove={profile ? mm : undefined}>
-          <SvgChart html={svg} viewBox={`0 0 ${ctx.W} ${ctx.H}`} label="Panneau Cn2" />
+        <div style={{ flex: "1 1 520px", minWidth: 0, overflowX: zoom > 1 ? "auto" : "visible" }}>
+          <div ref={svgRef} style={{ width: `${zoom * 100}%` }} onMouseMove={profile ? mm : undefined}>
+            <SvgChart html={svg} viewBox={`0 0 ${ctx.W} ${ctx.H}`} label="Panneau Cn2" />
+          </div>
         </div>
         {profile && (
           <SvgChart html={pf} viewBox="0 0 130 400" label="Profil de Cn2 à l'heure survolée" style={{ flex: "0 0 130px", width: 130 }} />
         )}
       </div>
+      {t0 != null && t1 != null && cn2.data && (
+        <p className="small muted mono" style={{ margin: "4px 0 0" }}>
+          {tr(view === "week" ? "jusqu'à 7 jours de runs principaux collés" : "dernières prévisions")} · {tr("du")} {fmtT(t0)} {tr("au")} {fmtT(t1)}{" "}
+          {tr("TU")} · {tr("dernier run")} {cn2.data.run_time.slice(0, 13).replace("T", " ")}Z · {tr("seeing de nuit seulement")} · {holes}{" "}
+          {tr("h sans Cn² (H+0 ou trou)")}
+        </p>
+      )}
     </div>
   );
 }

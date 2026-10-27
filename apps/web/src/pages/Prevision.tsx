@@ -9,8 +9,8 @@ import { corrChart } from "../charts/lieuCharts";
 import { cn2Svg, prevSvg } from "../charts/mockCharts";
 import { PVDEF, PVGRP, prevRealSvg, pvPanel } from "../charts/realCharts";
 import { Cn2RealPanel, DataChips, HistPanel } from "../components/panels";
-import { useRealForecast, useSiteHistory } from "../data/forecast";
-import { Cn2Legend, LegArome, LegBreak, LegDay, LegMed, LegMes, Sw, SvgChart } from "../components/ui";
+import { useHourlyMedians, useRealForecast, useSiteHistory, type View } from "../data/forecast";
+import { Cn2Legend, LegArome, LegBreak, LegDay, LegMed, LegMes, Seg, Sw, SvgChart } from "../components/ui";
 import { kHidden, kTxt, useCurrentPlace, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { fmt } from "../lib/util";
@@ -55,7 +55,7 @@ export default function Prevision() {
         <div className="panel">
           <h2>{tr("Cn² (altitude × temps)")}</h2>
           <Cn2Legend obs={OB} convective={!place.real} />
-          {place.real ? <Cn2RealPanel place={place} /> : <MockCn2 place={place} />}
+          {place.real ? <Cn2RealPanel place={place} defaultView="run" /> : <MockCn2 place={place} />}
           <KRead place={place} />
         </div>
         <div className="panel">
@@ -135,10 +135,12 @@ function KRead({ place }: { place: Place }) {
 
 function RealSeeing({ place }: { place: Place }) {
   const role = useUi((s) => s.role);
+  const showObs = useUi((s) => s.showObs);
   const { forecast } = useRealForecast(place);
+  const obs = useHourlyMedians(place);
   const svg = useLangMemo(
-    () => (forecast.data ? prevRealSvg(forecast.data, kTxt(place.K, kHidden(place, role), fmt)) : ""),
-    [forecast.data, place, role],
+    () => (forecast.data ? prevRealSvg(forecast.data, kTxt(place.K, kHidden(place, role), fmt), showObs ? obs : undefined) : ""),
+    [forecast.data, place, role, obs, showObs],
   );
   if (forecast.isLoading) return <p className="muted small">{tr("Chargement…")}</p>;
   if (forecast.isError || !forecast.data) return <NoData text="Pas de prévision enregistrée pour ce lieu." />;
@@ -192,7 +194,9 @@ function MockCorr({ place }: { place: Place }) {
 }
 
 function ModelVars({ place }: { place: Place }) {
-  const { forecast } = useRealForecast(place);
+  const [view, setView] = useState<View>("week");
+  const [zoom, setZoom] = useState(1);
+  const { forecast } = useRealForecast(place, view);
   const [sel, setSel] = useState<Set<string>[]>(() => [new Set(["see"]), new Set(["u10", "u100", "u500"])]);
   const panels = useLangMemo(
     () => (forecast.data ? [0, 1].map((k) => pvPanel(forecast.data!, place.nom, sel[k]!)) : null),
@@ -210,18 +214,40 @@ function ModelVars({ place }: { place: Place }) {
   return (
     <>
       <p className="small muted" style={{ margin: "0 0 6px" }}>
-        {tr(`${place.nom} · dernières prévisions · run ${forecast.data.run_time.slice(0, 13).replace("T", " ")}Z · nuits seulement`)}
+        {tr(
+          `${place.nom} · ${view === "week" ? "jusqu'à 7 jours de runs principaux collés" : "dernières prévisions"} · dernier run ${forecast.data.run_time.slice(0, 13).replace("T", " ")}Z · nuits seulement`,
+        )}
       </p>
-      <div className="legend" style={{ marginBottom: 6 }}>
+      <div className="legend" style={{ marginBottom: 6, alignItems: "center" }}>
+        {view === "week" && (
+          <span>
+            <Sw style={{ width: 16, height: 0, borderTop: "2px solid #cfd6e6" }} />
+            {tr("passé (runs principaux collés)")}
+          </span>
+        )}
         <span>
           <Sw style={{ width: 16, height: 0, borderTop: "2px dashed #cfd6e6" }} />
           {tr("prévu (dernier run)")}
         </span>
+        <Seg
+          value={view}
+          onChange={setView}
+          options={[
+            ["week", tr("Semaine (7 j max)")],
+            ["run", tr("Dernières prévisions")],
+          ]}
+        />
+        <span className="small muted">{tr("Zoom :")}</span>
+        <button onClick={() => setZoom((z) => Math.max(1, z / 2))}>−</button>
+        <button onClick={() => setZoom((z) => Math.min(16, z * 2))}>+</button>
+        <button onClick={() => setZoom(1)}>{tr("tout voir")}</button>
       </div>
       {panels.map((p, k) => (
         <div className="pvrow" key={k}>
-          <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-            <SvgChart html={p.svg} viewBox={`0 0 ${p.W} ${p.H}`} label={`Variables du modèle ${k + 1}`} />
+          <div style={{ flex: "1 1 auto", minWidth: 0, overflowX: zoom > 1 ? "auto" : "visible" }}>
+            <div style={{ width: `${zoom * 100}%` }}>
+              <SvgChart html={p.svg} viewBox={`0 0 ${p.W} ${p.H}`} label={`Variables du modèle ${k + 1}`} />
+            </div>
           </div>
           <div className="pvlist">
             {PVDEF.filter((q) => PVGRP[k]!.includes(q[0])).map(([id, lab, u, col, real]) => (

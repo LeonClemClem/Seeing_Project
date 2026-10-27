@@ -74,6 +74,8 @@ export interface ForecastPoint {
   r0_m: number | null;
   integral_cn2: number | null;
   h_coulim_m: number | null;
+  /** Ground altitude of the AROME grid point [m]. */
+  model_altitude_m?: number | null;
   /** Model variables {t2, dth, u10, u100, u500, shl, shj, tke}, absent for older forecasts. */
   variables?: Record<string, number | null> | null;
 }
@@ -182,10 +184,11 @@ export const api = {
   terms: (slug: string, from: string, to: string) =>
     get<Terms>(`/api/sites/${encodeURIComponent(slug)}/terms?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   latestRun: () => get<Run>("/api/runs/latest"),
-  forecast: (slug: string, run = "latest") =>
-    get<Forecast>(`/api/sites/${encodeURIComponent(slug)}/forecast?run=${encodeURIComponent(run)}`),
-  cn2: (slug: string, run = "latest") =>
-    get<Cn2>(`/api/sites/${encodeURIComponent(slug)}/cn2?run=${encodeURIComponent(run)}`),
+  /** view "week": up to 7 days of main runs stitched, then the run. */
+  forecast: (slug: string, run = "latest", view: "run" | "week" = "run") =>
+    get<Forecast>(`/api/sites/${encodeURIComponent(slug)}/forecast?run=${encodeURIComponent(run)}&view=${view}`),
+  cn2: (slug: string, run = "latest", view: "run" | "week" = "run") =>
+    get<Cn2>(`/api/sites/${encodeURIComponent(slug)}/cn2?run=${encodeURIComponent(run)}&view=${view}`),
   map: () => get<MapMeta>("/api/map"),
   /** Model orography of the map grid [m], NaN where undefined. */
   mapRelief: async (run: string): Promise<Float32Array> => {
@@ -209,7 +212,7 @@ export const queryKeys = {
   me: ["me"] as const,
   sites: ["sites"] as const,
   latestRun: ["runs", "latest"] as const,
-  forecast: (slug: string, run: string) => ["forecast", slug, run] as const,
-  cn2: (slug: string, run: string) => ["cn2", slug, run] as const,
+  forecast: (slug: string, run: string, view = "run") => ["forecast", slug, run, view] as const,
+  cn2: (slug: string, run: string, view = "run") => ["cn2", slug, run, view] as const,
   map: (run: string) => ["map", run] as const,
 };
