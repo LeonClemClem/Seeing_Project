@@ -13,7 +13,9 @@ import { Cn2RealPanel, DataChips, HistPanel } from "../components/panels";
 import { Cn2Legend, LegMed, LegMes, Seg, Sw, SvgChart } from "../components/ui";
 import { useUser } from "../data/auth";
 import { useSiteHistory } from "../data/forecast";
-import { kHidden, MOCK_PLACES, selectPlace, TEAM_SITE, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
+import { useNavigate } from "react-router-dom";
+
+import { kHidden, selectPlace, TEAM_SITE, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { parseCsv, type CsvOpts, type DateFmt, type NightPt } from "../lib/csv";
 import { C_AR, C_DAY, C_LINE, C_OBS, C_OBSD, C_TXT, dnText, fmt, pl, yaxis } from "../lib/util";
@@ -108,6 +110,7 @@ export default function Calibrer() {
   const mesf = useUi((s) => s.mesf);
   const lock = kHidden(place, role);
   const { mine } = usePlaces();
+  const nav = useNavigate();
   const user = useUser();
   const qc = useQueryClient();
   // Real place the account may calibrate: measurements and model terms come from the API.
@@ -263,7 +266,7 @@ export default function Calibrer() {
               "Ce site est calibré par l'administrateur : tu vois les résultats (courbes, Cn², historique, corrélation, qualité du calage), mais les outils de calibration (import CSV, réglage des K, calibration auto) ne fonctionnent que sur tes lieux personnels.",
             )}
           </p>
-          <button className="primary" onClick={() => setState(selectPlace(mine[0] ?? MOCK_PLACES[0]!))}>
+          <button className="primary" onClick={() => (mine[0] ? setState(selectPlace(mine[0])) : nav("/carte", { state: { newPlace: true } }))}>
             {tr("Passer à mon lieu")}
           </button>
         </div>

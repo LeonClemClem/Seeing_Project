@@ -10,7 +10,7 @@ import { cn2Svg } from "../charts/mockCharts";
 import { Cn2RealPanel, HistPanel } from "../components/panels";
 import { Chip, Cn2Legend, LegBreak, LegDay, LegMed, LegMes, Sw, SvgChart } from "../components/ui";
 import { useSiteHistory } from "../data/forecast";
-import { kHidden, kTxt, MAX_PLACES, MOCK_PLACES, usePlaceActions, usePlaces, type Place } from "../data/places";
+import { kHidden, kTxt, MAX_PLACES, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { C_TXT, ddmm, fmt, pd } from "../lib/util";
 import { lieuData } from "../mock/engine";
@@ -28,7 +28,8 @@ export default function Lieux() {
   const [open, setOpen] = useState({ pub: false, sh: false });
 
   const all = [...mine, ...pub, ...sh];
-  const l = sel.t === "lx" ? (all.find((p) => p.id === sel.id) ?? mine[0] ?? pub[0] ?? MOCK_PLACES[0]!) : null;
+  const cur = useCurrentPlace();
+  const l = all.find((p) => p.id === sel.id) ?? mine[0] ?? pub[0] ?? cur;
   const toggleM = (k: "brut" | "horaire" | "courbe") => setState((s) => ({ mesf: { ...s.mesf, [k]: !s.mesf[k] } }));
 
   const tile = (on: boolean, key: string, onClick: () => void, body: JSX.Element) => (
@@ -205,23 +206,9 @@ export default function Lieux() {
         </Chip>
       </div>
 
-      <PlaceDetail l={l!} />
+      <PlaceDetail l={l} />
 
       <div className="tiles" style={{ marginTop: 16 }}>
-        <div className="tile">
-          <div className="l">Fisheye</div>
-          <div className="v" style={{ fontSize: 15 }}>
-            {tr("1 par jour · utilisé")}
-          </div>
-          <div className="small muted">{tr("remise à zéro à 00h TU")}</div>
-        </div>
-        <div className="tile">
-          <div className="l">{tr("Demandes hors domaine AROME")}</div>
-          <div className="v" style={{ fontSize: 15 }}>
-            {tr("file d'attente")}
-          </div>
-          <div className="small muted">{tr("1 en cours")}</div>
-        </div>
         <div className="tile">
           <div className="l">{tr("Recalcul")}</div>
           <div className="v" style={{ fontSize: 15 }}>
