@@ -15,6 +15,15 @@ export interface Site {
   k?: number[] | null;
 }
 
+export interface SiteHistory {
+  nom: string;
+  modele?: string;
+  K?: number[];
+  episodes: { a: string; b: string; prevu: [string, number | null][]; mediane: [string, number | null][]; brut: [string, number | null][] }[];
+  paires: [string, number | null, number | null, boolean][];
+  generated_at: string;
+}
+
 export interface Measurements {
   times: string[];
   seeing_arcsec: number[];
@@ -154,6 +163,8 @@ export const api = {
     post<{ stored: number; rejected: number }>(`/api/sites/${encodeURIComponent(slug)}/measurements`, { points }),
   deleteMeasurements: (slug: string, night?: string) =>
     send<void>("DELETE", `/api/sites/${encodeURIComponent(slug)}/measurements${night ? `?night=${night}` : ""}`),
+  /** Research history of a monitored site (periods, hourly pairs); K and integrals only for calibrators. */
+  history: (slug: string) => get<SiteHistory>(`/api/sites/${encodeURIComponent(slug)}/history`),
   terms: (slug: string, from: string, to: string) =>
     get<Terms>(`/api/sites/${encodeURIComponent(slug)}/terms?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   latestRun: () => get<Run>("/api/runs/latest"),

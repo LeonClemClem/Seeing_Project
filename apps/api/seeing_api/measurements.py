@@ -111,7 +111,11 @@ def get_terms(
     ranked = (
         select(
             Forecast.valid_time, Forecast.lead_hour, Forecast.i_tke, Forecast.i_conv, Forecast.i_cis,
-            func.row_number().over(partition_by=Forecast.valid_time, order_by=Forecast.lead_hour).label("rk"),
+            # main runs (00/06/12/18Z) first, as in the research history, then the shortest lead
+            func.row_number().over(
+                partition_by=Forecast.valid_time,
+                order_by=(func.mod(func.extract("hour", ModelRun.run_time), 6) != 0, Forecast.lead_hour),
+            ).label("rk"),
         )
         .join(ModelRun, ModelRun.id == Forecast.run_id)
         .where(

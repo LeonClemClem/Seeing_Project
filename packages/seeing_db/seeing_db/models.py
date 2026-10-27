@@ -16,7 +16,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -137,6 +137,17 @@ class Cn2Profile(Base):
 
     run: Mapped[ModelRun] = relationship(back_populates="cn2_profiles")
     site: Mapped[Site] = relationship()
+
+
+class SiteHistory(Base):
+    """History of a monitored site as computed by the research scripts (research/export_lieux_site.py):
+    periods with forecast and measurements, hourly pairs, K = 1 integrals. Shown by the website."""
+
+    __tablename__ = "site_history"
+
+    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id", ondelete="CASCADE"), primary_key=True)
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    data: Mapped[dict] = mapped_column(JSONB)
 
 
 class Measurement(Base):

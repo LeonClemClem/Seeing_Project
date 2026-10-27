@@ -9,6 +9,7 @@ import { corrChart, histSvg, mailleSvg, seeHist } from "../charts/lieuCharts";
 import { cn2Svg } from "../charts/mockCharts";
 import { Cn2RealPanel, HistPanel } from "../components/panels";
 import { Chip, Cn2Legend, LegBreak, LegDay, LegMed, LegMes, Sw, SvgChart } from "../components/ui";
+import { useSiteHistory } from "../data/forecast";
 import { kHidden, kTxt, MAX_PLACES, MOCK_PLACES, usePlaceActions, usePlaces, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { sharedPlace, SHAREDV } from "../lib/geo";
@@ -302,7 +303,8 @@ function PlaceDetail({ l }: { l: Place }) {
   const corrf = useUi((s) => s.corrf);
   const mesf = useUi((s) => s.mesf);
   const hid = kHidden(l, role);
-  const data = useLangMemo(() => (l.real ? null : lieuData(l.nom, l.f, l.K, l.K)), [l]);
+  const real = useSiteHistory(l);
+  const data = useLangMemo(() => (l.real ? (real ?? null) : lieuData(l.nom, l.f, l.K, l.K)), [l, real]);
   const histo = useLangMemo(() => {
     const v = data ? seeHist(data) : [];
     return { ...histSvg(v, 460, 220, false), v };
