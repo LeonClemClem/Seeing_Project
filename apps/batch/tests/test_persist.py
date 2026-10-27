@@ -145,7 +145,7 @@ def test_run_batch_failure_marks_failed(db, tmp_path):
     orig = cli.compute_from_extracted
     cli.compute_from_extracted = lambda run, sites, fh: fake_forecasts(sites)
     try:
-        assert run_batch(db, run_time=RUN, grib_dir=tmp_path, fetch=_fake_fetch(calls)) == 0
+        assert run_batch(db, run_time=RUN, grib_dir=tmp_path, fetch=_fake_fetch(calls), retention_days=10**5) == 0
     finally:
         cli.compute_from_extracted = orig
     with db() as s:
@@ -156,7 +156,7 @@ def test_run_batch_failure_marks_failed(db, tmp_path):
 def test_run_batch_no_hours_is_failure(db, monkeypatch, tmp_path):
     monkeypatch.setattr("seeing_batch.cli.compute_from_extracted",
                         lambda run, sites, fh: fake_forecasts(sites, n_hours=0))
-    assert run_batch(db, run_time=RUN, grib_dir=tmp_path, fetch=_fake_fetch([])) == 1
+    assert run_batch(db, run_time=RUN, grib_dir=tmp_path, fetch=_fake_fetch([]), retention_days=10**5) == 1
 
 
 def test_parse_run_time():
@@ -172,7 +172,8 @@ def test_run_batch_stores_map_frames(db, monkeypatch, tmp_path):
 
     monkeypatch.setattr("seeing_batch.cli.compute_from_extracted",
                         lambda run, sites, fh: fake_forecasts(sites, run_time=run.run_time))
-    assert run_batch(db, run_time=RUN, grib_dir=tmp_path, fetch=_fake_fetch([]), map_enabled=True) == 0
+    assert run_batch(db, run_time=RUN, grib_dir=tmp_path, fetch=_fake_fetch([]), map_enabled=True,
+                     retention_days=10**5) == 0
     with db() as s:
         frames = s.scalars(select(MapFrame).order_by(MapFrame.lead_hour)).all()
         assert [f.lead_hour for f in frames] == [20, 21]
