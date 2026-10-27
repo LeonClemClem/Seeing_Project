@@ -8,7 +8,6 @@ import {
   C_TXT,
   ddmm,
   dnText,
-  hash,
   HOUR,
   isNightDate,
   pad2,
@@ -128,7 +127,9 @@ export interface Cn2Ctx {
 
 /** Prepare the Cn² matrix once per (data, altitude range). The "jet" range is 8-16 km of real altitude,
  * i.e. above the ground of the grid point. */
-export function cn2Ctx(cn: Cn2, fc: Forecast | undefined, alt: string, obs?: Map<number, number>): Cn2Ctx {
+export function cn2Ctx(cn: Cn2, fc: Forecast | undefined, alt: string, obs?: Map<number, number>, zoom = 1): Cn2Ctx {
+  // zoom: the panel gets wider (same height), the page scrolls it horizontally, as in the mock-up
+  const W = Math.round(900 * zoom);
   const sol = fc?.points.find((p) => p.model_altitude_m != null)?.model_altitude_m ?? 0;
   const [za0, zb1] = CN2ALT[alt] ?? CN2ALT["4"]!,
     za = alt === "jet" ? Math.max(0, za0 - sol) : za0,
@@ -144,11 +145,11 @@ export function cn2Ctx(cn: Cn2, fc: Forecast | undefined, alt: string, obs?: Map
   const times = cn.valid_times.map(ms);
   const byT = new Map((fc?.points ?? []).map((p) => [ms(p.valid_time), p]));
   return {
-    W: 900,
+    W,
     H: 400,
     L: 68,
     T: 46,
-    pw: 900 - 68 - 32,
+    pw: W - 68 - 32,
     ph: 400 - 46 - 56,
     n: times.length,
     za,
@@ -368,40 +369,13 @@ export const PVGRP = [
   ["u10", "u100", "u500", "shl", "shj"],
 ];
 
-/** Value of variable `id` at time t: from the forecast (batch), or a fictitious value for forecasts
- * computed before the variables were stored. */
-function pvValue(t: number, id: string, s: number, byT: Map<number, Forecast["points"][number]>) {
+/** Value of variable `id` at time t from the forecast; null where it has none (forecasts computed before
+ * the variables were stored): never a fictitious value. */
+function pvValue(t: number, id: string, byT: Map<number, Forecast["points"][number]>) {
   const p = byT.get(t);
-  if (p?.variables && id in p.variables) return p.variables[id] ?? null;
-  const
-    d = new Date(t),
-    i = t / HOUR,
-    hr = d.getUTCHours() + d.getUTCMinutes() / 60,
-    di = Math.cos(((hr - 14) / 24) * 2 * Math.PI),
-    r = (a: number, b: number, c: number) => Math.sin(i / a + s * b + c);
-  switch (id) {
-    case "see":
-      return p?.seeing_arcsec ?? null;
-    case "hc":
-      return p?.h_coulim_m ?? null;
-    case "dth":
-      return 0.4 - 1.6 * di + 0.4 * r(7, 1, 0);
-    case "u10":
-      return Math.max(0, 9 + 5 * r(11, 1, 0) + 3 * di + 2 * r(2.9, 2, 1));
-    case "u100":
-      return Math.max(0, 17 + 7 * r(11, 1, 0.3) - 2 * di + 3 * r(3.3, 2, 2));
-    case "u500":
-      return Math.max(0, 26 + 9 * r(13, 1, 0.6) + 3 * r(4.1, 3, 1));
-    case "shl":
-      return Math.max(0, 4 + 2.5 * r(9, 1, 1) - 1.5 * di);
-    case "shj":
-      return Math.max(0, 12 + 6 * r(29, 1, 0.5) + 2 * r(6, 2, 0));
-    case "tke":
-      return Math.max(0.02, 0.25 + 0.45 * Math.max(0, di) + 0.1 * r(5, 1, 2));
-    case "t2":
-      return 12 + 6 * di + 3 * r(40, 1, 0);
-  }
-  return null;
+  if (id === "see") return p?.seeing_arcsec ?? null;
+  if (id === "hc") return p?.h_coulim_m ?? null;
+  return p?.variables?.[id] ?? null;
 }
 
 export interface PvPanel {
@@ -414,15 +388,14 @@ export interface PvPanel {
 /** One sub-panel of model variables (night hours only, nights glued with a gap). */
 /** Model-variable panel; in the week view the hours before the latest run (stitched main runs) are solid,
  * the latest run dashed. */
-export function pvPanel(fc: Forecast, name: string, sel: Set<string>): PvPanel {
+export function pvPanel(fc: Forecast, _name: string, sel: Set<string>, zoom = 1): PvPanel {
   const runT = ms(fc.run_time);
-  const s = (hash(name) % 97) / 10;
   const byT = new Map(fc.points.map((p) => [ms(p.valid_time), p]));
   const tl = [...byT.keys()].sort((a, b) => a - b).filter((t) => isNightDate(new Date(t)));
   const D: Record<string, { a: (number | null)[]; lo: number; hi: number }> = {};
   PVDEF.forEach(([id]) => {
     const a = tl.map((t) => {
-      const v = pvValue(t, id, s, byT);
+      const v = pvValue(t, id, byT);
       return v != null && isFinite(v) ? v : null;
     });
     const ok = a.filter((v): v is number => v != null);
@@ -440,7 +413,7 @@ export function pvPanel(fc: Forecast, name: string, sel: Set<string>): PvPanel {
   const chosen = PVDEF.filter((q) => sel.has(q[0])),
     units = [...new Set(chosen.map((q) => q[2]))],
     common = units.length === 1,
-    W = 640,
+    W = Math.round(640 * zoom),
     H = 200,
     L = common ? 44 : 12,
     R = 8,

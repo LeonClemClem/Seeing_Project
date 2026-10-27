@@ -1,7 +1,8 @@
 /**
- * Global seeing map (canvas): the real maps of the latest run (GET /api/map, V2bd over the whole AROME
- * grid, night hours 19h-05h UTC, mean of the night 20h-04h), or a fictitious field while there is none. Public sites come from
- * the API, personal places are mock.
+ * Global seeing map (canvas): only real data. The maps of the latest run (GET /api/map, V2bd over the
+ * whole AROME grid, land and sea, night hours 19h-05h UTC, mean of the night 20h-04h) and the AROME
+ * orography drawn as in research/carte_seeing.py: coastline = 1 m contour of the 5x5-median relief,
+ * relief contours (1000 / 2000 m in white on large views, every 250 m with labels when zoomed), cities.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { useLocation } from "react-router-dom";
@@ -10,7 +11,7 @@ import { ColorBar, Seg } from "../components/ui";
 import { useUser } from "../data/auth";
 import { MAX_PLACES, selectPlace, siteToPlace, useCurrentPlace, usePlaceActions, usePlaces } from "../data/places";
 import { tr } from "../i18n";
-import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, parseCoord, relief, SARD, VILLES, ZONES, type Box, type Poly } from "../lib/geo";
+import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, parseCoord, SARD, VILLES, ZONES, type Box } from "../lib/geo";
 import { useGlobalMap, useLatestRunTime } from "../lib/hooks";
 import type { MapGrid } from "../api";
 import { D2R, esc, fmt, pad2, runLabel, turbo, turboGradient } from "../lib/util";
@@ -25,25 +26,17 @@ const ZMIN = 100 / 111.2;
 const NIGHT_H = [19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5],
   NH = NIGHT_H.length,
   MAPH = [...NIGHT_H, ...NIGHT_H],
-  inMean = (i: number) => MAPH[i] !== 19 && MAPH[i] !== 5,
-  TREND = [1.2, 1.14, 1.06, 1.0, 0.95, 0.92, 0.93, 0.97, 1.01, 1.07, 1.12, 1.24, 1.18, 1.1, 1.03, 0.98, 0.94, 0.95, 0.99, 1.04, 1.1, 1.16];
+  inMean = (i: number) => MAPH[i] !== 19 && MAPH[i] !== 5;
 const LEADMAX = 51;
 const KGLOB = [2, 57, 0.1];
 const JS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
 const LUT = [...Array(256)].map((_, k) => turbo(k / 255));
-const OTHERS: Poly[] = LANDS.filter((p) => p !== CORSE);
-
-const baseSee = (la: number, lo: number, r: number) =>
-  Math.max(
-    0.5,
-    4.3 -
-      3.0 * Math.min(1, r / 1500) +
-      (0.25 * (la - 46)) / 5 +
-      0.6 * Math.sin(la * 1.7 + lo * 0.9) * Math.cos(lo * 1.3 - la * 0.5) +
-      0.3 * Math.sin(la * 7.1 + 1) * Math.cos(lo * 6.3),
-  );
-const hourFac = (i: number, la: number, lo: number) =>
-  TREND[i]! * (1 + 0.2 * Math.sin(la * 1.3 + i * 0.55) * Math.cos(lo * 0.9 - i * 0.4));
+/** Colour of a seeing value: turbo on a fixed 0-10" range with a fixed square-root stretch, the same for
+ * every run so that nights can be compared (1" -> 32 %, 2" -> 45 %, 3" -> 55 %, 5" -> 71 % of the scale). */
+const SEE_TOP = 10;
+const seeColor = (s: number) => LUT[Math.round(Math.sqrt(Math.min(Math.max(s, 0), SEE_TOP) / SEE_TOP) * 255)]!;
+/** Views taller than this show the large-zone style (1000 / 2000 m contours), else 250 m contours. */
+const FINE_VIEW_DEG = 4;
 
 function fitBox(b: Box): Box {
   const r = CW / CH,
@@ -68,23 +61,14 @@ function clampView(v: Box): Box {
     no = Math.min(DOM.lo1, Math.max(DOM.lo0, clo));
   return { la0: nl - sl2 / 2, la1: nl + sl2 / 2, lo0: no - (so * f) / 2, lo1: no + (so * f) / 2 };
 }
-/* Contour lines: every 250 m with the real AROME relief, as research/carte_seeing.py; the fictitious
-   relief keeps its zoom-dependent step. */
-const isoStep = (V: Box, real = false) => {
-  if (real) return 250;
-  const s = V.la1 - V.la0;
-  return s > 4 ? 1000 : s > 1.2 ? 500 : 250;
-};
-/** Fixed colour scale of the research maps: turbo from 0 to 5". */
-const SEE_TOP = 5;
-
 interface Cache {
   key: string;
-  base: Float32Array;
   las: Float32Array;
   los: Float32Array;
-  sea: Uint8Array;
+  /** 0 none, 1 coastline, 2 major contour (white), 3 250 m contour (black) */
   iso: Uint8Array;
+  labels: [x: number, y: number, text: string][];
+  /** invisible land mask, only for the zone hit test of the domain view */
   mask: Uint8ClampedArray;
 }
 
@@ -111,38 +95,89 @@ function landMask(V: Box): Uint8ClampedArray {
   return g.getImageData(0, 0, CW, CH).data;
 }
 
-function viewCache(V: Box, prev: Cache | null, rel0: ((la: number, lo: number) => number) | null = null): Cache {
-  const key = [V.la0, V.la1, V.lo0, V.lo1].map((v) => v.toFixed(5)).join(",") + (rel0 ? "|real" : "");
+function viewCache(
+  V: Box,
+  prev: Cache | null,
+  rel0: ((la: number, lo: number) => number) | null,
+  coast0: ((la: number, lo: number) => number) | null,
+): Cache {
+  const key = [V.la0, V.la1, V.lo0, V.lo1].map((v) => v.toFixed(5)).join(",") + (rel0 ? "|r" : "") + (coast0 ? "|c" : "");
   if (prev?.key === key) return prev;
-  const iso0 = isoStep(V, !!rel0),
-    n = CW * CH,
+  const n = CW * CH,
     mask = landMask(V),
-    base = new Float32Array(n),
     las = new Float32Array(n),
     los = new Float32Array(n),
-    sea = new Uint8Array(n),
+    rel = new Float32Array(n),
+    med = new Float32Array(n),
     iso = new Uint8Array(n),
-    rel = new Float32Array(n);
+    fine = V.la1 - V.la0 <= FINE_VIEW_DEG,
+    cand: [number, number, number][] = [];
   for (let y = 0; y < CH; y++)
     for (let x = 0; x < CW; x++) {
       const j = y * CW + x,
         la = V.la1 - (y / CH) * (V.la1 - V.la0),
-        lo = V.lo0 + (x / CW) * (V.lo1 - V.lo0),
-        r = rel0 ? rel0(la, lo) : relief(la, lo);
-      rel[j] = r;
-      base[j] = baseSee(la, lo, r);
+        lo = V.lo0 + (x / CW) * (V.lo1 - V.lo0);
       las[j] = la;
       los[j] = lo;
-      sea[j] = mask[j * 4 + 3] ? 0 : 1;
+      rel[j] = rel0 ? rel0(la, lo) : NaN;
+      med[j] = coast0 ? coast0(la, lo) : NaN;
     }
+  const step = fine ? 250 : 1000;
   for (let y = 1; y < CH; y++)
     for (let x = 1; x < CW; x++) {
       const j = y * CW + x;
-      if ((sea[j] && !rel0) || !(rel[j]! > 0)) continue;
-      const a = Math.floor(rel[j]! / iso0);
-      if (a !== Math.floor(rel[j - 1]! / iso0) || a !== Math.floor(rel[j - CW]! / iso0)) iso[j] = 1;
+      // coastline: 1 m contour of the 5x5-median relief (the raw relief is noisy at sea)
+      const m = med[j]!,
+        mL = med[j - 1]!,
+        mU = med[j - CW]!;
+      if (!isNaN(m) && !isNaN(mL) && !isNaN(mU) && (m >= 1 !== mL >= 1 || m >= 1 !== mU >= 1)) {
+        iso[j] = 1;
+        continue;
+      }
+      const r = rel[j]!,
+        rL = rel[j - 1]!,
+        rU = rel[j - CW]!;
+      if (isNaN(r) || isNaN(rL) || isNaN(rU)) continue;
+      const b = Math.floor(r / step),
+        bo = Math.max(Math.floor(rL / step), Math.floor(rU / step)),
+        lv = Math.max(b, bo, Math.floor(Math.min(rL, rU) / step) + 1) * step;
+      if (b === Math.floor(rL / step) && b === Math.floor(rU / step)) continue;
+      if (fine) {
+        if (lv >= 250 && lv <= 2750) {
+          iso[j] = 3;
+          cand.push([x, y, lv]);
+        }
+      } else if (lv === 1000 || lv === 2000) iso[j] = 2;
     }
-  return { key, base, las, los, sea, iso, mask };
+  // contour labels (zoomed views, like clabel "%d m"): spread out, at most 30
+  const labels: Cache["labels"] = [];
+  for (let k = 0; k < cand.length && labels.length < 30; k += 23) {
+    const [x, y, lv] = cand[k]!;
+    if (x < 30 || x > CW - 60 || y < 20 || y > CH - 30) continue;
+    if (labels.every(([a, b2]) => (a - x) ** 2 + (b2 - y) ** 2 > 130 ** 2)) labels.push([x, y, `${lv} m`]);
+  }
+  return { key, las, los, iso, labels, mask };
+}
+
+/** 5x5 median of a grid (NaN ignored), as scipy.ndimage.median_filter(relief, 5) for the coastline. */
+function median5(g: MapGrid, a: Float32Array): Float32Array {
+  const out = new Float32Array(a.length),
+    w: number[] = [];
+  for (let r = 0; r < g.ny; r++)
+    for (let c = 0; c < g.nx; c++) {
+      w.length = 0;
+      for (let dr = -2; dr <= 2; dr++)
+        for (let dc = -2; dc <= 2; dc++) {
+          const rr = r + dr,
+            cc = c + dc;
+          if (rr < 0 || cc < 0 || rr >= g.ny || cc >= g.nx) continue;
+          const v = a[rr * g.nx + cc]!;
+          if (!isNaN(v)) w.push(v);
+        }
+      w.sort((x, y) => x - y);
+      out[r * g.nx + c] = w.length ? w[w.length >> 1]! : NaN;
+    }
+  return out;
 }
 
 type ZoneHit = [x: number, y: number, w: number, h: number, i: number];
@@ -233,22 +268,6 @@ export default function Carte() {
   );
   const night = NIGHTS[Math.min(MNI, NIGHTS.length - 1)] ?? { i0: 0, i1: NH - 1, lab: "" };
 
-  const frameFac = useCallback(
-    (la: number, lo: number) => {
-      if (mode === "m") {
-        let s = 0,
-          n = 0;
-        for (let i = night.i0; i <= night.i1; i++)
-          if (inMean(i)) {
-            s += hourFac(i, la, lo);
-            n++;
-          }
-        return s / n;
-      }
-      return hourFac(MI, la, lo);
-    },
-    [mode, MI, night.i0, night.i1],
-  );
 
   /* Real map: the frame of the chosen hour, or the mean seeing of the night's frames. Hours the run
      does not cover are left out (no interpolation, no fictitious field): no value at all for a
@@ -276,8 +295,9 @@ export default function Carte() {
     return { sample: sampler(gmap.meta.grid, mean), hours: used.map((i) => MAPH[i]!), expected: idx.length };
   }, [gmap, mode, MI, night.i0, night.i1, frameT, RUN0]);
   const sample = real?.sample ?? null;
-  /** Real AROME orography of the map grid, when the run has it. */
+  /** Real AROME orography of the map grid, when the run has it, and its 5x5 median (coastline). */
   const relReal = useMemo(() => (gmap?.relief ? sampler(gmap.meta.grid, gmap.relief) : null), [gmap]);
+  const coast = useMemo(() => (gmap?.relief ? sampler(gmap.meta.grid, median5(gmap.meta.grid, gmap.relief)) : null), [gmap]);
 
   const toXY = useCallback(
     (la: number, lo: number) => [((lo - VW.lo0) / (VW.lo1 - VW.lo0)) * CW, ((VW.la1 - la) / (VW.la1 - VW.la0)) * CH] as const,
@@ -291,52 +311,43 @@ export default function Carte() {
     const cv = canvas.current;
     if (!cv) return;
     const cx = cv.getContext("2d")!;
-    const C = (cache.current = viewCache(VW, cache.current, relReal));
+    const C = (cache.current = viewCache(VW, cache.current, relReal, coast));
     const img = cx.createImageData(CW, CH),
       D = img.data;
     for (let j = 0; j < CW * CH; j++) {
-      const p = j * 4;
-      // The real map covers the whole AROME domain, sea included; the fictitious field is land only.
-      if (C.sea[j] && !sample) {
-        D[p] = 27;
-        D[p + 1] = 39;
-        D[p + 2] = 64;
-        D[p + 3] = 255;
-        continue;
-      }
-      // Fixed colour stretch (turbo 0–5", as the research maps) so that maps stay comparable from run to run.
-      const s = sample ? sample(C.las[j]!, C.los[j]!) : C.base[j]! * frameFac(C.las[j]!, C.los[j]!);
-      if (isNaN(s)) {
-        D[p] = 60;
-        D[p + 1] = 66;
-        D[p + 2] = 80;
-        D[p + 3] = 255;
-        continue;
-      }
-      const c = LUT[Math.min(255, Math.max(0, Math.round((s / SEE_TOP) * 255)))]!,
-        d = C.iso[j] ? 0.45 : 1;
-      D[p] = c[0] * d;
-      D[p + 1] = c[1] * d;
-      D[p + 2] = c[2] * d;
+      const p = j * 4,
+        s = sample ? sample(C.las[j]!, C.los[j]!) : NaN;
+      // no map yet, or hour not covered by the run: neutral grey (no fictitious field)
+      const c = isNaN(s) ? [60, 66, 80] : seeColor(s),
+        k = C.iso[j];
+      let r = c[0]!,
+        g2 = c[1]!,
+        b = c[2]!;
+      if (k === 1) r = g2 = b = 0;
+      else if (k === 2) [r, g2, b] = [r * 0.4 + 255 * 0.6, g2 * 0.4 + 255 * 0.6, b * 0.4 + 255 * 0.6];
+      else if (k === 3) [r, g2, b] = [r * 0.5, g2 * 0.5, b * 0.5];
+      D[p] = r;
+      D[p + 1] = g2;
+      D[p + 2] = b;
       D[p + 3] = 255;
     }
     cx.putImageData(img, 0, 0);
     const big = VW.la1 - VW.la0 < 3.2;
-    const poly = (pl: Poly) => {
-      cx.beginPath();
-      pl.forEach((q, k) => {
-        const [x, y] = toXY(...q);
-        if (k) cx.lineTo(x, y);
-        else cx.moveTo(x, y);
-      });
-      cx.closePath();
-      cx.stroke();
-    };
-    cx.lineWidth = 1;
-    cx.strokeStyle = "rgba(255,255,255,.55)";
-    OTHERS.forEach(poly);
-    cx.strokeStyle = "rgba(255,255,255,.8)";
-    [FRA, CORSE].forEach(poly);
+    cx.font = "9px 'IBM Plex Sans',sans-serif";
+    C.labels.forEach(([x, y, txt]) => {
+      cx.lineWidth = 2.5;
+      cx.strokeStyle = "rgba(255,255,255,.55)";
+      cx.strokeText(txt, x + 2, y - 2);
+      cx.fillStyle = "#000";
+      cx.fillText(txt, x + 2, y - 2);
+    });
+    if (!gmap) {
+      cx.font = "500 14px 'IBM Plex Sans',sans-serif";
+      cx.fillStyle = "#e6ebf6";
+      cx.textAlign = "center";
+      cx.fillText(tr("La carte apparaîtra après le prochain run du batch."), CW / 2, CH / 2);
+      cx.textAlign = "left";
+    }
     // Places shared by the community (the API blurs other members' positions by 5-11 km).
     sh.forEach(({ lat: la, lon: lo }) => {
       const [x, y] = toXY(la, lo),
@@ -467,8 +478,8 @@ export default function Carte() {
     );
     const hkm = Math.round((VW.la1 - VW.la0) * 111.2),
       zmax = VW.la1 - VW.la0 <= ZMIN + 1e-6;
-    label(tr(`${hkm} × ${km} km${zmax ? " · zoom maximal" : ""} · isolignes ${isoStep(VW, !!relReal)} m`), CW - (zmax ? 300 : 200), CH - 12);
-  }, [VW, frameFac, sample, relReal, toXY, pub, sh, mine, MZH, newPt, role, lang]);
+    label(tr(`${hkm} × ${km} km${zmax ? " · zoom maximal" : ""} · isolignes ${VW.la1 - VW.la0 <= FINE_VIEW_DEG ? "250" : "1000 / 2000"} m`), CW - (zmax ? 300 : 200), CH - 12);
+  }, [VW, sample, relReal, coast, gmap, toXY, pub, sh, mine, MZH, newPt, role, lang]);
 
   /* ---------- animation ---------- */
   const last = NIGHTS[NIGHTS.length - 1]?.i1 ?? NH - 1;
@@ -569,7 +580,8 @@ export default function Carte() {
       lo = LO(x);
     setTip(
       relReal || onLand(x, y)
-        ? `<span class="mono">${la.toFixed(3)} N · ${lo.toFixed(3)} E</span> · ${tr("relief AROME")} <span class="mono">${Math.round(relReal ? relReal(la, lo) : relief(la, lo))} m</span>`
+        ? `<span class="mono">${la.toFixed(3)} N · ${lo.toFixed(3)} E</span>` +
+            (relReal ? ` · ${tr("relief AROME")} <span class="mono">${Math.round(relReal(la, lo))} m</span>` : "")
         : `<span class="mono">${la.toFixed(2)} N · ${lo.toFixed(2)} E</span> · ${tr("hors de la zone du calcul global")}`,
     );
   };
@@ -826,7 +838,7 @@ export default function Carte() {
               </span>
               <span>
                 <span className="sw" style={{ width: 14, borderTop: "1px solid rgba(0,0,0,.6)" }} />
-                {tr("Relief AROME, isolignes tous les 1000 m (500 m en zoom)")}
+                {tr("Relief AROME : trait de côte, isolignes 1000 et 2000 m (tous les 250 m en zoom)")}
               </span>
               <span>
                 <span className="sw" style={{ width: 14, height: 12, background: "rgb(60,66,80)" }} />

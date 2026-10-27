@@ -77,8 +77,8 @@ export function usePlaces(): { pub: Place[]; sh: Place[]; hid: Place[]; mine: Pl
     const pub = others.filter((p) => !p.shared && !p.hidden),
       sh = others.filter((p) => p.shared),
       hid = others.filter((p) => p.hidden);
-    // Logged out: the example places show what an account gives.
-    const mine = user ? own : MOCK_PLACES;
+    // Only real places: a logged-out visitor has no personal place (no example places).
+    const mine = user ? own : [];
     return { pub, sh, hid, mine, all: [...others, ...mine] };
   }, [sites.data, user]);
 }
@@ -96,13 +96,19 @@ export function usePlaceActions() {
   };
 }
 
+/** Place shown by default (and while the site list loads): the OHP, a real public site. */
+export const DEFAULT_SITE = "ohp";
+const DEFAULT_PLACE: Place = {
+  id: "pub:ohp", nom: "OHP", lat: 43.9317, lon: 5.7128, alt: 650, kind: "pub", slug: "ohp", K: [...KDEF], real: true, f: 1,
+};
+
 /** Site of the shared "CosmoDrôme team" account: its team sees and sets its K. */
 export const TEAM_SITE = "cosmodrome";
 
 export function useCurrentPlace(): Place {
   const id = useUi((s) => s.place);
   const { all } = usePlaces();
-  return all.find((p) => p.id === id) ?? MOCK_PLACES[0]!;
+  return all.find((p) => p.id === id) ?? all.find((p) => p.slug === DEFAULT_SITE) ?? all[0] ?? DEFAULT_PLACE;
 }
 
 /** K of public and shared sites are visible to the administrator only (and to the team for its own site);

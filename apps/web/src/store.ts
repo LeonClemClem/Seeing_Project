@@ -31,7 +31,7 @@ function initialLang(): Lang {
 let state: UiState = {
   lang: initialLang(),
   role: "user",
-  place: "mine:jardin",
+  place: "pub:ohp",
   K: [11.6, 20.8, 0.1],
   KCAL: [11.6, 20.8, 0.1],
   kmode: "A",

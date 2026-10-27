@@ -199,8 +199,8 @@ function ModelVars({ place }: { place: Place }) {
   const { forecast } = useRealForecast(place, view);
   const [sel, setSel] = useState<Set<string>[]>(() => [new Set(["see"]), new Set(["u10", "u100", "u500"])]);
   const panels = useLangMemo(
-    () => (forecast.data ? [0, 1].map((k) => pvPanel(forecast.data!, place.nom, sel[k]!)) : null),
-    [forecast.data, place.nom, sel],
+    () => (forecast.data ? [0, 1].map((k) => pvPanel(forecast.data!, place.nom, sel[k]!, zoom)) : null),
+    [forecast.data, place.nom, sel, zoom],
   );
   if (!forecast.data || !panels) return <p className="muted small">{tr("Pas de variables enregistrées pour ce lieu.")}</p>;
   const dg = (v: number) => (Math.abs(v) >= 20 ? v.toFixed(0) : Math.abs(v) >= 2 ? v.toFixed(1) : v.toFixed(2));

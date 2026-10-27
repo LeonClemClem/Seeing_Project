@@ -139,14 +139,27 @@ export function Cn2RealPanel({
   const obs = useHourlyMedians(place);
   const showObs = useUi((s) => s.showObs);
   const ctx = useMemo(
-    () => (cn2.data ? cn2Ctx(cn2.data, forecast.data, alt, showObs ? obs : undefined) : null),
-    [cn2.data, forecast.data, alt, obs, showObs],
+    () => (cn2.data ? cn2Ctx(cn2.data, forecast.data, alt, showObs ? obs : undefined, zoom) : null),
+    [cn2.data, forecast.data, alt, obs, showObs, zoom],
   );
   const svg = useLangMemo(() => (ctx && cn2.data ? cn2RealSvg(ctx, Date.parse(cn2.data.run_time)) : ""), [ctx, cn2.data]);
   const [hover, setHover] = useState<number | null>(null);
   const svgRef = useRef<HTMLDivElement>(null);
+  const scRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ x: number; s: number } | null>(null);
   const hi = hover ?? (ctx ? Math.min(ctx.n - 1, 6) : 0);
   const pf = useLangMemo(() => (ctx && profile ? cn2ProfileSvg(ctx, hi, 130) : ""), [ctx, hi, profile]);
+  /** Zoom keeping the centre of the visible part in place (as the mock-up). */
+  const setZoomC = (f: number) => {
+    const sc = scRef.current,
+      frac = sc && sc.scrollWidth ? (sc.scrollLeft + sc.clientWidth / 2) / sc.scrollWidth : 0.5;
+    const z = f ? Math.min(16, Math.max(1, zoom * f)) : 1;
+    setZoom(z);
+    requestAnimationFrame(() => {
+      const s2 = scRef.current;
+      if (s2) s2.scrollLeft = frac * s2.scrollWidth - s2.clientWidth / 2;
+    });
+  };
 
   const controls = (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "4px 0 6px" }}>
@@ -171,9 +184,9 @@ export function Cn2RealPanel({
         <option value="tout">{tr("jusqu'en haut (16 km)")}</option>
       </select>
       <span className="small muted">{tr("Zoom :")}</span>
-      <button onClick={() => setZoom((z) => Math.max(1, z / 2))}>−</button>
-      <button onClick={() => setZoom((z) => Math.min(16, z * 2))}>+</button>
-      <button onClick={() => setZoom(1)}>{tr("tout voir")}</button>
+      <button onClick={() => setZoomC(0.5)}>−</button>
+      <button onClick={() => setZoomC(2)}>+</button>
+      <button onClick={() => setZoomC(0)}>{tr("tout voir")}</button>
       {profile && <span className="small muted">{tr("survole le panneau : profil à l'heure choisie")}</span>}
     </div>
   );
@@ -208,7 +221,18 @@ export function Cn2RealPanel({
     <div style={style}>
       {controls}
       <div style={{ display: "flex", gap: 2, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div style={{ flex: "1 1 520px", minWidth: 0, overflowX: zoom > 1 ? "auto" : "visible" }}>
+        <div
+          ref={scRef}
+          style={{ flex: "1 1 520px", minWidth: 0, overflowX: zoom > 1 ? "auto" : "visible", cursor: zoom > 1 ? "grab" : undefined }}
+          onMouseDown={(e) => {
+            if (zoom > 1 && scRef.current) drag.current = { x: e.clientX, s: scRef.current.scrollLeft };
+          }}
+          onMouseMove={(e) => {
+            if (drag.current && scRef.current) scRef.current.scrollLeft = drag.current.s - (e.clientX - drag.current.x);
+          }}
+          onMouseUp={() => (drag.current = null)}
+          onMouseLeave={() => (drag.current = null)}
+        >
           <div ref={svgRef} style={{ width: `${zoom * 100}%` }} onMouseMove={profile ? mm : undefined}>
             <SvgChart html={svg} viewBox={`0 0 ${ctx.W} ${ctx.H}`} label="Panneau Cn2" />
           </div>

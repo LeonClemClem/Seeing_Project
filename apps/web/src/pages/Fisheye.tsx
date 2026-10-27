@@ -12,10 +12,8 @@ import { useCurrentPlace } from "../data/places";
 import { tr } from "../i18n";
 import { useLatestRunTime } from "../lib/hooks";
 import {
-  airmass,
   altaz,
   CAT,
-  horizon,
   LN,
   moonAltAz,
   moonPhase,
@@ -33,7 +31,8 @@ const FN = 520,
   FR = 232,
   FC = FN / 2,
   ELMIN = 5;
-const OPT0 = { cons: ["Constellations", true], sol: ["Soleil et Lune", true], hor: ["Horizon", true], trk: ["Course des objets", true], nua: ["Nuages", false] } as const;
+/* Only real elements: no fictitious horizon profile nor clouds (the mock-up's were synthetic). */
+const OPT0 = { cons: ["Constellations", true], sol: ["Soleil et Lune", true], trk: ["Course des objets", true] } as const;
 type OptKey = keyof typeof OPT0;
 
 const LAMBDA = 500e-9;
@@ -88,7 +87,7 @@ export default function Fisheye() {
   const [fcur, setFcur] = useState(3);
   const [playing, setPlaying] = useState(false);
   const [cal, setCal] = useState<"mine" | "def">("mine");
-  const [opt, setOpt] = useState<Record<OptKey, boolean>>({ cons: true, sol: true, hor: true, trk: true, nua: false });
+  const [opt, setOpt] = useState<Record<OptKey, boolean>>({ cons: true, sol: true, trk: true });
   const [plOn, setPlOn] = useState(() => new Set(["Jupiter", "Saturne", "Mars"]));
   const [tgts, setTgts] = useState<CatObj[]>(() => [CAT[0]!, CAT[9]!]);
   const [q, setQ] = useState("");
@@ -106,16 +105,13 @@ export default function Fisheye() {
     return fe.frames.find((f) => f.lead_hour === lead);
   };
   const K: K3 = cal === "mine" ? place.K : fe ? [fe.k[0]!, fe.k[1]!, fe.k[2]!] : KDEF;
-  const SZ = (i: number) => {
-    const f = Math.pow((K[0] * 0.6 + K[1] * 0.4) / (KDEF[0] * 0.6 + KDEF[1] * 0.4), 0.6),
-      j = i + FNI * 3;
-    return (1.1 + 0.45 * Math.cos(((j - 5) / 11) * Math.PI * 2) + 0.1 * Math.sin(j * 1.3)) * f * (1 + 0.15 * FNI);
-  };
-  const vis = (alt: number, az: number) => alt >= ELMIN && (!opt.hor || alt >= horizon(az));
+  // az kept so that every caller can pass (alt, az): there is no horizon profile (it was fictitious)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const vis = (alt: number, _az: number) => alt >= ELMIN;
   const seeSky = (i: number, alt: number, az: number) => {
     const fr = frameAt(i);
-    if (fe) return fr ? realSee(fe, fr, K, alt, az) : NaN; // hour not covered by the run: no value
-    return SZ(i) * Math.pow(airmass(alt), 0.6) * (1 + 0.15 * Math.cos((az - 250) * D2R) * (1 - alt / 90));
+    // no fisheye data (yet) or hour not covered by the run: no value, never a fictitious field
+    return fe && fr ? realSee(fe, fr, K, alt, az) : NaN;
   };
   const best = (o: CatObj) => {
     let b: [number, number] | null = null;
@@ -157,12 +153,8 @@ export default function Fisheye() {
         const alt = 90 - (r / FR) * 90,
           az = (Math.atan2(-dx, dy) / D2R + 360) % 360;
         const s = vis(alt, az) ? seeSky(fcur, alt, az) : NaN;
-        let col: number[] = isNaN(s) ? [55, 62, 80] : turbo(s / 8);
-        if (opt.nua && vis(alt, az)) {
-          const d = Math.hypot((((az - 60 - fcur * 8 + 540) % 360) - 180) * Math.cos(alt * D2R), alt - 30),
-            f = Math.max(0, 1 - d / 30) * 0.75;
-          col = col.map((v) => Math.round(v * (1 - f) + 255 * f));
-        }
+        // same colours as the map: turbo, 0-10" with a fixed square-root stretch
+        const col: number[] = isNaN(s) ? [55, 62, 80] : turbo(Math.sqrt(Math.min(Math.max(s, 0), 10) / 10));
         D[p] = col[0]!;
         D[p + 1] = col[1]!;
         D[p + 2] = col[2]!;
@@ -348,7 +340,7 @@ export default function Fisheye() {
       <div className="grid2">
         <div className="panel">
           <canvas ref={cv} width={FN} height={FN} aria-label={tr("Fisheye du seeing avec objets du ciel")} />
-          <ColorBar left={'0"'} right={'8"'} gradient={turboGradient()} />
+          <ColorBar left={'0"'} right={'10"'} gradient={turboGradient()} />
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
             <span className="small muted">{tr("Nuit :")}</span>
             <Seg
@@ -396,7 +388,10 @@ export default function Fisheye() {
             <div className="tiles">
               <div className="tile">
                 <div className="l">{tr("Seeing au zénith")}</div>
-                <div className="v">{SZ(fcur).toFixed(2)}"</div>
+                <div className="v">{(() => {
+                  const z = seeSky(fcur, 90, 0);
+                  return isNaN(z) ? "–" : z.toFixed(2) + "\"";
+                })()}</div>
               </div>
               <div className="tile">
                 <div className="l">{tr("Soleil")}</div>

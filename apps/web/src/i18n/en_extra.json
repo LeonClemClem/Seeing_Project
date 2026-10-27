@@ -9,6 +9,8 @@
 "Supprimer ce lieu": "Delete this place",
 "Utilisés dès le prochain run.": "Used from the next run.",
 "Lieu partagé": "Shared place",
+"Relief AROME : trait de côte, isolignes 1000 et 2000 m (tous les 250 m en zoom)": "AROME relief: coastline, 1000 and 2000 m contours (every 250 m when zoomed)",
+"La carte apparaîtra après le prochain run du batch.": "The map will appear after the next batch run.",
 "Étoiles, objets, planètes, Soleil et Lune placés à leurs vraies positions pour ce lieu et cette nuit.": "Stars, objects, planets, Sun and Moon at their real positions for this place and night.",
 "Aucun lieu partagé pour l'instant.": "No shared place yet.",
 "Pas de prévision à cette heure (run incomplet)": "No forecast at this hour (incomplete run)",
