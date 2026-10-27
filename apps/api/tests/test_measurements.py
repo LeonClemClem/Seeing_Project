@@ -49,6 +49,8 @@ def test_upload_read_delete_measurements():
     assert bob.get(f"/api/sites/{slug}/measurements").status_code == 404
     assert bob.post(f"/api/sites/{slug}/measurements", json={"points": pts}).status_code == 404
     assert bob.post("/api/sites/saint-veran/measurements", json={"points": pts}).status_code == 404
+    # public site: its monitor is readable by every logged-in user, still not writable
+    assert bob.get("/api/sites/saint-veran/measurements").status_code == 200
 
 
 def test_terms_use_the_latest_run_before_each_hour():

@@ -117,7 +117,7 @@ def run_batch(
 
 
 def monitors_days() -> int:
-    return int(os.environ.get("MONITORS_DAYS", "7"))
+    return int(os.environ.get("MONITORS_DAYS", "30"))  # Miratlas keeps ~30 days: a missed day is caught up
 
 
 def monitors_due(now: datetime | None = None) -> bool:

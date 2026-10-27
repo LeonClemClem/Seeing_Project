@@ -25,6 +25,46 @@ export function useRealForecast(place: Place, view: View = "run") {
   return { forecast, cn2 };
 }
 
+/** Raw measurements of a real site [ms, arcsec], sorted: those stored on the server (research uploads and the
+ * daily collection of the online monitors) and the raw points of the research history. */
+export function useRawMeasurements(place: Place): [number, number][] {
+  const slug = place.slug ?? "";
+  const q = useQuery({
+    queryKey: ["measurements", slug],
+    queryFn: () => api.measurements(slug),
+    enabled: place.real && !!slug,
+    retry: false,
+    staleTime: 10 * 60 * 1000,
+  });
+  const h = useSiteHistory(place);
+  return useMemo(() => {
+    const m = new Map<number, number>();
+    h?.episodes.forEach((e) =>
+      e.brut.forEach(([t, v]) => {
+        if (v != null) m.set(Date.parse(t.length <= 16 ? t + ":00Z" : t), v);
+      }),
+    );
+    q.data?.times.forEach((t, i) => m.set(Date.parse(t), q.data!.seeing_arcsec[i]!));
+    return [...m.entries()].sort((a, b) => a[0] - b[0]);
+  }, [q.data, h]);
+}
+
+/** Hourly medians of raw points [ms, arcsec], by round UTC hour [ms] (each hour +/- 30 min). */
+export function hourlyMedians(raw: [number, number][]): Map<number, number> {
+  const by = new Map<number, number[]>();
+  raw.forEach(([t, v]) => {
+    const k = Math.round(t / 3600000) * 3600000;
+    (by.get(k) ?? by.set(k, []).get(k)!).push(v);
+  });
+  const out = new Map<number, number>();
+  by.forEach((v, k) => {
+    v.sort((a, b) => a - b);
+    const n = v.length;
+    out.set(k, n % 2 ? v[(n - 1) / 2]! : (v[n / 2 - 1]! + v[n / 2]!) / 2);
+  });
+  return out;
+}
+
 /** Measured hourly medians of a real site (research history), by UTC hour [ms]. */
 export function useHourlyMedians(place: Place): Map<number, number> {
   const h = useSiteHistory(place);

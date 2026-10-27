@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 
 import { histChart, histSvg, seeHist } from "../charts/lieuCharts";
 import { cn2Ctx, cn2ProfileSvg, cn2RealSvg } from "../charts/realCharts";
-import { useHourlyMedians, useRealForecast, type View } from "../data/forecast";
+import { hourlyMedians, useHourlyMedians, useRawMeasurements, useRealForecast, type View } from "../data/forecast";
 import type { Place } from "../data/places";
 import { tr } from "../i18n";
 import type { LieuData } from "../mock/engine";
@@ -83,7 +83,17 @@ export function HistPanel({ data, OB, inset = true }: { data: LieuData; OB: bool
 
   const h = useLangMemo(() => histChart(data, { OB, mesf, zoom, win }), [data, OB, mesf, zoom, win]);
   const hv = useMemo(() => (inset ? seeHist(data) : []), [data, inset]);
-  const small = useLangMemo(() => (hv.length ? histSvg(hv, 332, 56, true).svg : ""), [hv]);
+  // inset as the mock-up: it takes the height of the header row, the histogram fills it
+  const insetRef = useRef<HTMLDivElement>(null);
+  const [hh, setHh] = useState(56);
+  useEffect(() => {
+    const el = insetRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setHh(Math.max(52, Math.round(el.clientHeight - 6))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [hv.length, OB]);
+  const small = useLangMemo(() => (hv.length ? histSvg(hv, 332, hh, true).svg : ""), [hv, hh]);
 
   return (
     <>
@@ -99,8 +109,13 @@ export function HistPanel({ data, OB, inset = true }: { data: LieuData; OB: bool
           <span className="small muted">{zoom > 1 ? tr(`× ${zoom} (fais défiler horizontalement)`) : ""}</span>
         </div>
         {OB && small && (
-          <div className="hginset" style={{ padding: "2px 4px" }}>
-            <SvgChart html={small} viewBox="0 0 332 56" label="Histogramme du seeing enregistré" />
+          <div className="hginset" ref={insetRef}>
+            <SvgChart
+              html={small}
+              viewBox={`0 0 332 ${hh}`}
+              label="Histogramme du seeing enregistré"
+              style={{ position: "absolute", left: 4, top: 2, width: "calc(100% - 8px)", height: hh, maxWidth: "none" }}
+            />
           </div>
         )}
       </div>
@@ -136,11 +151,15 @@ export function Cn2RealPanel({
   const [view, setView] = useState<View>(defaultView);
   const [zoom, setZoom] = useState(1);
   const { forecast, cn2 } = useRealForecast(place, view);
-  const obs = useHourlyMedians(place);
+  const histMed = useHourlyMedians(place);
+  const raw = useRawMeasurements(place);
   const showObs = useUi((s) => s.showObs);
+  const mesf = useUi((s) => s.mesf);
+  // hourly medians: research history first, then those of the raw points (daily monitor collection)
+  const obs = useMemo(() => new Map([...hourlyMedians(raw), ...histMed]), [raw, histMed]);
   const ctx = useMemo(
-    () => (cn2.data ? cn2Ctx(cn2.data, forecast.data, alt, showObs ? obs : undefined, zoom) : null),
-    [cn2.data, forecast.data, alt, obs, showObs, zoom],
+    () => (cn2.data ? cn2Ctx(cn2.data, forecast.data, alt, showObs ? obs : undefined, zoom, showObs ? raw : [], mesf) : null),
+    [cn2.data, forecast.data, alt, obs, raw, showObs, zoom, mesf],
   );
   const svg = useLangMemo(() => (ctx && cn2.data ? cn2RealSvg(ctx, Date.parse(cn2.data.run_time)) : ""), [ctx, cn2.data]);
   const [hover, setHover] = useState<number | null>(null);
