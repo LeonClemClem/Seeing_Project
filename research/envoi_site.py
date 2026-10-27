@@ -13,7 +13,8 @@ Pour chaque site de historique_sites.SITES, envoie au site :
 Il faut un compte ADMINISTRATEUR du site : e-mail et mot de passe sont demandes au lancement
 (le mot de passe n'est ni affiche ni enregistre).
 Tant que le site est derriere IAP (connexion Google), le script demande a gcloud un jeton d'identite
-de ton compte Google (gcloud auth print-identity-token) et l'envoie dans l'en-tete Authorization (le site, lui, utilise un cookie).
+du compte de service seeing-uploader (autorise a passer IAP, rien d'autre), au nom de ton compte gcloud,
+et l'envoie dans l'en-tete Authorization (le site, lui, utilise un cookie).
 
 Usage : python envoi_site.py [--url URL] [--sites "OHP,Drôme"] [--sans mesures,previsions,historique] [--essai]
         --essai : lit et compte tout, sans rien envoyer (pas de connexion).
@@ -26,6 +27,9 @@ import argparse, getpass, importlib.util, json, math, os, shutil, subprocess
 import pandas as pd
 
 URL_PROD = "https://seeing-web-prod-62naw3atjq-uc.a.run.app"
+# Passage d'IAP : compte de service autorise et identifiant OAuth d'IAP du site de production (pas des secrets).
+COMPTE_IAP = "seeing-uploader@project-astrarome.iam.gserviceaccount.com"
+CLIENT_IAP = "5123733464-g1cleua3a3djp1s5ajrvmlj0916dnle8.apps.googleusercontent.com"
 # nom dans historique_sites -> site du serveur
 SLUGS = {"Drôme": "verclause", "Copernic": "copernic-gap", "Saint-Veran": "saint-veran", "OHP": "ohp",
          "Seeing monitor 5": "seeing-monitor-5", "Pic du Midi": "pic-du-midi", "Cosmodrome": "cosmodrome"}
@@ -92,7 +96,10 @@ def jeton_iap():
     g = gcloud()
     if not g:
         return None
-    r = subprocess.run([g, "auth", "print-identity-token"], capture_output=True, text=True)
+    r = subprocess.run([g, "auth", "print-identity-token", f"--impersonate-service-account={COMPTE_IAP}",
+                        f"--audiences={CLIENT_IAP}", "--include-email"], capture_output=True, text=True)
+    if not r.stdout.strip():
+        print("Pas de jeton IAP :", r.stderr.strip()[-300:])
     return r.stdout.strip() or None
 
 
