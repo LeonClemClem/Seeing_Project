@@ -89,7 +89,8 @@ def test_forecast_shape_and_null_handling(client, session):
     assert [p["lead_hour"] for p in fc["points"]] == [0, 1, 2]
     assert [p["seeing_arcsec"] for p in fc["points"]] == [1.0, None, None]
     assert fc["points"][1]["valid_time"] == "2026-10-13T01:00:00Z"
-    assert set(fc["points"][0]) == {"lead_hour", "valid_time", "seeing_arcsec", "r0_m", "integral_cn2", "h_coulim_m"}
+    assert set(fc["points"][0]) == {"lead_hour", "valid_time", "seeing_arcsec", "r0_m", "integral_cn2", "h_coulim_m",
+                                    "model_altitude_m", "variables"}
 
 
 def test_cn2_union_grid_padded_with_null(client, session):

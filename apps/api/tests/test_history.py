@@ -75,4 +75,6 @@ def test_cn2_import_for_the_week_view():
     r = adm.post("/api/admin/sites/ohp/cn2", json=body).json()
     assert r == {"site": "ohp", "profiles": 2, "kept_existing": 0, "too_recent_runs": 0}  # wrong length skipped
     cn = adm.get("/api/sites/ohp/cn2", params={"run": "2026-10-14T00:00Z"}).json()
-    assert cn["heights_m"] == [10.0, 110.0, 210.0] and cn["cn2"][0] == [1e-15, None, 1e-17]
+    assert cn["heights_m"] == [10.0, 110.0, 210.0]
+    row = cn["cn2"][0]  # stored as REAL (float32)
+    assert row[1] is None and row[0] == pytest.approx(1e-15, rel=1e-6) and row[2] == pytest.approx(1e-17, rel=1e-6)
