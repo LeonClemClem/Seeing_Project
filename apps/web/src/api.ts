@@ -74,6 +74,10 @@ export interface ForecastPoint {
   r0_m: number | null;
   integral_cn2: number | null;
   h_coulim_m: number | null;
+  /** Ground altitude of the AROME grid point [m]. */
+  model_altitude_m?: number | null;
+  /** Model variables {t2, dth, u10, u100, u500, shl, shj, tke}, absent for older forecasts. */
+  variables?: Record<string, number | null> | null;
 }
 
 export interface Forecast {
@@ -105,6 +109,8 @@ export interface MapMeta {
   see_min: number;
   see_max: number;
   frames: { lead_hour: number; valid_time: string }[];
+  /** GET /api/map/relief serves the model orography of the grid. */
+  relief?: boolean;
 }
 
 export type UserRole = "user" | "team" | "admin";
@@ -178,11 +184,21 @@ export const api = {
   terms: (slug: string, from: string, to: string) =>
     get<Terms>(`/api/sites/${encodeURIComponent(slug)}/terms?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   latestRun: () => get<Run>("/api/runs/latest"),
-  forecast: (slug: string, run = "latest") =>
-    get<Forecast>(`/api/sites/${encodeURIComponent(slug)}/forecast?run=${encodeURIComponent(run)}`),
-  cn2: (slug: string, run = "latest") =>
-    get<Cn2>(`/api/sites/${encodeURIComponent(slug)}/cn2?run=${encodeURIComponent(run)}`),
+  /** view "week": up to 7 days of main runs stitched, then the run. */
+  forecast: (slug: string, run = "latest", view: "run" | "week" = "run") =>
+    get<Forecast>(`/api/sites/${encodeURIComponent(slug)}/forecast?run=${encodeURIComponent(run)}&view=${view}`),
+  cn2: (slug: string, run = "latest", view: "run" | "week" = "run") =>
+    get<Cn2>(`/api/sites/${encodeURIComponent(slug)}/cn2?run=${encodeURIComponent(run)}&view=${view}`),
   map: () => get<MapMeta>("/api/map"),
+  /** Model orography of the map grid [m], NaN where undefined. */
+  mapRelief: async (run: string): Promise<Float32Array> => {
+    const res = await fetch(`/api/map/relief?run=${encodeURIComponent(run)}`, { credentials: "same-origin" });
+    if (!res.ok) throw new ApiError(res.status, res.statusText);
+    const q = new Uint16Array(await res.arrayBuffer()),
+      out = new Float32Array(q.length);
+    for (let i = 0; i < q.length; i++) out[i] = q[i] === 65535 ? NaN : q[i]! - 500;
+    return out;
+  },
   /** Raw codes of one map frame (uint8, 255 = no value). */
   mapFrame: async (run: string, lead: number): Promise<Uint8Array> => {
     const res = await fetch(`/api/map/frame?run=${encodeURIComponent(run)}&lead=${lead}`, { credentials: "same-origin" });
@@ -196,7 +212,7 @@ export const queryKeys = {
   me: ["me"] as const,
   sites: ["sites"] as const,
   latestRun: ["runs", "latest"] as const,
-  forecast: (slug: string, run: string) => ["forecast", slug, run] as const,
-  cn2: (slug: string, run: string) => ["cn2", slug, run] as const,
+  forecast: (slug: string, run: string, view = "run") => ["forecast", slug, run, view] as const,
+  cn2: (slug: string, run: string, view = "run") => ["cn2", slug, run, view] as const,
   map: (run: string) => ["map", run] as const,
 };

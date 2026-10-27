@@ -3,7 +3,7 @@
  * (API places of the logged-in account; example places when logged out). All API places have real
  * forecasts, computed by the batch at every run.
  */
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import { api, queryKeys, type PlaceIn, type PlacePatch, type Site } from "../api";
@@ -62,7 +62,9 @@ export const siteToPlace = (s: Site): Place => ({
 
 export function useSites() {
   const user = useUser();
-  return useQuery({ queryKey: [...queryKeys.sites, user?.id ?? 0], queryFn: api.sites });
+  // keepPreviousData: while the list reloads (login, new place), keep the previous one instead of falling
+  // back for an instant to the example places (their fictitious panels).
+  return useQuery({ queryKey: [...queryKeys.sites, user?.id ?? 0], queryFn: api.sites, placeholderData: keepPreviousData });
 }
 
 export function usePlaces(): { pub: Place[]; sh: Place[]; hid: Place[]; mine: Place[]; all: Place[] } {

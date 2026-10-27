@@ -2,13 +2,14 @@
 
 import hashlib
 import math
+from datetime import timedelta
 import os
 import zlib
 from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from seeing_api.auth import NO_STORE, CurrentUser, user_out
@@ -20,6 +21,30 @@ router = APIRouter(prefix="/api")
 
 SessionDep = Annotated[Session, Depends(get_session)]
 RunParam = Annotated[str, Query(description="`latest` or an ISO 8601 run time, e.g. 2026-10-13T12:00Z")]
+ViewParam = Annotated[
+    str,
+    Query(pattern="^(run|week)$", description="`run`: the run only; `week`: up to 7 days of main runs stitched, then the run"),
+]
+WEEK = timedelta(days=7)
+
+
+def stitched(session: Session, model, site_id: int, run: ModelRun):
+    """Rows of `model` (Forecast or Cn2Profile) for every valid hour from 7 days before `run` to the end
+    of `run`: for each hour, the main run (00/06/12/18Z) issued last before it, i.e. the shortest lead,
+    other runs only to fill gaps; runs after `run` are ignored."""
+    ranked = (
+        select(model.id, func.row_number().over(
+            partition_by=model.valid_time,
+            order_by=(func.mod(func.extract("hour", ModelRun.run_time), 6) != 0, model.lead_hour),
+        ).label("rk"))
+        .join(ModelRun, ModelRun.id == model.run_id)
+        .where(model.site_id == site_id, ModelRun.status == RunStatus.success, ModelRun.run_time <= run.run_time,
+               model.valid_time >= run.run_time - WEEK)
+        .subquery()
+    )
+    return session.scalars(
+        select(model).join(ranked, ranked.c.id == model.id).where(ranked.c.rk == 1).order_by(model.valid_time)
+    ).all()
 
 IAP_EMAIL_HEADER = "X-Goog-Authenticated-User-Email"
 
@@ -123,14 +148,19 @@ def latest_run(session: SessionDep) -> RunOut:
 
 
 @router.get("/sites/{slug}/forecast", response_model=ForecastOut)
-def site_forecast(slug: str, session: SessionDep, user: CurrentUser, run: RunParam = "latest") -> ForecastOut:
+def site_forecast(
+    slug: str, session: SessionDep, user: CurrentUser, run: RunParam = "latest", view: ViewParam = "run"
+) -> ForecastOut:
     site = get_site(session, slug, user)
     model_run = resolve_run(session, run)
-    rows = session.scalars(
-        select(Forecast)
-        .where(Forecast.run_id == model_run.id, Forecast.site_id == site.id)
-        .order_by(Forecast.lead_hour)
-    )
+    if view == "week":
+        rows = stitched(session, Forecast, site.id, model_run)
+    else:
+        rows = session.scalars(
+            select(Forecast)
+            .where(Forecast.run_id == model_run.id, Forecast.site_id == site.id)
+            .order_by(Forecast.lead_hour)
+        )
     points = [
         ForecastPoint(
             lead_hour=f.lead_hour,
@@ -139,6 +169,8 @@ def site_forecast(slug: str, session: SessionDep, user: CurrentUser, run: RunPar
             r0_m=clean(f.r0_m),
             integral_cn2=clean(f.integral_cn2),
             h_coulim_m=clean(f.h_coulim_m),
+            model_altitude_m=clean(f.model_altitude_m),
+            variables=f.variables,
         )
         for f in rows
     ]
@@ -151,16 +183,21 @@ def _height_key(h: float) -> float:
 
 
 @router.get("/sites/{slug}/cn2", response_model=Cn2Out)
-def site_cn2(slug: str, session: SessionDep, user: CurrentUser, run: RunParam = "latest") -> Cn2Out:
+def site_cn2(
+    slug: str, session: SessionDep, user: CurrentUser, run: RunParam = "latest", view: ViewParam = "run"
+) -> Cn2Out:
     site = get_site(session, slug, user)
     model_run = resolve_run(session, run)
-    profiles = list(
-        session.scalars(
-            select(Cn2Profile)
-            .where(Cn2Profile.run_id == model_run.id, Cn2Profile.site_id == site.id)
-            .order_by(Cn2Profile.lead_hour)
+    if view == "week":
+        profiles = list(stitched(session, Cn2Profile, site.id, model_run))
+    else:
+        profiles = list(
+            session.scalars(
+                select(Cn2Profile)
+                .where(Cn2Profile.run_id == model_run.id, Cn2Profile.site_id == site.id)
+                .order_by(Cn2Profile.lead_hour)
+            )
         )
-    )
     heights = sorted({_height_key(h) for p in profiles for h in p.heights_m if h is not None and math.isfinite(h)})
     index = {h: i for i, h in enumerate(heights)}
     matrix: list[list[float | None]] = []
@@ -182,6 +219,7 @@ def site_cn2(slug: str, session: SessionDep, user: CurrentUser, run: RunParam = 
 
 # Same scale as seeing_core.grid.SEE_MIN / SEE_MAX (the API does not depend on seeing_core).
 MAP_SEE_MIN, MAP_SEE_MAX = 0.2, 10.0
+RELIEF_LEAD = -1  # map_frames row of the orography (seeing_core.grid.RELIEF_LEAD)
 
 
 def _map_run(session: Session, run: str) -> ModelRun:
@@ -190,7 +228,7 @@ def _map_run(session: Session, run: str) -> ModelRun:
         return resolve_run(session, run)
     found = session.scalar(
         select(ModelRun)
-        .where(ModelRun.status == RunStatus.success, ModelRun.id.in_(select(MapFrame.run_id)))
+        .where(ModelRun.status == RunStatus.success, ModelRun.id.in_(select(MapFrame.run_id).where(MapFrame.lead_hour >= 0)))
         .order_by(ModelRun.run_time.desc())
         .limit(1)
     )
@@ -205,7 +243,7 @@ def global_map(session: SessionDep, run: RunParam = "latest") -> MapOut:
     rows = session.execute(
         select(MapFrame.lead_hour, MapFrame.valid_time, MapFrame.ny, MapFrame.nx, MapFrame.lat0, MapFrame.lon0,
                MapFrame.dlat, MapFrame.dlon)
-        .where(MapFrame.run_id == model_run.id)
+        .where(MapFrame.run_id == model_run.id, MapFrame.lead_hour >= 0)
         .order_by(MapFrame.lead_hour)
     ).all()
     if not rows:
@@ -217,7 +255,20 @@ def global_map(session: SessionDep, run: RunParam = "latest") -> MapOut:
         see_min=MAP_SEE_MIN,
         see_max=MAP_SEE_MAX,
         frames=[MapFrameOut(lead_hour=x.lead_hour, valid_time=utc(x.valid_time)) for x in rows],
+        relief=session.scalar(select(MapFrame.id).where(MapFrame.run_id == model_run.id, MapFrame.lead_hour == RELIEF_LEAD))
+        is not None,
     )
+
+
+@router.get("/map/relief")
+def global_map_relief(session: SessionDep, run: RunParam = "latest") -> Response:
+    """Model orography of the map grid: ny * nx little-endian uint16, altitude = value - 500 m, 65535 = none."""
+    model_run = _map_run(session, run)
+    data = session.scalar(select(MapFrame.data).where(MapFrame.run_id == model_run.id, MapFrame.lead_hour == RELIEF_LEAD))
+    if data is None:
+        raise HTTPException(404, "No relief for this map")
+    return Response(zlib.decompress(data), media_type="application/octet-stream",
+                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.get("/map/frame")

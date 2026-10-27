@@ -31,6 +31,10 @@ class ForecastPoint(BaseModel):
     r0_m: float | None
     integral_cn2: float | None
     h_coulim_m: float | None
+    # Ground altitude of the AROME grid point [m] (absolute altitudes, e.g. the jet stream band).
+    model_altitude_m: float | None = None
+    # Model variables {t2, dth, u10, u100, u500, shl, shj, tke}, null for older forecasts.
+    variables: dict[str, float | None] | None = None
 
 
 class ForecastOut(BaseModel):
@@ -82,3 +86,5 @@ class MapOut(BaseModel):
     see_min: float
     see_max: float
     frames: list[MapFrameOut]
+    # GET /api/map/relief serves the model orography of the grid (contour lines)
+    relief: bool = False

@@ -468,3 +468,18 @@ def decode_split(data: bytes, shape: tuple[int, int]) -> tuple[np.ndarray, np.nd
     bad = a == 255
     a[bad] = np.nan
     return a[0] / 254.0, a[1] * H_LOW_STEP, a[2] * H_HIGH_STEP
+
+
+# Model orography of the map grid (contour lines of the website map): uint16 = altitude + 500 m, 65535 = none.
+RELIEF_LEAD = -1  # map_frames row of a run holding its orography
+
+
+def encode_relief(h: np.ndarray) -> bytes:
+    a = np.asarray(h, dtype=np.float64)
+    q = np.where(np.isfinite(a), np.clip(np.round(a + 500.0), 0, 65534), 65535).astype("<u2")
+    return zlib.compress(q.tobytes(), 6)
+
+
+def decode_relief(data: bytes, shape: tuple[int, int]) -> np.ndarray:
+    q = np.frombuffer(zlib.decompress(data), dtype="<u2").reshape(shape).astype(np.float64)
+    return np.where(q == 65535, np.nan, q - 500.0)

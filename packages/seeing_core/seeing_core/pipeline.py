@@ -24,6 +24,7 @@ from seeing_core.profiles import (
     surface_kinematic_heat_flux,
 )
 from seeing_core.seeing import display_cn2_profile, integrate_seeing, seeing_from_integral, v2bd_blend
+from seeing_core.variables import model_variables
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,8 @@ class HourResult:
     i_tke: float = np.nan
     i_conv: float = np.nan
     i_cis: float = np.nan
+    # Model variables of the hour (seeing_core.variables.model_variables), None where undefined.
+    variables: dict | None = None
 
 
 @dataclass
@@ -141,7 +144,7 @@ def compute_hour(
 
 
 def compute_hour_terms(site: SiteSpec, hourly: dict[str, dict], sp3: dict, hour: int, surface_altitude: float):
-    """V2bd compute_hour() plus the (i_tke, i_conv, i_cis) integrals at K = 1."""
+    """V2bd compute_hour() plus the (i_tke, i_conv, i_cis) integrals at K = 1 and the model variables."""
     for pkg in REQUIRED_HOURLY:
         if hour not in hourly[pkg]:
             raise MissingDataError(f"H+{hour} missing from {pkg}")
@@ -150,10 +153,12 @@ def compute_hour_terms(site: SiteSpec, hourly: dict[str, dict], sp3: dict, hour:
         raise MissingDataError(f"H_COULIM/blh unavailable at H+{hour}")
     hag = build_hag_profile(hourly["HP1"][hour], hourly["HP2"].get(hour))
     iso = build_isobaric_profile(hourly["IP1"][hour], hourly["IP4"].get(hour), surface_altitude)
-    return _hour_v2bd(site, sp3, hour, h_coulim, hag, iso)
+    hp1 = hourly["HP1"][hour]
+    w = tuple(next(iter(hp1.get(name, {}).values()), np.nan) for name in ("10u", "10v"))
+    return _hour_v2bd(site, sp3, hour, h_coulim, hag, iso, wind10=w)
 
 
-def _hour_v2bd(site: SiteSpec, sp3: dict, hour: int, h_coulim: float, hag: dict, iso: dict):
+def _hour_v2bd(site: SiteSpec, sp3: dict, hour: int, h_coulim: float, hag: dict, iso: dict, wind10=None):
     """V2bd: the three terms at K = 1 on the whole profile, mixed by the soft transition at H_COULIM.
 
     TKE on all levels; convective closure only where the TKE model has a hole below H_COULIM (as in
@@ -193,7 +198,7 @@ def _hour_v2bd(site: SiteSpec, sp3: dict, hour: int, h_coulim: float, hag: dict,
         terms = (np.nan, np.nan, np.nan)
     cn2 = np.where(cn2 > 0, cn2, np.nan)
     heights, cn2_display = display_cn2_profile(display_profile_heights(hag, iso), z, cn2)
-    return integral, r0, seeing, h_coulim, heights, cn2_display, terms
+    return integral, r0, seeing, h_coulim, heights, cn2_display, terms, model_variables(hag, full, wind10)
 
 
 def compute_from_extracted(
@@ -216,9 +221,9 @@ def compute_from_extracted(
         hours: list[HourResult] = []
         for hour in range(forecast_hours + 1):
             try:
-                terms = (np.nan, np.nan, np.nan)
+                terms, variables = (np.nan, np.nan, np.nan), None
                 if model == "V2bd":
-                    integral, r0, seeing, h_coulim, heights, cn2, terms = compute_hour_terms(
+                    integral, r0, seeing, h_coulim, heights, cn2, terms, variables = compute_hour_terms(
                         site, hourly, sp3, hour, surface_altitude
                     )
                 else:
@@ -242,6 +247,7 @@ def compute_from_extracted(
                     i_tke=terms[0],
                     i_conv=terms[1],
                     i_cis=terms[2],
+                    variables=variables,
                 )
             )
         out[site.slug] = SiteForecast(slug=site.slug, run_time=run.run_time, hours=hours)

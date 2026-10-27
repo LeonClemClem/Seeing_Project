@@ -90,3 +90,16 @@ export function parseCoord(s: string, lat: boolean): number | null {
   if (n.length > 1 && (+n[1]! >= 60 || +(n[2] || 0) >= 60)) return null;
   return isFinite(v) && Math.abs(v) <= (lat ? 90 : 180) ? v : null;
 }
+
+/** Cities of the research map (research/carte_seeing.py VILLES): white dots, small names. */
+export const VILLES: [string, number, number][] = [
+  ["Paris", 48.8566, 2.3522], ["Marseille", 43.2965, 5.3698], ["Lyon", 45.764, 4.8357], ["Toulouse", 43.6047, 1.4442],
+  ["Nice", 43.7102, 7.262], ["Nantes", 47.2184, -1.5536], ["Montpellier", 43.6108, 3.8767], ["Strasbourg", 48.5734, 7.7521],
+  ["Bordeaux", 44.8378, -0.5792], ["Lille", 50.6292, 3.0573], ["Rennes", 48.1173, -1.6778], ["Reims", 49.2583, 4.0317],
+  ["Toulon", 43.1242, 5.928], ["Grenoble", 45.1885, 5.7245], ["Dijon", 47.322, 5.0415], ["Clermont-Ferrand", 45.7772, 3.087],
+  ["Brest", 48.3904, -4.4861], ["Limoges", 45.8336, 1.2611], ["Tours", 47.3941, 0.6848], ["Rouen", 49.4432, 1.0999],
+  ["Metz", 49.1193, 6.1757], ["Perpignan", 42.6887, 2.8948], ["Nîmes", 43.8367, 4.3601], ["Avignon", 43.9493, 4.8055],
+  ["Ajaccio", 41.9192, 8.7386], ["Besançon", 47.2378, 6.0241], ["Poitiers", 46.5802, 0.3404], ["Pau", 43.2951, -0.3708],
+  ["Genève", 46.2044, 6.1432], ["Bruxelles", 50.8503, 4.3517], ["Turin", 45.0703, 7.6869], ["Zurich", 47.3769, 8.5417],
+  ["Barcelone", 41.3874, 2.1686],
+];

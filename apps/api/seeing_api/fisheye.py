@@ -83,7 +83,8 @@ def fisheye(
 ) -> FisheyeOut:
     model_run = _map_run(session, run)
     rows = session.execute(
-        select(MapFrame).where(MapFrame.run_id == model_run.id, MapFrame.extra.is_not(None)).order_by(MapFrame.lead_hour)
+        select(MapFrame).where(MapFrame.run_id == model_run.id, MapFrame.extra.is_not(None), MapFrame.lead_hour >= 0)
+        .order_by(MapFrame.lead_hour)
     ).scalars().all()
     if not rows:
         raise HTTPException(404, "No fisheye data for this run yet")

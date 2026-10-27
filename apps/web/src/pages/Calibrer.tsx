@@ -212,7 +212,8 @@ export default function Calibrer() {
   const realHist = useSiteHistory(place);
   const corr = useLangMemo(() => corrMock(K, KCAL, place.f), [K, KCAL, place.f]);
   const hist = useLangMemo(() => (place.real ? realHist : lieuData(place.nom, place.f, K, KCAL)), [place, K, KCAL, realHist]);
-  const corrR = useLangMemo(() => (realHist ? corrChart(realHist, { horaire: true, nuit: true, brut: false }) : null), [realHist]);
+  const corrf = useUi((s) => s.corrf);
+  const corrR = useLangMemo(() => (realHist ? corrChart(realHist, corrf) : null), [realHist, corrf]);
   useEffect(() => setSaved(""), [K]);
 
   const kb = (k: "L" | 0 | 1, f: number) => {

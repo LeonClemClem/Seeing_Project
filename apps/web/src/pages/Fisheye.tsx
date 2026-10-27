@@ -1,6 +1,6 @@
 /**
- * Seeing fisheye for the selected place, 19h–05h UTC. The seeing field is fictitious; stars, catalogue
- * objects, Sun and Moon are at their real positions for the place; planets are fictitious (mockup).
+ * Seeing fisheye for the selected place, 19h–05h UTC, from the global maps of the latest run (fictitious
+ * field while there is none); stars, catalogue objects, Sun, Moon and planets at their real positions.
  */
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -15,12 +15,12 @@ import {
   airmass,
   altaz,
   CAT,
-  eclipticDec,
   horizon,
   LN,
   moonAltAz,
   moonPhase,
   PL,
+  planetRaDec,
   ST,
   sunAltAz,
   type CatObj,
@@ -250,9 +250,9 @@ export default function Fisheye() {
           c.fillText(tr(n), x + 5, y + 12);
         }
       });
-    PL.forEach(([n, s, col, ra]) => {
+    PL.forEach(([n, s, col]) => {
       if (!plOn.has(n)) return;
-      const dec = eclipticDec(ra);
+      const [ra, dec] = planetRaDec(n, t);
       if (opt.trk) track(ra, dec, col);
       const [a, z] = altaz(ra, dec, t, lat, lon);
       if (vis(a, z)) {
@@ -536,7 +536,7 @@ export default function Fisheye() {
             ))}
         </div>
         <p className="note">
-          {tr("Étoiles, objets, Soleil et Lune placés avec leurs vraies coordonnées pour ce lieu et cette nuit ; planètes à des positions fictives dans la maquette.")}
+          {tr("Étoiles, objets, planètes, Soleil et Lune placés à leurs vraies positions pour ce lieu et cette nuit.")}
         </p>
       </div>
     </section>

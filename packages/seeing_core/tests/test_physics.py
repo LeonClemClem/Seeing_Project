@@ -184,3 +184,16 @@ def test_v2bd_terms_rebuild_the_integral_for_any_k():
         for h in compute_from_extracted(run, [site], 1)["s"].hours:
             rebuilt = site.k_tke * h.i_tke + site.k_tke_conv * h.i_conv + site.k_cis * h.i_cis
             assert rebuilt == pytest.approx(h.integral_cn2, rel=1e-9)
+
+
+def test_model_variables_of_the_synthetic_profile():
+    h = compute_from_extracted(_synthetic_run(hours=(1,)), [SITE], 1)["s"].hours[0]
+    v = h.variables
+    # synthetic HP1: T = 288 - 0.004 z, U = 2 + 0.004 z, V = 1, TKE = 0.3
+    assert v["t2"] == pytest.approx(288 - 0.04 - 273.15)
+    assert v["u10"] == pytest.approx(np.hypot(2.04, 1) * 3.6)
+    assert v["u500"] == pytest.approx(np.hypot(4.0, 1) * 3.6)
+    assert v["shl"] == pytest.approx((4.0 - 2.04) / 0.49)
+    assert v["tke"] == pytest.approx(0.3)
+    assert v["shj"] is not None and v["shj"] > 0
+    assert v["dth"] is not None

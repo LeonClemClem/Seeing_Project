@@ -21,7 +21,8 @@ import {
 const ms = (s: string) => Date.parse(s);
 
 /** Forecast seeing of the latest run (night only, daytime drawn at half width). viewBox 0 0 900 220. */
-export function prevRealSvg(fc: Forecast, kLabel: string) {
+/** Real seeing forecast; `obs` = measured hourly medians by UTC hour [ms], drawn as squares. */
+export function prevRealSvg(fc: Forecast, kLabel: string, obs?: Map<number, number>) {
   const pts = fc.points.filter((p) => p.lead_hour > 0).sort((a, b) => a.lead_hour - b.lead_hour);
   if (!pts.length)
     return `<text x="450" y="110" text-anchor="middle" font-size="13" fill="${C_TXT}">${tr("Pas de prévision enregistrée pour ce lieu.")}</text>`;
@@ -48,7 +49,12 @@ export function prevRealSvg(fc: Forecast, kLabel: string) {
     const i = Math.round((ms(p.valid_time) - t0) / HOUR);
     if (p.seeing_arcsec != null && p.seeing_arcsec > 0 && isNightDate(tt(i))) sv.push([i, p.seeing_arcsec]);
   });
-  const ymax = Math.max(3, Math.ceil(Math.max(...sv.map((p) => p[1]), 0) * 1.15)),
+  const ob: [number, number][] = [];
+  obs?.forEach((v, t) => {
+    const i = Math.round((t - t0) / HOUR);
+    if (i >= 0 && i < n) ob.push([i, v]);
+  });
+  const ymax = Math.max(3, Math.ceil(Math.max(...sv.map((p) => p[1]), ...ob.map((p) => p[1]), 0) * 1.15)),
     Y = (v: number) => T + ph - (Math.min(v, ymax) / ymax) * ph;
   let g = "",
     s0 = 0,
@@ -85,6 +91,7 @@ export function prevRealSvg(fc: Forecast, kLabel: string) {
     prev = i;
   });
   fl();
+  ob.forEach(([i, v]) => (g += `<rect x="${X(i + 0.5) - 3.5}" y="${Y(v) - 3.5}" width="7" height="7" fill="#fff" stroke="#000" stroke-width="1"/>`));
   if (sv.length) {
     const [li, lv] = sv.reduce((m, q) => (q[1] > m[1] ? q : m));
     g += `<text x="${X(li + 0.5)}" y="${Y(lv) - 9}" text-anchor="middle" font-size="13" font-weight="700" fill="${C_AR}" stroke="#0a0f1d" stroke-width="3.5" paint-order="stroke">Seeing AROME</text>`;
@@ -113,11 +120,19 @@ export interface Cn2Ctx {
   lg: (number | null)[][];
   hc: (number | null)[];
   see: (number | null)[];
+  /** Measured hourly median seeing at each time (research history), null when none. */
+  obs: (number | null)[];
+  /** Ground altitude of the AROME grid point [m] (the jet stream is at 8-16 km of real altitude). */
+  sol: number;
 }
 
-/** Prepare the Cn² matrix once per (data, altitude range). */
-export function cn2Ctx(cn: Cn2, fc: Forecast | undefined, alt: string): Cn2Ctx {
-  const [za, zb0] = CN2ALT[alt] ?? CN2ALT["4"]!;
+/** Prepare the Cn² matrix once per (data, altitude range). The "jet" range is 8-16 km of real altitude,
+ * i.e. above the ground of the grid point. */
+export function cn2Ctx(cn: Cn2, fc: Forecast | undefined, alt: string, obs?: Map<number, number>): Cn2Ctx {
+  const sol = fc?.points.find((p) => p.model_altitude_m != null)?.model_altitude_m ?? 0;
+  const [za0, zb1] = CN2ALT[alt] ?? CN2ALT["4"]!,
+    za = alt === "jet" ? Math.max(0, za0 - sol) : za0,
+    zb0 = alt === "jet" ? zb1 - sol : zb1;
   const heights = cn.heights_m,
     zb = Math.min(zb0, Math.max(...heights));
   const lg = cn.cn2.map((row) => row.map((v) => (v != null && v > 0 ? Math.log10(v) : null)));
@@ -148,7 +163,27 @@ export function cn2Ctx(cn: Cn2, fc: Forecast | undefined, alt: string): Cn2Ctx {
       const s = byT.get(t)?.seeing_arcsec;
       return s != null && s > 0 && isNightDate(new Date(t)) ? s : null;
     }),
+    obs: times.map((t) => obs?.get(t) ?? null),
+    sol,
   };
+}
+
+/** Jet stream of a profile (log10 Cn² by height): a clear local Cn² peak between 8 and 16 km of real
+ * altitude, at least 0.3 decade above the minimum of the 4 km - peak range and of the 3 km above it
+ * (same rule as the mock-up). Returns its height above ground and log10 Cn², or null. */
+export function jetStream(c: Cn2Ctx, i: number): { z: number; v: number } | null {
+  const row = c.lg[i];
+  if (!row) return null;
+  const P = c.heights.map((z, k) => [z, row[k]] as const).filter((q): q is readonly [number, number] => q[1] != null);
+  const J = P.filter(([z]) => z >= 8000 - c.sol && z <= 16000 - c.sol);
+  if (J.length <= 2) return null;
+  const [zj, vj] = J.reduce((m, q) => (q[1] > m[1] ? q : m));
+  const ki = P.findIndex((q) => q[0] === zj),
+    low = P.filter(([z]) => z >= 4000 - c.sol && z < zj).map((q) => q[1]),
+    up = P.filter(([z]) => z > zj && z <= zj + 3000).map((q) => q[1]);
+  const local = ki > 0 && ki < P.length - 1 && vj >= P[ki - 1]![1] && vj >= P[ki + 1]![1];
+  if (!local || !low.length || !up.length || vj - Math.min(...low) < 0.3 || vj - Math.min(...up) < 0.3) return null;
+  return { z: zj, v: vj };
 }
 
 /** Cn² panel: turbo heatmap (log10, interpolated vertically), boundary layer, night seeing on the right axis. */
@@ -224,7 +259,8 @@ export function cn2RealSvg(c: Cn2Ctx, runMs: number) {
       g += `<text x="${X(i)}" y="${T + ph + 37}" text-anchor="middle" font-size="12" font-weight="600" fill="${hh === 12 ? "#f2c14e" : "#9cc7ff"}">${tr(hh === 12 ? "Jour" : "Nuit")}</text>`;
   }
   const SEE = c.see.map((s, i) => [i, s] as const).filter((q): q is readonly [number, number] => q[1] != null);
-  const smax = Math.max(2, Math.max(...SEE.map((p) => p[1]), 0) * 1.2),
+  const OBS = c.obs.map((s, i) => [i, s] as const).filter((q): q is readonly [number, number] => q[1] != null);
+  const smax = Math.max(2, Math.max(...SEE.map((p) => p[1]), ...OBS.map((p) => p[1]), 0) * 1.2),
     YS = (v: number) => T + ph - (Math.min(v, smax) / smax) * ph;
   let seg: number[][] = [],
     prev: number | null = null;
@@ -238,6 +274,8 @@ export function cn2RealSvg(c: Cn2Ctx, runMs: number) {
     prev = i;
   });
   fl();
+  // measured hourly median seeing (white, black outline), on the same right axis
+  OBS.forEach(([i, s]) => (g += `<circle cx="${X(i + 0.5)}" cy="${YS(s)}" r="3.4" fill="#fff" stroke="#000" stroke-width="1"/>`));
   {
     const cand = SEE.map(([i, s]) => [X(i + 0.5), YS(s)] as const).filter(([x, y]) => x > L + 20 && x < L + pw - 120 && y > T + 22),
       p = cand.length ? cand.reduce((m, q) => (q[1] < m[1] ? q : m)) : null;
@@ -296,6 +334,11 @@ export function cn2ProfileSvg(c: Cn2Ctx, i: number, pfW: number) {
   });
   if (pts.length > 1) g += pl(pts, 'stroke="#5eead4" stroke-width="2"');
   pts.forEach(([x, y]) => (g += `<circle cx="${x}" cy="${y}" r="2" fill="#5eead4"/>`));
+  const jet = jetStream(c, i);
+  if (jet && jet.z >= c.za && jet.z <= c.zb) {
+    const y = Yz(jet.z);
+    g += `<line x1="${L}" x2="${L + pw}" y1="${y}" y2="${y}" stroke="#f2c14e" stroke-width="1" stroke-dasharray="3 2"/><circle cx="${X(jet.v)}" cy="${y}" r="3.2" fill="#f2c14e" stroke="#000" stroke-width="0.8"/><text x="${L + 3}" y="${y - 4}" font-size="11" font-weight="600" fill="#f2c14e" stroke="#000" stroke-width="3" paint-order="stroke">Jet stream</text><text x="${L + pw - 2}" y="${y + 12}" text-anchor="end" font-size="9" fill="#f2c14e" stroke="#000" stroke-width="2.5" paint-order="stroke">${((jet.z + c.sol) / 1000).toFixed(1)} km ${tr("d'altitude")}</text>`;
+  }
   const hc = c.hc[i];
   if (hc != null && hc >= c.za && hc <= c.zb)
     g += `<line x1="${L}" x2="${L + pw}" y1="${Yz(hc)}" y2="${Yz(hc)}" stroke="#000" stroke-width="4.2"/><line x1="${L}" x2="${L + pw}" y1="${Yz(hc)}" y2="${Yz(hc)}" stroke="#ff2bd6" stroke-width="2.4"/><text x="${L + 4}" y="${Yz(hc) - 4}" font-size="12" font-weight="500" fill="#ff2bd6" stroke="#000" stroke-width="3" paint-order="stroke">BL</text><text x="${L + pw - 2}" y="${Yz(hc) - 3}" text-anchor="end" font-size="9" fill="#ff2bd6">${Math.round(hc)} m</text>`;
@@ -310,24 +353,27 @@ export function cn2ProfileSvg(c: Cn2Ctx, i: number, pfW: number) {
 /* ---------- model variables ---------- */
 export const PVDEF: [id: string, label: string, unit: string, color: string, real: boolean][] = [
   ["see", "Seeing", '"', "#8fd0ff", true],
-  ["dth", "Stabilité (dθ/dz, 10–100 m)", " K/100 m", "#ff9f6b", false],
+  ["dth", "Stabilité (dθ/dz, 10–100 m)", " K/100 m", "#ff9f6b", true],
   ["hc", "BL", " m", "#ff3cf0", true],
-  ["u10", "Vent à 10 m", " km/h", "#9be89b", false],
-  ["u100", "Vent à 100 m", " km/h", "#4fc06a", false],
-  ["u500", "Vent à 500 m", " km/h", "#1f8f45", false],
-  ["shl", "Cisaillement (10 m – 500 m)", " m/s/km", "#f2c14e", false],
-  ["shj", "Cisaillement jetstream", " m/s/km", "#e8743b", false],
-  ["tke", "TKE", " m²/s²", "#c79bff", false],
-  ["t2", "Température", " °C", "#ff6b6b", false],
+  ["u10", "Vent à 10 m", " km/h", "#9be89b", true],
+  ["u100", "Vent à 100 m", " km/h", "#4fc06a", true],
+  ["u500", "Vent à 500 m", " km/h", "#1f8f45", true],
+  ["shl", "Cisaillement (10 m – 500 m)", " m/s/km", "#f2c14e", true],
+  ["shj", "Cisaillement jetstream", " m/s/km", "#e8743b", true],
+  ["tke", "TKE", " m²/s²", "#c79bff", true],
+  ["t2", "Température", " °C", "#ff6b6b", true],
 ];
 export const PVGRP = [
   ["see", "dth", "hc", "tke", "t2"],
   ["u10", "u100", "u500", "shl", "shj"],
 ];
 
-/** Value of variable `id` at time t; seeing and BL are real, the others fictitious (not in the export yet). */
+/** Value of variable `id` at time t: from the forecast (batch), or a fictitious value for forecasts
+ * computed before the variables were stored. */
 function pvValue(t: number, id: string, s: number, byT: Map<number, Forecast["points"][number]>) {
-  const p = byT.get(t),
+  const p = byT.get(t);
+  if (p?.variables && id in p.variables) return p.variables[id] ?? null;
+  const
     d = new Date(t),
     i = t / HOUR,
     hr = d.getUTCHours() + d.getUTCMinutes() / 60,
@@ -366,7 +412,10 @@ export interface PvPanel {
 }
 
 /** One sub-panel of model variables (night hours only, nights glued with a gap). */
+/** Model-variable panel; in the week view the hours before the latest run (stitched main runs) are solid,
+ * the latest run dashed. */
 export function pvPanel(fc: Forecast, name: string, sel: Set<string>): PvPanel {
+  const runT = ms(fc.run_time);
   const s = (hash(name) % 97) / 10;
   const byT = new Map(fc.points.map((p) => [ms(p.valid_time), p]));
   const tl = [...byT.keys()].sort((a, b) => a - b).filter((t) => isNightDate(new Date(t)));
@@ -435,9 +484,10 @@ export function pvPanel(fc: Forecast, name: string, sel: Set<string>): PvPanel {
     const S2 = D[id]!,
       Y = common ? Yc : (v: number) => T + ph - ((v - S2.lo) / (S2.hi - S2.lo || 1)) * ph * 0.92 - ph * 0.04;
     let seg: number[][] = [],
-      pv: number | null = null;
+      pv: number | null = null,
+      past = false;
     const fl = () => {
-      if (seg.length > 1) g += pl(seg, `stroke="${col}" stroke-width="1.8" stroke-dasharray="5 3"`);
+      if (seg.length > 1) g += pl(seg, `stroke="${col}" stroke-width="1.8"${past ? "" : ' stroke-dasharray="5 3"'}`);
       seg = [];
     };
     S2.a.forEach((v, j) => {
@@ -446,7 +496,13 @@ export function pvPanel(fc: Forecast, name: string, sel: Set<string>): PvPanel {
         pv = null;
         return;
       }
-      if (pv != null && tl[j]! - tl[pv]! > HOUR) fl();
+      const isPast = tl[j]! < runT;
+      if (pv != null && (tl[j]! - tl[pv]! > HOUR || isPast !== past)) {
+        const last = seg[seg.length - 1];
+        fl();
+        if (last && isPast !== past && tl[j]! - tl[pv]! <= HOUR) seg.push(last); // continuous at the run
+      }
+      past = isPast;
       seg.push([X(j) + cwn / 2, Y(v)]);
       pv = j;
     });

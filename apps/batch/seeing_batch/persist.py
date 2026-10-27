@@ -79,6 +79,7 @@ def store_results(
                     h_coulim_m=_num(h.h_coulim_m), model_altitude_m=_num(h.model_altitude_m),
                     i_tke=_num(getattr(h, "i_tke", None)), i_conv=_num(getattr(h, "i_conv", None)),
                     i_cis=_num(getattr(h, "i_cis", None)),
+                    variables=getattr(h, "variables", None),
                 ))
                 profile_rows.append(dict(
                     run_id=run_id, site_id=site_id, valid_time=h.valid_time, lead_hour=h.lead_hour,
@@ -96,14 +97,20 @@ def store_results(
 
 
 def map_frame_rows(grid, run_time: datetime, k) -> list[dict]:
-    """MapFrame rows (without run_id) of a GridExtractor's computed frames."""
+    """MapFrame rows (without run_id) of a GridExtractor's computed frames, plus one row with
+    lead_hour = RELIEF_LEAD holding the model orography (contour lines of the website map)."""
+    from seeing_core.grid import RELIEF_LEAD, encode_relief
+
     g = grid.geometry
-    return [
-        dict(valid_time=run_time + timedelta(hours=step), lead_hour=step, ny=g.ny, nx=g.nx, lat0=g.lat0,
-             lon0=g.lon0, dlat=g.dlat, dlon=g.dlon, k_tke=k[0], k_cis=k[1], k_conv=k[2], data=data,
-             extra=getattr(grid, "extras", {}).get(step))
+    common = dict(ny=g.ny, nx=g.nx, lat0=g.lat0, lon0=g.lon0, dlat=g.dlat, dlon=g.dlon, k_tke=k[0], k_cis=k[1], k_conv=k[2])
+    rows = [
+        dict(valid_time=run_time + timedelta(hours=step), lead_hour=step, data=data,
+             extra=getattr(grid, "extras", {}).get(step), **common)
         for step, data in sorted(grid.frames.items())
     ]
+    if rows and getattr(grid, "surface_h", None) is not None:
+        rows.append(dict(valid_time=run_time, lead_hour=RELIEF_LEAD, data=encode_relief(grid.surface_h), extra=None, **common))
+    return rows
 
 
 def mark_failed(session_factory: sessionmaker, run_id: int, error: str) -> None:
