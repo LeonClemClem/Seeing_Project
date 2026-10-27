@@ -41,8 +41,8 @@ logger = logging.getLogger(__name__)
 
 # K of the global map (one set for every grid point and every run, until the global calibration).
 MAP_K = (2.0, 57.0, 0.1)  # K_TKE, K_CIS, K_conv
-# Map hours: the night from 20h to 04h UTC.
-NIGHT_HOURS_UTC = (20, 21, 22, 23, 0, 1, 2, 3, 4)
+# Map hours: the night from 19h to 05h UTC (the map's night mean uses 20h-04h, the fisheye 19h-05h).
+NIGHT_HOURS_UTC = (19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5)
 DEFAULT_STRIDE = 2
 
 # Fields: fields[(package, shortName, level)] = 2-D array (ny, nx)
@@ -108,6 +108,8 @@ class GridExtractor:
         self._done: set[int] = set()
         # encoded seeing map (encode_seeing) of every computed lead hour
         self.frames: dict[int, bytes] = {}
+        # encode_split() of every computed lead hour (fisheye)
+        self.extras: dict[int, bytes] = {}
         self.failed = False
 
     def _geometry(self, gid) -> GridGeometry:
@@ -186,20 +188,24 @@ class GridExtractor:
         return out
 
     def compute_ready(self, k: tuple[float, float, float] = MAP_K) -> list[int]:
-        """Compute (and free) every complete lead hour; the encoded maps go to self.frames."""
+        """Compute (and free) every complete lead hour; the encoded maps go to self.frames and the
+        low / high turbulence split to self.extras."""
         done = self.complete_steps()
         for s in done:
-            self.frames[s] = encode_seeing(self.compute(s, k))
+            integrals = self.compute(s)
+            shape = np.asarray(self.surface_h).shape
+            self.frames[s] = encode_seeing(seeing_from_integrals(integrals, k).reshape(shape))
+            self.extras[s] = encode_split(integrals, k, shape)
         return done
 
-    def compute(self, step: int, k: tuple[float, float, float] = MAP_K) -> np.ndarray:
-        """Seeing [arcsec] of one lead hour on the subsampled grid (ny, nx); frees its fields."""
+    def compute(self, step: int) -> np.ndarray:
+        """V2bd integrals and moments (npoints, 6) of one lead hour on the subsampled grid; frees its fields."""
         fields = self._fields.pop(step, {})
         self._done.add(step)
         if self.geometry is None or self.surface_h is None:
             raise RuntimeError("grid geometry or model orography SP2:h not read")
         h = max(step, 1)
-        return seeing_map(fields, self._sshf.get(h), self._sshf.get(h - 1), self.surface_h, k)
+        return map_integrals(fields, self._sshf.get(h), self._sshf.get(h - 1), self.surface_h)
 
 
 # --- physics on columns -----------------------------------------------------------------------
@@ -267,8 +273,9 @@ def v2bd_integrals(
     z: np.ndarray, T: np.ndarray, U: np.ndarray, V: np.ndarray, P: np.ndarray, E: np.ndarray,
     h_coulim: np.ndarray, w_theta0: np.ndarray,
 ) -> np.ndarray:
-    """(n, 3) integrals I_tke, I_conv, I_cis of the V2bd terms at K = 1, already weighted by the
-    soft transition, so that  integral(Cn2 dz) = K_TKE * I_tke + K_conv * I_conv + K_CIS * I_cis.
+    """(n, 6): integrals I_tke, I_conv, I_cis of the V2bd terms at K = 1, already weighted by the soft
+    transition, so that  integral(Cn2 dz) = K_TKE * I_tke + K_conv * I_conv + K_CIS * I_cis, then their
+    first moments in altitude Z_x = integral(z * term dz) (heights of the turbulence, for the fisheye).
 
     Rows are columns, levels sorted by altitude, NaN-padded at the end (z NaN beyond the last level).
     """
@@ -310,9 +317,9 @@ def v2bd_integrals(
     shear1 = np.where(valid & (idx >= first[:, None]), np.take_along_axis(sh_sub, back, axis=1), 0.0)
 
     w = 0.5 * (1.0 - np.tanh((zf - h) / V2BD_TRANSITION_M))
+    terms = (w * tke1 * valid, w * conv1, (1.0 - w) * shear1)
     out = np.stack(
-        [np.trapezoid(w * tke1 * valid, zf, axis=1), np.trapezoid(w * conv1, zf, axis=1),
-         np.trapezoid((1.0 - w) * shear1, zf, axis=1)],
+        [np.trapezoid(c, zf, axis=1) for c in terms] + [np.trapezoid(zf * c, zf, axis=1) for c in terms],
         axis=1,
     )
     out[(nv < 2) | ~np.isfinite(h_coulim)] = np.nan
@@ -390,9 +397,9 @@ def map_integrals(
     fields: Fields, sshf_now: np.ndarray | None, sshf_prev: np.ndarray | None, surface_h: np.ndarray,
     chunk: int = 20000,
 ) -> np.ndarray:
-    """(npoints, 3) V2bd integrals of every grid point, computed by chunks of columns."""
+    """(npoints, 6) V2bd integrals and moments of every grid point, computed by chunks of columns."""
     n = np.asarray(surface_h).size
-    out = np.full((n, 3), np.nan)
+    out = np.full((n, 6), np.nan)
     for a in range(0, n, chunk):
         sl = slice(a, min(n, a + chunk))
         out[sl] = v2bd_integrals(*columns_from_fields(fields, sshf_now, sshf_prev, surface_h, sl))
@@ -426,3 +433,38 @@ def decode_seeing(data: bytes, shape: tuple[int, int]) -> np.ndarray:
     codes = np.frombuffer(zlib.decompress(data), dtype=np.uint8).reshape(shape)
     s = np.exp(np.log(SEE_MIN) + codes / 254.0 * (np.log(SEE_MAX) - np.log(SEE_MIN)))
     return np.where(codes == 255, np.nan, s)
+
+
+# Low / high turbulence split, one byte each (fisheye): share of the boundary-layer terms (TKE +
+# convection) in the integral, J-weighted heights of the low and high parts.
+H_LOW_STEP, H_HIGH_STEP = 20.0, 100.0  # m per code: low 0-5080 m, high 0-25 400 m
+
+
+def split(integrals: np.ndarray, k: tuple[float, float, float] = MAP_K) -> tuple[np.ndarray, ...]:
+    """(share of the low part, height of the low part [m], height of the high part [m]) for K."""
+    i = np.asarray(integrals, dtype=np.float64)
+    with np.errstate(all="ignore"):
+        j_low = k[0] * i[..., 0] + k[2] * i[..., 1]
+        j_high = k[1] * i[..., 2]
+        share = j_low / (j_low + j_high)
+        h_low = (k[0] * i[..., 3] + k[2] * i[..., 4]) / j_low
+        h_high = i[..., 5] / i[..., 2]
+    return share, h_low, h_high
+
+
+def encode_split(integrals: np.ndarray, k: tuple[float, float, float], shape: tuple[int, ...]) -> bytes:
+    share, h_low, h_high = split(integrals, k)
+
+    def code(v, scale, top=254):
+        q = np.round(np.asarray(v) * scale)
+        return np.where(np.isfinite(q), np.clip(q, 0, top), 255).astype(np.uint8).reshape(shape)
+
+    planes = [code(share, 254.0), code(h_low, 1 / H_LOW_STEP), code(h_high, 1 / H_HIGH_STEP)]
+    return zlib.compress(np.concatenate([a.reshape(-1) for a in planes]).tobytes(), 6)
+
+
+def decode_split(data: bytes, shape: tuple[int, int]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    a = np.frombuffer(zlib.decompress(data), dtype=np.uint8).reshape(3, *shape).astype(np.float64)
+    bad = a == 255
+    a[bad] = np.nan
+    return a[0] / 254.0, a[1] * H_LOW_STEP, a[2] * H_HIGH_STEP

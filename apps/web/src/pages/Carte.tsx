@@ -1,6 +1,6 @@
 /**
  * Global seeing map (canvas): the real maps of the latest run (GET /api/map, V2bd over the whole AROME
- * grid, night hours 20h-04h UTC), or a fictitious field while there is none. Public sites come from
+ * grid, night hours 19h-05h UTC, mean of the night 20h-04h), or a fictitious field while there is none. Public sites come from
  * the API, personal places are mock.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
@@ -21,8 +21,12 @@ const CW = 720,
   CH = 700;
 /** Max zoom: 100 km tall. */
 const ZMIN = 100 / 111.2;
-const MAPH = [20, 21, 22, 23, 0, 1, 2, 3, 4, 20, 21, 22, 23, 0, 1, 2, 3, 4],
-  TREND = [1.14, 1.06, 1.0, 0.95, 0.92, 0.93, 0.97, 1.01, 1.07, 1.18, 1.1, 1.03, 0.98, 0.94, 0.95, 0.99, 1.04, 1.1];
+/* Map hours: 19h-05h UTC for 2 nights (NH frames each); the night mean uses 20h-04h only. */
+const NIGHT_H = [19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5],
+  NH = NIGHT_H.length,
+  MAPH = [...NIGHT_H, ...NIGHT_H],
+  inMean = (i: number) => MAPH[i] !== 19 && MAPH[i] !== 5,
+  TREND = [1.2, 1.14, 1.06, 1.0, 0.95, 0.92, 0.93, 0.97, 1.01, 1.07, 1.12, 1.24, 1.18, 1.1, 1.03, 0.98, 0.94, 0.95, 0.99, 1.04, 1.1, 1.16];
 const LEADMAX = 51;
 const KGLOB = [2, 57, 0.1];
 const JS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
@@ -201,7 +205,7 @@ export default function Carte() {
 
   const frameT = useCallback(
     (i: number) => {
-      const k = Math.floor(i / 9),
+      const k = Math.floor(i / NH),
         h = MAPH[i]!,
         r = new Date(RUN0),
         d = new Date(Date.UTC(r.getUTCFullYear(), r.getUTCMonth(), r.getUTCDate() + k, 20));
@@ -215,35 +219,41 @@ export default function Carte() {
     () =>
       [0, 1]
         .map((k) => {
-          const a = frameT(k * 9),
-            b = frameT(k * 9 + 8);
-          return { i0: k * 9, i1: k * 9 + 8, lab: `${pad2(a.getUTCDate())} au ${pad2(b.getUTCDate())}/${pad2(b.getUTCMonth() + 1)}` };
+          const a = frameT(k * NH),
+            b = frameT(k * NH + NH - 1);
+          return { i0: k * NH, i1: k * NH + NH - 1, lab: `${pad2(a.getUTCDate())} au ${pad2(b.getUTCDate())}/${pad2(b.getUTCMonth() + 1)}` };
         })
         .filter((n) => (frameT(n.i0).getTime() - RUN0) / 3600000 <= LEADMAX),
     [frameT, RUN0],
   );
-  const night = NIGHTS[Math.min(MNI, NIGHTS.length - 1)] ?? { i0: 0, i1: 8, lab: "" };
+  const night = NIGHTS[Math.min(MNI, NIGHTS.length - 1)] ?? { i0: 0, i1: NH - 1, lab: "" };
 
   const frameFac = useCallback(
     (la: number, lo: number) => {
       if (mode === "m") {
-        let s = 0;
-        for (let i = night.i0; i <= night.i1; i++) s += hourFac(i, la, lo);
-        return s / (night.i1 - night.i0 + 1);
+        let s = 0,
+          n = 0;
+        for (let i = night.i0; i <= night.i1; i++)
+          if (inMean(i)) {
+            s += hourFac(i, la, lo);
+            n++;
+          }
+        return s / n;
       }
       return hourFac(MI, la, lo);
     },
     [mode, MI, night.i0, night.i1],
   );
 
-  /* Real map: the frame of the chosen hour, or the mean seeing of the night's frames. */
-  const sample = useMemo(() => {
+  /* Real map: the frame of the chosen hour, or the mean seeing of the night's frames. Hours the run
+     does not cover are left out (no interpolation, no fictitious field): no value at all for a
+     missing hour, and the mean says which hours it really uses. */
+  const real = useMemo(() => {
     if (!gmap) return null;
-    const idx = mode === "m" ? [...Array(night.i1 - night.i0 + 1)].map((_, k) => night.i0 + k) : [MI];
-    const arrs = idx
-      .map((i) => gmap.frames.get(Math.round((frameT(i).getTime() - RUN0) / 3600000)))
-      .filter((a): a is Float32Array => !!a);
-    if (!arrs.length) return null;
+    const idx = mode === "m" ? [...Array(night.i1 - night.i0 + 1)].map((_, k) => night.i0 + k).filter(inMean) : [MI];
+    const used = idx.filter((i) => gmap.frames.has(Math.round((frameT(i).getTime() - RUN0) / 3600000)));
+    const arrs = used.map((i) => gmap.frames.get(Math.round((frameT(i).getTime() - RUN0) / 3600000))!);
+    if (!arrs.length) return { sample: (): number => NaN, hours: [] as number[], expected: idx.length };
     const n = arrs[0]!.length,
       mean = new Float32Array(n);
     for (let j = 0; j < n; j++) {
@@ -258,8 +268,9 @@ export default function Carte() {
       }
       mean[j] = c ? s / c : NaN;
     }
-    return sampler(gmap.meta.grid, mean);
+    return { sample: sampler(gmap.meta.grid, mean), hours: used.map((i) => MAPH[i]!), expected: idx.length };
   }, [gmap, mode, MI, night.i0, night.i1, frameT, RUN0]);
+  const sample = real?.sample ?? null;
 
   const toXY = useCallback(
     (la: number, lo: number) => [((lo - VW.lo0) / (VW.lo1 - VW.lo0)) * CW, ((VW.la1 - la) / (VW.la1 - VW.la0)) * CH] as const,
@@ -431,7 +442,7 @@ export default function Carte() {
   }, [VW, frameFac, sample, toXY, pub, mine, MZH, newPt, role, lang]);
 
   /* ---------- animation ---------- */
-  const last = NIGHTS[NIGHTS.length - 1]?.i1 ?? 8;
+  const last = NIGHTS[NIGHTS.length - 1]?.i1 ?? NH - 1;
   useEffect(() => {
     if (!playing) return;
     const id = setInterval(() => {
@@ -592,10 +603,19 @@ export default function Carte() {
 
   const fd = frameT(MI),
     lead = Math.round((fd.getTime() - RUN0) / 3600000);
+  // Hour range really averaged (the run may stop before the end of the night).
+  const meanRange = (() => {
+    const h = real?.hours ?? [];
+    if (!real) return "20h–04h TU";
+    if (!h.length) return "aucune heure couverte par le run";
+    const txt = `${pad2(h[0]!)}h–${pad2(h[h.length - 1]!)}h TU`;
+    return h.length < real.expected ? `${txt}, run incomplet : ${h.length} h sur ${real.expected}` : txt;
+  })();
   const hourLabel =
     mode === "m"
-      ? tr(`moyenne nuit du ${night.lab}`)
-      : tr(`${JS[fd.getUTCDay()]} ${pad2(fd.getUTCDate())}/${pad2(fd.getUTCMonth() + 1)} · ${pad2(fd.getUTCHours())}h TU · +${lead} h`);
+      ? tr(`moyenne nuit du ${night.lab} (${meanRange})`)
+      : tr(`${JS[fd.getUTCDay()]} ${pad2(fd.getUTCDate())}/${pad2(fd.getUTCMonth() + 1)} · ${pad2(fd.getUTCHours())}h TU · +${lead} h`) +
+        (real && !real.hours.length ? tr(" · pas de prévision à cette heure") : "");
   const runL = runLabel(RUN0),
     endL = new Date(RUN0 + LEADMAX * 3600000);
   const nextRun = pad2(new Date(RUN0 + 6 * 3600000).getUTCHours()) + "Z";
@@ -656,7 +676,7 @@ export default function Carte() {
               <span className="small muted">
                 run <span className="mono">{runL}</span> · {tr("prévision jusqu'à")} <span className="mono">+{LEADMAX} h</span> (
                 {`${pad2(endL.getUTCDate())}/${pad2(endL.getUTCMonth() + 1)} ${pad2(endL.getUTCHours())}h`} {tr("TU")}) ·{" "}
-                {tr("nuits seulement (20h–04h TU)")}
+                {tr("nuits seulement (19h–05h TU, moyenne 20h–04h)")}
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
@@ -686,7 +706,7 @@ export default function Carte() {
                   setMode(m);
                 }}
                 options={[
-                  ["m", tr("Moyenne de la nuit")],
+                  ["m", tr("Moyenne de la nuit (20h–04h TU)")],
                   ["h", tr("Heure par heure")],
                 ]}
               />

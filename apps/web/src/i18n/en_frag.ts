@@ -3,7 +3,7 @@
 export const EN_FRAG: [RegExp, string | ((m: string) => string)][] = [
 
 [/^(dim|lun|mar|mer|jeu|ven|sam)\. /,(m: string) => (({ dim: "Sun", lun: "Mon", mar: "Tue", mer: "Wed", jeu: "Thu", ven: "Fri", sam: "Sat" }) as Record<string, string>)[m.slice(0, 3)] + " "],
-[/moyenne nuit du (\d+) au (\d+\/\d+)/g,"night mean $1–$2"],[/Nuit du (\d+) au (\d+\/\d+)/g,"Night of $1–$2"],[/Nuit du (\d+\/\d+)/g,"Night of $1"],
+[/moyenne nuit du (\d+) au (\d+\/\d+)/g,"night mean $1–$2"],[/\((\d+h–\d+h) TU\)/g,"($1 UTC)"],[/\((\d+h–\d+h) TU, run incomplet : (\d+) h sur (\d+)\)/g,"($1 UTC, incomplete run: $2 h of $3)"],[/aucune heure couverte par le run/g,"no hour covered by the run"],[/ · pas de prévision à cette heure/g," · no forecast at this hour"],[/Nuit du (\d+) au (\d+\/\d+)/g,"Night of $1–$2"],[/Nuit du (\d+\/\d+)/g,"Night of $1"],
 [/(\d+) période\(s\) avec prévision et mesures, du ([\d\/]+) au ([\d\/]+) ; axe compressé \(seules ces périodes sont montrées\)\./,"$1 period(s) with forecast and measurements, from $2 to $3; compressed axis (only these periods are shown)."],
 [/jusqu'à 7 jours de runs principaux collés/g,"up to 7 days of glued main runs"],[/dernières prévisions/g,"latest forecasts"],[/du ([\d\/]+ \d+h) au ([\d\/]+ \d+h)/g,"from $1 to $2"],
 [/mesures du ([\d\/]+) au ([\d\/]+)/g,"measurements from $1 to $2"],[/· nuits seulement$/,"· nights only"],[/fais défiler vers la gauche pour l'historique/g,"scroll left for the history"],[/^évolution prévue par le dernier run$/,"forecast evolution from the latest run"],[/même fenêtre que le panneau Cn²/g,"same window as the Cn² panel"],

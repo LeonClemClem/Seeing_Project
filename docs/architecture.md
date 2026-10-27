@@ -184,6 +184,12 @@ All responses are JSON; times are ISO 8601 UTC (`Z`).
   existing rows kept, runs newer than every stored run skipped), `GET /api/sites/{slug}/history` (visible
   sites; K, integrals and Cn2 panels only for those who may calibrate). Sent from the PC by
   `research/envoi_site.py` (administrator login prompted). `/terms` prefers main runs (00/06/12/18Z).
+- `GET /api/fisheye?lat&lon&run=latest` → `{run_time, k, elevations (10–90° by 5), azimuths (0–350° by 10), frames:
+  [{lead_hour, valid_time, j_low, j_high}]}`: line-of-sight Cn2 integrals at the map K, from the stored map frames
+  only (no new physics): two layers, boundary layer (share and J-weighted height in `map_frames.extra`, migration
+  0011) and free atmosphere (its height), each read where the line of sight crosses its height, divided by
+  sin(elevation). The browser rescales with other K: J = K_TKE/K_TKE_map·j_low + K_CIS/K_CIS_map·j_high.
+  Map frames now cover 19h–05h UTC (the map mean still uses 20h–04h).
 - `GET /api/map?run=latest|<ISO run_time>` → `{run_time, grid: {ny, nx, lat0, lon0, dlat, dlon}, see_min,
   see_max, frames: [{lead_hour, valid_time}]}` (`latest` = newest successful run with a map; 404 if none).
 - `GET /api/map/frame?lead=N&run=...` → `ny * nx` bytes, row-major (row r at lat0 + r * dlat), code c →

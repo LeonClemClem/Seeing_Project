@@ -100,7 +100,8 @@ def map_frame_rows(grid, run_time: datetime, k) -> list[dict]:
     g = grid.geometry
     return [
         dict(valid_time=run_time + timedelta(hours=step), lead_hour=step, ny=g.ny, nx=g.nx, lat0=g.lat0,
-             lon0=g.lon0, dlat=g.dlat, dlon=g.dlon, k_tke=k[0], k_cis=k[1], k_conv=k[2], data=data)
+             lon0=g.lon0, dlat=g.dlat, dlon=g.dlon, k_tke=k[0], k_cis=k[1], k_conv=k[2], data=data,
+             extra=getattr(grid, "extras", {}).get(step))
         for step, data in sorted(grid.frames.items())
     ]
 

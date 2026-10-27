@@ -96,6 +96,9 @@ class MapFrame(Base):
     k_cis: Mapped[float] = mapped_column(Float)
     k_conv: Mapped[float] = mapped_column(Float)
     data: Mapped[bytes] = mapped_column(LargeBinary)
+    # zlib(3 uint8 planes): share of the low (boundary-layer) turbulence, heights of the low and high
+    # parts (seeing_core.grid.encode_split), for the fisheye. NULL for older frames.
+    extra: Mapped[bytes | None] = mapped_column(LargeBinary)
 
     run: Mapped[ModelRun] = relationship(back_populates="map_frames")
 
