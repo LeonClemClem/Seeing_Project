@@ -90,3 +90,11 @@ def test_split_heights_and_roundtrip(extracted):
     d = decode_split(encode_split(i, MAP_K, oro.shape), oro.shape)
     np.testing.assert_allclose(d[0][0], share, atol=0.003)
     np.testing.assert_allclose(d[2][0], h_high, atol=60)
+
+
+def test_relief_roundtrip():
+    from seeing_core.grid import decode_relief, encode_relief
+
+    h = np.array([[0.0, 4807.4, -20.0], [np.nan, 1234.6, 3.0]])
+    d = decode_relief(encode_relief(h), h.shape)
+    np.testing.assert_allclose(d, [[0, 4807, -20], [np.nan, 1235, 3]], equal_nan=True)

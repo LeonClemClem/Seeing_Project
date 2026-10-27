@@ -12,17 +12,15 @@ import { Chip, Cn2Legend, LegBreak, LegDay, LegMed, LegMes, Sw, SvgChart } from 
 import { useSiteHistory } from "../data/forecast";
 import { kHidden, kTxt, MAX_PLACES, MOCK_PLACES, usePlaceActions, usePlaces, type Place } from "../data/places";
 import { tr } from "../i18n";
-import { sharedPlace, SHAREDV } from "../lib/geo";
 import { C_TXT, ddmm, fmt, pd } from "../lib/util";
 import { lieuData } from "../mock/engine";
 import { setState, useLangMemo, useUi } from "../store";
 
-type Sel = { t: "lx"; id: string } | { t: "sh"; k: number };
+type Sel = { t: "lx"; id: string };
 
 export default function Lieux() {
   const { pub, sh, mine } = usePlaces();
   const { remove } = usePlaceActions();
-  const role = useUi((s) => s.role);
   const current = useUi((s) => s.place);
   const mesf = useUi((s) => s.mesf);
   const nav = useNavigate();
@@ -164,12 +162,12 @@ export default function Lieux() {
         style={{ marginTop: 10, border: "1px solid var(--line)", borderRadius: 10, padding: "8px 12px", background: "var(--panel)" }}
       >
         <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
-          {tr("Partagés par la communauté")} <span className="small muted">({sh.length + SHAREDV.length})</span>
+          {tr("Partagés par la communauté")} <span className="small muted">({sh.length})</span>
         </summary>
         <div className="tiles" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", marginTop: 6 }}>
-          {sh.length > 0 && (
+          {!sh.length && (
             <div style={{ gridColumn: "1/-1" }} className="small muted">
-              {tr("Observatoires (données réelles)")}
+              {tr("Aucun lieu partagé pour l'instant.")}
             </div>
           )}
           {sh.map((p) =>
@@ -189,27 +187,6 @@ export default function Lieux() {
               </>,
             ),
           )}
-          <div style={{ gridColumn: "1/-1", marginTop: 6 }} className="small muted">
-            {tr("Lieux de membres (position floutée à 5–11 km, données fictives dans la maquette)")}
-          </div>
-          {SHAREDV.map((_, k) => {
-            const s = sharedPlace(k);
-            return tile(
-              sel.t === "sh" && sel.k === k,
-              "sh" + k,
-              () => setSel({ t: "sh", k }),
-              <>
-                <div style={{ fontWeight: 500 }}>{tr(s.nom)}</div>
-                <div className="small muted mono">
-                  ≈ {s.la.toFixed(2)} N · {s.lo.toFixed(2)} E
-                </div>
-                <div className="small" style={{ marginTop: 4 }}>
-                  {tr(`${s.nuits} nuits mesurées`)}
-                </div>
-                <div className="small muted">{tr(`médiane ${s.med}″ · r nuit ${s.r}`)}</div>
-              </>,
-            );
-          })}
         </div>
       </details>
 
@@ -228,7 +205,7 @@ export default function Lieux() {
         </Chip>
       </div>
 
-      {sel.t === "sh" ? <SharedDetail k={sel.k} admin={role === "admin"} /> : <PlaceDetail l={l!} />}
+      <PlaceDetail l={l!} />
 
       <div className="tiles" style={{ marginTop: 16 }}>
         <div className="tile">
@@ -254,47 +231,6 @@ export default function Lieux() {
         </div>
       </div>
     </section>
-  );
-}
-
-function SharedDetail({ k, admin }: { k: number; admin: boolean }) {
-  const s = sharedPlace(k);
-  return (
-    <div className="panel" style={{ marginTop: 16 }}>
-      <h2>{tr(s.nom)}</h2>
-      <p className="small muted" style={{ margin: "0 0 8px" }}>
-        {tr(
-          "Lieu partagé par un membre de la communauté : position floutée à 5–11 km, sans nom ; ses mesures servent à caler les K des lieux voisins. Paramètres fictifs dans la maquette.",
-        )}
-      </p>
-      <div className="tiles">
-        <div className="tile">
-          <div className="l">{tr("Position (floutée)")}</div>
-          <div className="v" style={{ fontSize: 15 }}>
-            ≈ {s.la.toFixed(2)} N · {s.lo.toFixed(2)} E
-          </div>
-        </div>
-        <div className="tile">
-          <div className="l">{tr("Nuits mesurées")}</div>
-          <div className="v">{s.nuits}</div>
-          <div className="small muted">{tr(`${s.h} h de nuit`)}</div>
-        </div>
-        <div className="tile">
-          <div className="l">{tr("Seeing médian")}</div>
-          <div className="v">{s.med}″</div>
-        </div>
-        <div className="tile">
-          <div className="l">{tr("r nuit")}</div>
-          <div className="v">{s.r}</div>
-        </div>
-        <div className="tile">
-          <div className="l">K</div>
-          <div className="v" style={{ fontSize: 15 }}>
-            {tr(admin ? "visibles par l'administrateur" : "confidentiels")}
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }
 

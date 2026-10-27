@@ -107,6 +107,8 @@ export interface MapMeta {
   see_min: number;
   see_max: number;
   frames: { lead_hour: number; valid_time: string }[];
+  /** GET /api/map/relief serves the model orography of the grid. */
+  relief?: boolean;
 }
 
 export type UserRole = "user" | "team" | "admin";
@@ -185,6 +187,15 @@ export const api = {
   cn2: (slug: string, run = "latest") =>
     get<Cn2>(`/api/sites/${encodeURIComponent(slug)}/cn2?run=${encodeURIComponent(run)}`),
   map: () => get<MapMeta>("/api/map"),
+  /** Model orography of the map grid [m], NaN where undefined. */
+  mapRelief: async (run: string): Promise<Float32Array> => {
+    const res = await fetch(`/api/map/relief?run=${encodeURIComponent(run)}`, { credentials: "same-origin" });
+    if (!res.ok) throw new ApiError(res.status, res.statusText);
+    const q = new Uint16Array(await res.arrayBuffer()),
+      out = new Float32Array(q.length);
+    for (let i = 0; i < q.length; i++) out[i] = q[i] === 65535 ? NaN : q[i]! - 500;
+    return out;
+  },
   /** Raw codes of one map frame (uint8, 255 = no value). */
   mapFrame: async (run: string, lead: number): Promise<Uint8Array> => {
     const res = await fetch(`/api/map/frame?run=${encodeURIComponent(run)}&lead=${lead}`, { credentials: "same-origin" });

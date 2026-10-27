@@ -219,6 +219,7 @@ def site_cn2(
 
 # Same scale as seeing_core.grid.SEE_MIN / SEE_MAX (the API does not depend on seeing_core).
 MAP_SEE_MIN, MAP_SEE_MAX = 0.2, 10.0
+RELIEF_LEAD = -1  # map_frames row of the orography (seeing_core.grid.RELIEF_LEAD)
 
 
 def _map_run(session: Session, run: str) -> ModelRun:
@@ -227,7 +228,7 @@ def _map_run(session: Session, run: str) -> ModelRun:
         return resolve_run(session, run)
     found = session.scalar(
         select(ModelRun)
-        .where(ModelRun.status == RunStatus.success, ModelRun.id.in_(select(MapFrame.run_id)))
+        .where(ModelRun.status == RunStatus.success, ModelRun.id.in_(select(MapFrame.run_id).where(MapFrame.lead_hour >= 0)))
         .order_by(ModelRun.run_time.desc())
         .limit(1)
     )
@@ -242,7 +243,7 @@ def global_map(session: SessionDep, run: RunParam = "latest") -> MapOut:
     rows = session.execute(
         select(MapFrame.lead_hour, MapFrame.valid_time, MapFrame.ny, MapFrame.nx, MapFrame.lat0, MapFrame.lon0,
                MapFrame.dlat, MapFrame.dlon)
-        .where(MapFrame.run_id == model_run.id)
+        .where(MapFrame.run_id == model_run.id, MapFrame.lead_hour >= 0)
         .order_by(MapFrame.lead_hour)
     ).all()
     if not rows:
@@ -254,7 +255,20 @@ def global_map(session: SessionDep, run: RunParam = "latest") -> MapOut:
         see_min=MAP_SEE_MIN,
         see_max=MAP_SEE_MAX,
         frames=[MapFrameOut(lead_hour=x.lead_hour, valid_time=utc(x.valid_time)) for x in rows],
+        relief=session.scalar(select(MapFrame.id).where(MapFrame.run_id == model_run.id, MapFrame.lead_hour == RELIEF_LEAD))
+        is not None,
     )
+
+
+@router.get("/map/relief")
+def global_map_relief(session: SessionDep, run: RunParam = "latest") -> Response:
+    """Model orography of the map grid: ny * nx little-endian uint16, altitude = value - 500 m, 65535 = none."""
+    model_run = _map_run(session, run)
+    data = session.scalar(select(MapFrame.data).where(MapFrame.run_id == model_run.id, MapFrame.lead_hour == RELIEF_LEAD))
+    if data is None:
+        raise HTTPException(404, "No relief for this map")
+    return Response(zlib.decompress(data), media_type="application/octet-stream",
+                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.get("/map/frame")

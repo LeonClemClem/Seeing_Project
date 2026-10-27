@@ -10,7 +10,7 @@ import { ColorBar, Seg } from "../components/ui";
 import { useUser } from "../data/auth";
 import { MAX_PLACES, selectPlace, siteToPlace, useCurrentPlace, usePlaceActions, usePlaces } from "../data/places";
 import { tr } from "../i18n";
-import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, parseCoord, relief, SARD, SHAREDV, ZONES, type Box, type Poly } from "../lib/geo";
+import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, parseCoord, relief, SARD, VILLES, ZONES, type Box, type Poly } from "../lib/geo";
 import { useGlobalMap, useLatestRunTime } from "../lib/hooks";
 import type { MapGrid } from "../api";
 import { D2R, esc, fmt, pad2, runLabel, turbo, turboGradient } from "../lib/util";
@@ -68,10 +68,15 @@ function clampView(v: Box): Box {
     no = Math.min(DOM.lo1, Math.max(DOM.lo0, clo));
   return { la0: nl - sl2 / 2, la1: nl + sl2 / 2, lo0: no - (so * f) / 2, lo1: no + (so * f) / 2 };
 }
-const isoStep = (V: Box) => {
+/* Contour lines: every 250 m with the real AROME relief, as research/carte_seeing.py; the fictitious
+   relief keeps its zoom-dependent step. */
+const isoStep = (V: Box, real = false) => {
+  if (real) return 250;
   const s = V.la1 - V.la0;
   return s > 4 ? 1000 : s > 1.2 ? 500 : 250;
 };
+/** Fixed colour scale of the research maps: turbo from 0 to 5". */
+const SEE_TOP = 5;
 
 interface Cache {
   key: string;
@@ -106,10 +111,10 @@ function landMask(V: Box): Uint8ClampedArray {
   return g.getImageData(0, 0, CW, CH).data;
 }
 
-function viewCache(V: Box, prev: Cache | null): Cache {
-  const key = [V.la0, V.la1, V.lo0, V.lo1].map((v) => v.toFixed(5)).join(",");
+function viewCache(V: Box, prev: Cache | null, rel0: ((la: number, lo: number) => number) | null = null): Cache {
+  const key = [V.la0, V.la1, V.lo0, V.lo1].map((v) => v.toFixed(5)).join(",") + (rel0 ? "|real" : "");
   if (prev?.key === key) return prev;
-  const iso0 = isoStep(V),
+  const iso0 = isoStep(V, !!rel0),
     n = CW * CH,
     mask = landMask(V),
     base = new Float32Array(n),
@@ -123,7 +128,7 @@ function viewCache(V: Box, prev: Cache | null): Cache {
       const j = y * CW + x,
         la = V.la1 - (y / CH) * (V.la1 - V.la0),
         lo = V.lo0 + (x / CW) * (V.lo1 - V.lo0),
-        r = relief(la, lo);
+        r = rel0 ? rel0(la, lo) : relief(la, lo);
       rel[j] = r;
       base[j] = baseSee(la, lo, r);
       las[j] = la;
@@ -133,7 +138,7 @@ function viewCache(V: Box, prev: Cache | null): Cache {
   for (let y = 1; y < CH; y++)
     for (let x = 1; x < CW; x++) {
       const j = y * CW + x;
-      if (sea[j]) continue;
+      if ((sea[j] && !rel0) || !(rel[j]! > 0)) continue;
       const a = Math.floor(rel[j]! / iso0);
       if (a !== Math.floor(rel[j - 1]! / iso0) || a !== Math.floor(rel[j - CW]! / iso0)) iso[j] = 1;
     }
@@ -176,7 +181,7 @@ export default function Carte() {
   const role = useUi((s) => s.role);
   const lang = useUi((s) => s.lang);
   const place = useCurrentPlace();
-  const { pub, mine } = usePlaces();
+  const { pub, sh, mine } = usePlaces();
   const user = useUser();
   const { create: createPlace } = usePlaceActions();
   const { runTime } = useLatestRunTime();
@@ -271,6 +276,8 @@ export default function Carte() {
     return { sample: sampler(gmap.meta.grid, mean), hours: used.map((i) => MAPH[i]!), expected: idx.length };
   }, [gmap, mode, MI, night.i0, night.i1, frameT, RUN0]);
   const sample = real?.sample ?? null;
+  /** Real AROME orography of the map grid, when the run has it. */
+  const relReal = useMemo(() => (gmap?.relief ? sampler(gmap.meta.grid, gmap.relief) : null), [gmap]);
 
   const toXY = useCallback(
     (la: number, lo: number) => [((lo - VW.lo0) / (VW.lo1 - VW.lo0)) * CW, ((VW.la1 - la) / (VW.la1 - VW.la0)) * CH] as const,
@@ -284,7 +291,7 @@ export default function Carte() {
     const cv = canvas.current;
     if (!cv) return;
     const cx = cv.getContext("2d")!;
-    const C = (cache.current = viewCache(VW, cache.current));
+    const C = (cache.current = viewCache(VW, cache.current, relReal));
     const img = cx.createImageData(CW, CH),
       D = img.data;
     for (let j = 0; j < CW * CH; j++) {
@@ -297,7 +304,7 @@ export default function Carte() {
         D[p + 3] = 255;
         continue;
       }
-      // Fixed colour stretch (0–6") so that maps stay comparable from one run to the next.
+      // Fixed colour stretch (turbo 0–5", as the research maps) so that maps stay comparable from run to run.
       const s = sample ? sample(C.las[j]!, C.los[j]!) : C.base[j]! * frameFac(C.las[j]!, C.los[j]!);
       if (isNaN(s)) {
         D[p] = 60;
@@ -306,7 +313,7 @@ export default function Carte() {
         D[p + 3] = 255;
         continue;
       }
-      const c = LUT[Math.min(255, Math.round((s / 6) * 255))]!,
+      const c = LUT[Math.min(255, Math.max(0, Math.round((s / SEE_TOP) * 255)))]!,
         d = C.iso[j] ? 0.45 : 1;
       D[p] = c[0] * d;
       D[p + 1] = c[1] * d;
@@ -330,7 +337,8 @@ export default function Carte() {
     OTHERS.forEach(poly);
     cx.strokeStyle = "rgba(255,255,255,.8)";
     [FRA, CORSE].forEach(poly);
-    SHAREDV.forEach(([la, lo]) => {
+    // Places shared by the community (the API blurs other members' positions by 5-11 km).
+    sh.forEach(({ lat: la, lon: lo }) => {
       const [x, y] = toXY(la, lo),
         r = big ? 7 : 5;
       cx.beginPath();
@@ -378,7 +386,27 @@ export default function Carte() {
       cx.lineWidth = 1.2;
       cx.stroke();
     };
-    mine.forEach((p) => {
+    // Cities, as research/carte_seeing.py (ajoute_villes): white dots ringed in black, small translucent names.
+    cx.font = `${big ? 11 : 9}px 'IBM Plex Sans',sans-serif`;
+    VILLES.forEach(([nom, la, lo]) => {
+      const [x, y] = toXY(la, lo);
+      if (x < -20 || x > CW + 20 || y < -20 || y > CH + 20) return;
+      cx.beginPath();
+      cx.arc(x, y, big ? 3 : 2.2, 0, 7);
+      cx.fillStyle = "#fff";
+      cx.fill();
+      cx.strokeStyle = "#000";
+      cx.lineWidth = 0.9;
+      cx.stroke();
+      cx.lineWidth = 2;
+      cx.strokeStyle = "rgba(255,255,255,.45)";
+      cx.strokeText(nom, x + 4, y - 3);
+      cx.fillStyle = "rgba(0,0,0,.6)";
+      cx.fillText(nom, x + 4, y - 3);
+    });
+    cx.font = "500 12px 'IBM Plex Sans',sans-serif";
+    // Only real places: the example places of a logged-out visitor are not drawn on the map.
+    mine.filter((p) => p.real).forEach((p) => {
       const [x, y] = toXY(p.lat, p.lon);
       star(x, y, big ? 10 : 7);
       if (big) label(tr(p.nom), x + 12, y + 4);
@@ -439,8 +467,8 @@ export default function Carte() {
     );
     const hkm = Math.round((VW.la1 - VW.la0) * 111.2),
       zmax = VW.la1 - VW.la0 <= ZMIN + 1e-6;
-    label(tr(`${hkm} × ${km} km${zmax ? " · zoom maximal" : ""} · isolignes ${isoStep(VW)} m`), CW - (zmax ? 300 : 200), CH - 12);
-  }, [VW, frameFac, sample, toXY, pub, mine, MZH, newPt, role, lang]);
+    label(tr(`${hkm} × ${km} km${zmax ? " · zoom maximal" : ""} · isolignes ${isoStep(VW, !!relReal)} m`), CW - (zmax ? 300 : 200), CH - 12);
+  }, [VW, frameFac, sample, relReal, toXY, pub, sh, mine, MZH, newPt, role, lang]);
 
   /* ---------- animation ---------- */
   const last = NIGHTS[NIGHTS.length - 1]?.i1 ?? NH - 1;
@@ -540,8 +568,8 @@ export default function Carte() {
     const la = LA(y),
       lo = LO(x);
     setTip(
-      onLand(x, y)
-        ? `<span class="mono">${la.toFixed(3)} N · ${lo.toFixed(3)} E</span> · ${tr("relief AROME")} <span class="mono">${Math.round(relief(la, lo))} m</span>`
+      relReal || onLand(x, y)
+        ? `<span class="mono">${la.toFixed(3)} N · ${lo.toFixed(3)} E</span> · ${tr("relief AROME")} <span class="mono">${Math.round(relReal ? relReal(la, lo) : relief(la, lo))} m</span>`
         : `<span class="mono">${la.toFixed(2)} N · ${lo.toFixed(2)} E</span> · ${tr("hors de la zone du calcul global")}`,
     );
   };

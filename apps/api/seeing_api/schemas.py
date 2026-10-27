@@ -86,3 +86,5 @@ class MapOut(BaseModel):
     see_min: float
     see_max: float
     frames: list[MapFrameOut]
+    # GET /api/map/relief serves the model orography of the grid (contour lines)
+    relief: bool = False
