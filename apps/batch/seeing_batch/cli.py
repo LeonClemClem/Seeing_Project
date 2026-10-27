@@ -1,4 +1,4 @@
-"""`seeing-batch run [--run-time ISO] [--keep-gribs]` | `seeing-batch monitors [--days N]`"""
+"""`seeing-batch run [--run-time ISO] [--keep-gribs]` | `seeing-batch monitors [--days N] [--since-forecasts]`"""
 
 from __future__ import annotations
 
@@ -138,6 +138,8 @@ def main(argv: list[str] | None = None) -> None:
     run.add_argument("--keep-gribs", action="store_true", help="Keep the downloaded GRIB files in GRIB_DIR.")
     mon = sub.add_parser("monitors", help="Fetch the online seeing monitors now and store their measurements.")
     mon.add_argument("--days", type=int, default=None, help="Days fetched where the source keeps them (default MONITORS_DAYS).")
+    mon.add_argument("--since-forecasts", action="store_true",
+                     help="Catch up back to the earliest past forecast of each site (where the source keeps that far).")
     args = parser.parse_args(argv)
 
     setup_logging(os.environ.get("LOG_LEVEL", "INFO"))
@@ -145,7 +147,7 @@ def main(argv: list[str] | None = None) -> None:
     try:
         session_factory = make_session_factory(engine)
         if args.command == "monitors":
-            monitors.collect(session_factory, days=args.days or monitors_days())
+            monitors.collect(session_factory, days=args.days or monitors_days(), since_forecasts=args.since_forecasts)
             code = 0
         else:
             if monitors_due():

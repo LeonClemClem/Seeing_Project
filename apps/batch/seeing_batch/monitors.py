@@ -19,11 +19,11 @@ from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 
 import numpy as np
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import sessionmaker
 
-from seeing_db import Measurement, Site
+from seeing_db import Forecast, Measurement, Site
 
 logger = logging.getLogger("seeing_batch")
 
@@ -74,18 +74,21 @@ def paris_to_utc(local: datetime) -> datetime:
 
 
 # ---------------------------------------------------------------- Miratlas
-def miratlas_query(ds_uid: str, days: int) -> bytes:
-    start = (datetime.now(UTC) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+MIRATLAS_WINDOW_DAYS = 30  # one query per 30 days (the API caps the points of a query)
+
+
+def miratlas_query(ds_uid: str, start: datetime, stop: datetime) -> bytes:
+    a, b = (t.strftime("%Y-%m-%dT%H:%M:%SZ") for t in (start, stop))
     queries = []
     for ref, field in (("day", "day_see"), ("night", "night_see")):
         flux = (
-            f'from(bucket: "miratlas")\n  |> range(start: {start}, stop: v.timeRangeStop)\n'
+            f'from(bucket: "miratlas")\n  |> range(start: {a}, stop: {b})\n'
             f'  |> filter(fn: (r) => r._measurement == "ism_stations" and r._field == "{field}")\n'
             "  |> filter(fn: (r) => r._value > 0 and r._value <= 10)\n"
             '  |> group(columns: ["_field"])'
         )
         queries.append({"refId": ref, "datasource": {"type": "influxdb", "uid": ds_uid}, "query": flux, "maxDataPoints": 100000})
-    return json.dumps({"queries": queries, "from": f"now-{days}d", "to": "now"}).encode()
+    return json.dumps({"queries": queries, "from": str(int(start.timestamp() * 1000)), "to": str(int(stop.timestamp() * 1000))}).encode()
 
 
 def parse_miratlas(payload: dict) -> Points:
@@ -105,8 +108,16 @@ def parse_miratlas(payload: dict) -> Points:
 
 
 def fetch_miratlas(ds_uid: str, days: int) -> Points:
-    body, _ = _get(MIRATLAS_API, miratlas_query(ds_uid, days))
-    return parse_miratlas(json.loads(body))
+    """The last `days` days, in 30-day queries (the API keeps at least 4 months: data since 29/06/2026)."""
+    now = datetime.now(UTC)
+    out: Points = []
+    start = now - timedelta(days=days)
+    while start < now:
+        stop = min(now, start + timedelta(days=MIRATLAS_WINDOW_DAYS))
+        body, _ = _get(MIRATLAS_API, miratlas_query(ds_uid, start, stop))
+        out += parse_miratlas(json.loads(body))
+        start = stop
+    return out
 
 
 # ---------------------------------------------------------------- Copernic
@@ -301,19 +312,30 @@ def store(session_factory: sessionmaker, slug: str, points: Points) -> int:
         site_id = session.scalar(select(Site.id).where(Site.slug == slug))
         if site_id is None:
             return 0
-        stmt = pg_insert(Measurement).values([dict(site_id=site_id, time=t, seeing_arcsec=v) for t, v in rows.items()])
-        session.execute(stmt.on_conflict_do_update(index_elements=["site_id", "time"], set_={"seeing_arcsec": stmt.excluded.seeing_arcsec}))
+        items = list(rows.items())
+        for i in range(0, len(items), 5000):  # bounded statements (a catch-up sends ~60 000 points per site)
+            stmt = pg_insert(Measurement).values([dict(site_id=site_id, time=t, seeing_arcsec=v) for t, v in items[i : i + 5000]])
+            session.execute(stmt.on_conflict_do_update(index_elements=["site_id", "time"], set_={"seeing_arcsec": stmt.excluded.seeing_arcsec}))
         session.commit()
     return len(rows)
 
 
-def collect(session_factory: sessionmaker, days: int = 7, sources=None) -> dict[str, int | str]:
+def days_since_forecasts(session_factory: sessionmaker, slug: str, now: datetime | None = None) -> int:
+    """Days back to the earliest stored forecast of the site (0 when it has none)."""
+    with session_factory() as session:
+        t0 = session.scalar(select(func.min(Forecast.valid_time)).join(Site, Site.id == Forecast.site_id).where(Site.slug == slug))
+    return 0 if t0 is None else ((now or datetime.now(UTC)) - t0).days + 2
+
+
+def collect(session_factory: sessionmaker, days: int = 7, sources=None, since_forecasts: bool = False) -> dict[str, int | str]:
     """Fetch every source and store its points (idempotent: same time = same row). A failing source is logged
-    and skipped, never failing the batch."""
+    and skipped, never failing the batch. `since_forecasts`: go back to the earliest past forecast of each site,
+    where the source keeps that far (Miratlas; Copernic and ROSA only have their last night online)."""
     report: dict[str, int | str] = {}
     for slug, fetch in (sources or SOURCES).items():
         try:
-            report[slug] = store(session_factory, slug, fetch(days))
+            n = max(days, days_since_forecasts(session_factory, slug)) if since_forecasts else days
+            report[slug] = store(session_factory, slug, fetch(n))
         except Exception as e:  # noqa: BLE001 - one monitor down must not stop the others
             report[slug] = f"error: {e}"
             logger.warning("Monitor %s: %s", slug, e)

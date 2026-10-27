@@ -9,7 +9,7 @@ from seeing_batch import monitors
 from seeing_batch.cli import monitors_due
 from sqlalchemy import func, select
 
-from seeing_db import Measurement
+from seeing_db import Forecast, Measurement, ModelRun, RunStatus, Site
 
 
 def test_paris_time():
@@ -83,3 +83,20 @@ def test_collect_stores_idempotently(db):
     monitors.collect(db, 7, sources)  # same points again: no duplicate
     with db() as s:
         assert s.scalar(select(func.count()).select_from(Measurement)) == 2
+
+
+def test_collect_since_forecasts_goes_back_to_the_earliest_forecast(db):
+
+    now = datetime.now(UTC)
+    with db() as s:
+        site = s.scalar(select(Site).where(Site.slug == "ohp"))
+        run = ModelRun(run_time=now - timedelta(days=50), status=RunStatus.success)
+        s.add(run)
+        s.flush()
+        s.add(Forecast(run_id=run.id, site_id=site.id, valid_time=now - timedelta(days=49, hours=12), lead_hour=12))
+        s.commit()
+    asked = {}
+    monitors.collect(db, 30, {"ohp": lambda days: asked.setdefault("ohp", days) and [], "verclause": lambda days: asked.setdefault("v", days) and []},
+                     since_forecasts=True)
+    assert asked == {"ohp": 51, "v": 30}  # verclause has no forecast: the default window
+    assert monitors.days_since_forecasts(db, "copernic-gap") == 0
