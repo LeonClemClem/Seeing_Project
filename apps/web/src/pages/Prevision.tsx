@@ -20,7 +20,8 @@ import { useLangMemo, useUi } from "../store";
 export default function Prevision() {
   const place = useCurrentPlace();
   const showObs = useUi((s) => s.showObs);
-  const OB = showObs && !place.real;
+  // measurements shown for real sites too (their research history), as in the mock-up
+  const OB = showObs;
 
   return (
     <section>
