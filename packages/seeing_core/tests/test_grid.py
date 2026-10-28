@@ -98,3 +98,18 @@ def test_relief_roundtrip():
     h = np.array([[0.0, 4807.4, -20.0], [np.nan, 1234.6, 3.0]])
     d = decode_relief(encode_relief(h), h.shape)
     np.testing.assert_allclose(d, [[0, 4807, -20], [np.nan, 1235, 3]], equal_nan=True)
+
+
+def test_cells_around_north_to_south_west_to_east():
+    from seeing_core.grid import GridGeometry, cells_around
+
+    # grid scanned north to south (dlat < 0) as AROME: altitude = 100 * row + column
+    g = GridGeometry(ny=10, nx=10, lat0=45.0, lon0=5.0, dlat=-0.025, dlon=0.025)
+    h = np.array([[100.0 * r + c for c in range(10)] for r in range(10)])
+    h[3, 4] = np.nan
+    cells = cells_around(h, g, lat=45.0 - 5 * 0.025, lon=5.0 + 5 * 0.025)
+    assert cells["lat0"] == pytest.approx(44.875) and cells["lon0"] == pytest.approx(5.125) and cells["step"] == 0.025
+    assert cells["alt"][0] == [None if c == 4 else 300 + c for c in range(3, 8)]  # north row = row 3
+    assert cells["alt"][2][2] == 505  # the site's cell
+    assert cells["alt"][4] == [700 + c for c in range(3, 8)]  # south row = row 7
+    assert cells_around(h, g, lat=45.0, lon=5.0) is None  # too close to the edge

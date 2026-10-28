@@ -6,7 +6,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { api, queryKeys, type PlaceIn, type PlacePatch, type Site } from "../api";
+import { api, queryKeys, type Cells, type PlaceIn, type PlacePatch, type Site } from "../api";
 import { useUser } from "./auth";
 import { KDEF } from "../mock/engine";
 import { useUi, type K3, type Role, type UiState } from "../store";
@@ -28,6 +28,8 @@ export interface Place {
   K: K3;
   /** Real forecasts from the API (as opposed to the fictitious model). */
   real: boolean;
+  /** AROME orography of the 5 x 5 cells around the place (API), when the batch has computed it. */
+  cells?: Cells | null;
   /** Measurement factor of the fictitious monitor (mock places). */
   f: number;
   /** Mock table columns of "Mes lieux". */
@@ -55,6 +57,7 @@ export const siteToPlace = (s: Site): Place => ({
   hidden: s.visibility === "hidden",
   K: s.k && s.k.length === 3 ? [s.k[0]!, s.k[1]!, s.k[2]!] : [...KDEF],
   real: true,
+  cells: s.cells ?? null,
   f: 1,
   vis: !s.owned ? undefined : s.visibility === "shared" ? "partagé · position approchée" : "privé",
   mesures: s.owned ? "" : undefined,

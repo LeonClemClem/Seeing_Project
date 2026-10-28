@@ -232,7 +232,7 @@ function PlaceDetail({ l }: { l: Place }) {
     const v = data ? seeHist(data) : [];
     return { ...histSvg(v, 460, 220, false), v };
   }, [data]);
-  const maille = useLangMemo(() => mailleSvg(tr(l.nom), l.lat, l.lon, l.alt), [l]);
+  const maille = useLangMemo(() => mailleSvg(tr(l.nom), l.lat, l.lon, l.alt, l.cells), [l]);
   const corr = useLangMemo(() => (data ? corrChart(data, corrf) : null), [data, corrf]);
   const cn2 = useLangMemo(() => (l.real ? "" : cn2Svg(l.K, l.K, true, { mesf }, l.f)), [l, mesf]);
   const first = data?.episodes[0],

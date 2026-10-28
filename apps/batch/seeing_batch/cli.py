@@ -92,6 +92,8 @@ def run_batch(
             raise RuntimeError("No lead hour could be computed for any site")
         frames = persist.map_frame_rows(grid, run_time, MAP_K) if grid is not None and not grid.failed and grid.frames else []
         n = persist.store_results(session_factory, run_id, forecasts, {spec.slug: sid for sid, spec in site_rows}, frames)
+        if grid is not None and getattr(grid, "surface_h_full", None) is not None:
+            persist.store_cells(session_factory, grid, site_rows)
     except Exception as exc:
         logger.exception("Run %s failed", rt, extra={"run_time": rt})
         persist.mark_failed(session_factory, run_id, f"{type(exc).__name__}: {exc}")

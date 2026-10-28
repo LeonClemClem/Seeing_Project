@@ -179,3 +179,19 @@ def test_run_batch_stores_map_frames(db, monkeypatch, tmp_path):
         assert [f.lead_hour for f in frames] == [19, 20]
         assert (frames[0].ny, frames[0].nx, frames[0].k_tke, frames[0].k_cis) == (2, 3, 2.0, 35.0)
         assert frames[0].valid_time == RUN + timedelta(hours=19)
+
+
+def test_store_cells(db):
+    from seeing_core.grid import GridGeometry
+
+    class Grid:
+        geometry_full = GridGeometry(ny=400, nx=400, lat0=48.0, lon0=3.0, dlat=-0.025, dlon=0.025)
+        surface_h_full = np.full((400, 400), 1234.0)
+
+    with db() as s:
+        rows = persist.load_sites(s)
+    n = persist.store_cells(db, Grid(), rows)
+    assert n >= 1
+    with db() as s:
+        site = s.scalar(select(Site).where(Site.slug == "ohp"))
+        assert site.cells["alt"][2][2] == 1234 and len(site.cells["alt"]) == 5

@@ -63,6 +63,7 @@ def test_private_and_shared_places_seen_by_others():
     assert priv["slug"] not in seen
     s = seen[pub["slug"]]
     assert s["name"] == "Lieu partagé" and s["k"] is None and not s["owned"] and s["altitude_m"] is None
+    assert s["cells"] is None  # the cells around the place would give its exact position away
     import math
     d = math.hypot((s["lat"] - 45.2) * 111.2, (s["lon"] - 6.2) * 111.32 * math.cos(math.radians(45.2)))
     assert 4.9 <= d <= 11.1
