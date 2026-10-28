@@ -212,10 +212,11 @@ function MockCorr({ place }: { place: Place }) {
 }
 
 function ModelVars({ place }: { place: Place }) {
-  const [view, setView] = useState<View>("week");
+  // default: latest forecasts, every variable ticked (each sub-panel has its own complementary list)
+  const [view, setView] = useState<View>("run");
   const [zoom, setZoom] = useState(1);
   const { forecast } = useRealForecast(place, view);
-  const [sel, setSel] = useState<Set<string>[]>(() => [new Set(["see"]), new Set(["u10", "u100", "u500"])]);
+  const [sel, setSel] = useState<Set<string>[]>(() => [0, 1].map((k) => new Set(PVGRP[k])));
   const panels = useLangMemo(
     () => (forecast.data ? [0, 1].map((k) => pvPanel(forecast.data!, place.nom, sel[k]!, zoom)) : null),
     [forecast.data, place.nom, sel, zoom],
