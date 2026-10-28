@@ -166,13 +166,22 @@ export function cn2Ctx(
     zb0 = alt === "jet" ? zb1 - sol : zb1;
   const heights = cn.heights_m,
     zb = Math.min(zb0, Math.max(...heights));
-  const lg = cn.cn2.map((row) => row.map((v) => (v != null && v > 0 ? Math.log10(v) : null)));
+  // one column per hour from the first to the last profile: the panel is drawn by hour index, so the hours
+  // missing in the stitched series (runs without profiles) must stay as empty columns, else everything after
+  // a gap shifts to the left (the raw measurements, placed by time, then no longer line up)
+  const t0 = cn.valid_times.length ? ms(cn.valid_times[0]!) : 0,
+    nh = cn.valid_times.length ? Math.round((ms(cn.valid_times[cn.valid_times.length - 1]!) - t0) / HOUR) + 1 : 0,
+    times = Array.from({ length: nh }, (_, i) => t0 + i * HOUR),
+    rowAt = new Map(cn.valid_times.map((s, k) => [ms(s), k]));
+  const lg = times.map((tm) => {
+    const k = rowAt.get(tm);
+    return k == null ? heights.map(() => null) : cn.cn2[k]!.map((v) => (v != null && v > 0 ? Math.log10(v) : null));
+  });
   const a: number[] = [];
   lg.forEach((row) => row.forEach((v, k) => v != null && heights[k]! <= 4000 && a.push(v)));
   a.sort((x, y) => x - y);
   const lo = a.length ? a[Math.floor(a.length * 0.05)]! : -18,
     hi = a.length ? a[Math.floor(a.length * 0.995)]! : -13;
-  const times = cn.valid_times.map(ms);
   const byT = new Map((fc?.points ?? []).map((p) => [ms(p.valid_time), p]));
   return {
     W,
