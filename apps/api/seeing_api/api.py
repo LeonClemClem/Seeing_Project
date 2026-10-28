@@ -23,15 +23,18 @@ SessionDep = Annotated[Session, Depends(get_session)]
 RunParam = Annotated[str, Query(description="`latest` or an ISO 8601 run time, e.g. 2026-10-13T12:00Z")]
 ViewParam = Annotated[
     str,
-    Query(pattern="^(run|week)$", description="`run`: the run only; `week`: up to 7 days of main runs stitched, then the run"),
+    Query(
+        pattern="^(run|week|all)$",
+        description="`run`: the run only; `week`: up to 7 days of main runs stitched, then the run; `all`: every past run stitched",
+    ),
 ]
 WEEK = timedelta(days=7)
 
 
-def stitched(session: Session, model, site_id: int, run: ModelRun):
-    """Rows of `model` (Forecast or Cn2Profile) for every valid hour from 7 days before `run` to the end
-    of `run`: for each hour, the main run (00/06/12/18Z) issued last before it, i.e. the shortest lead,
-    other runs only to fill gaps; runs after `run` are ignored."""
+def stitched(session: Session, model, site_id: int, run: ModelRun, span: timedelta | None = WEEK):
+    """Rows of `model` (Forecast or Cn2Profile) for every valid hour from `span` (7 days; None = all) before
+    `run` to the end of `run`: for each hour, the main run (00/06/12/18Z) issued last before it, i.e. the
+    shortest lead, other runs only to fill gaps; runs after `run` are ignored."""
     ranked = (
         select(model.id, func.row_number().over(
             partition_by=model.valid_time,
@@ -39,7 +42,7 @@ def stitched(session: Session, model, site_id: int, run: ModelRun):
         ).label("rk"))
         .join(ModelRun, ModelRun.id == model.run_id)
         .where(model.site_id == site_id, ModelRun.status == RunStatus.success, ModelRun.run_time <= run.run_time,
-               model.valid_time >= run.run_time - WEEK)
+               *([model.valid_time >= run.run_time - span] if span is not None else []))
         .subquery()
     )
     return session.scalars(
@@ -153,8 +156,8 @@ def site_forecast(
 ) -> ForecastOut:
     site = get_site(session, slug, user)
     model_run = resolve_run(session, run)
-    if view == "week":
-        rows = stitched(session, Forecast, site.id, model_run)
+    if view in ("week", "all"):
+        rows = stitched(session, Forecast, site.id, model_run, WEEK if view == "week" else None)
     else:
         rows = session.scalars(
             select(Forecast)
@@ -188,7 +191,7 @@ def site_cn2(
 ) -> Cn2Out:
     site = get_site(session, slug, user)
     model_run = resolve_run(session, run)
-    if view == "week":
+    if view in ("week", "all"):  # Cn² profiles: at most a week (the panel shows 7 days)
         profiles = list(stitched(session, Cn2Profile, site.id, model_run))
     else:
         profiles = list(

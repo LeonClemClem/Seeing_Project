@@ -177,3 +177,12 @@ def test_week_view_stitches_main_runs(client, session):
     cn = client.get("/api/sites/saint-veran/cn2", params={"view": "week"}).json()
     assert len(cn["valid_times"]) == 9 and cn["run_time"] == "2026-10-13T06:00:00Z"
     assert client.get("/api/sites/saint-veran/cn2", params={"view": "x"}).status_code == 422
+
+
+def test_all_view_goes_back_beyond_a_week(client, session):
+    add_run(session, T0 - timedelta(days=20), seeing=[0.5, 0.6])
+    add_run(session, T0, seeing=[1.0, 1.1])
+    wk = client.get("/api/sites/saint-veran/forecast", params={"view": "week"}).json()
+    assert [p["seeing_arcsec"] for p in wk["points"]] == [1.0, 1.1]
+    al = client.get("/api/sites/saint-veran/forecast", params={"view": "all"}).json()
+    assert [p["seeing_arcsec"] for p in al["points"]] == [0.5, 0.6, 1.0, 1.1]

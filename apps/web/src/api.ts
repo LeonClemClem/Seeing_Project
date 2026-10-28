@@ -185,7 +185,7 @@ export const api = {
     get<Terms>(`/api/sites/${encodeURIComponent(slug)}/terms?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   latestRun: () => get<Run>("/api/runs/latest"),
   /** view "week": up to 7 days of main runs stitched, then the run. */
-  forecast: (slug: string, run = "latest", view: "run" | "week" = "run") =>
+  forecast: (slug: string, run = "latest", view: "run" | "week" | "all" = "run") =>
     get<Forecast>(`/api/sites/${encodeURIComponent(slug)}/forecast?run=${encodeURIComponent(run)}&view=${view}`),
   cn2: (slug: string, run = "latest", view: "run" | "week" = "run") =>
     get<Cn2>(`/api/sites/${encodeURIComponent(slug)}/cn2?run=${encodeURIComponent(run)}&view=${view}`),
