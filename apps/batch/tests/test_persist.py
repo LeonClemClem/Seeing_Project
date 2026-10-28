@@ -127,6 +127,10 @@ def test_run_batch_success_then_idempotent(db, monkeypatch, tmp_path):
     # Already stored with success: cheap exit 0, nothing downloaded.
     assert run_batch(db, **kw) == 0
     assert calls == [RUN]
+    # --force: recomputed and replaced (no duplicate rows)
+    assert run_batch(db, **kw, force=True) == 0
+    assert calls == [RUN, RUN]
+    assert count(db, Forecast) == 3 * n_sites
 
 
 def test_run_batch_failure_marks_failed(db, tmp_path):
