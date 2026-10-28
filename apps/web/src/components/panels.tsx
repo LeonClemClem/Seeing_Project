@@ -17,7 +17,9 @@ export function DataChips({ id }: { id: string }) {
   const mesf = useUi((s) => s.mesf);
   const corrf = useUi((s) => s.corrf);
   const on = (k: "brut" | "horaire" | "courbe" | "nuit") =>
-    k === "nuit" ? corrf.nuit : k === "courbe" ? mesf.courbe : mesf[k] && corrf[k];
+    // brutes / médianes horaires drive both the charts (mesf) and the correlation (corrf), which Mes lieux sets
+    // apart: lit when either shows them, and a click sets both, so that the chip never says "off" while drawn
+    k === "nuit" ? corrf.nuit : k === "courbe" ? mesf.courbe : mesf[k] || corrf[k];
   const toggle = (k: "brut" | "horaire" | "courbe" | "nuit") => {
     const v = !on(k);
     setState((s: UiState) => ({
