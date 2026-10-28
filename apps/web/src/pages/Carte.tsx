@@ -48,7 +48,9 @@ function fitBox(b: Box): Box {
   else so = (sl * r) / c;
   return { la0: cla - sl / 2, la1: cla + sl / 2, lo0: (b.lo0 + b.lo1) / 2 - so / 2, lo1: (b.lo0 + b.lo1) / 2 + so / 2 };
 }
-/** Clamp zoom and centre to the domain. */
+/** The whole AROME domain fills the view: no panning then, only zooming in. */
+const isFullView = (v: Box) => v.la1 - v.la0 >= fitBox(DOM).la1 - fitBox(DOM).la0 - 1e-9;
+/** Clamp zoom and centre to the domain; the whole-domain view is always centred on the domain. */
 function clampView(v: Box): Box {
   const DV = fitBox(DOM),
     sl = v.la1 - v.la0,
@@ -57,6 +59,7 @@ function clampView(v: Box): Box {
     f = sl2 / sl,
     cla = (v.la0 + v.la1) / 2,
     clo = (v.lo0 + v.lo1) / 2;
+  if (sl2 >= DV.la1 - DV.la0 - 1e-9) return DV;
   const nl = Math.min(DOM.la1, Math.max(DOM.la0, cla)),
     no = Math.min(DOM.lo1, Math.max(DOM.lo0, clo));
   return { la0: nl - sl2 / 2, la1: nl + sl2 / 2, lo0: no - (so * f) / 2, lo1: no + (so * f) / 2 };
@@ -583,7 +586,7 @@ export default function Carte() {
       const dx = x - d.x,
         dy = y - d.y;
       if (Math.hypot(dx, dy) > 4) d.moved = true;
-      if (d.moved) {
+      if (d.moved && !isFullView(VW)) {
         const c = canvas.current!.getContext("2d")!;
         c.fillStyle = "#1b2740";
         c.fillRect(0, 0, CW, CH);
@@ -594,7 +597,7 @@ export default function Carte() {
     const zz = zoneAt(x, y),
       zi = zz ? zz[4] : -1;
     if (zi !== MZH) setMZH(zi);
-    canvas.current!.style.cursor = zi >= 0 ? "pointer" : "grab";
+    canvas.current!.style.cursor = zi >= 0 ? "pointer" : isFullView(VW) ? "default" : "grab";
     if (zz) return setTip(`${tr("Clique pour zoomer sur")} <b>${esc(tr(ZONES[zi]![0]))}</b>`);
     const la = LA(y),
       lo = LO(x);
