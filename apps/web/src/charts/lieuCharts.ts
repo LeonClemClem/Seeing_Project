@@ -324,17 +324,13 @@ export const seeHist = (l: LieuData) => {
 
 /** Histogram of measured night seeing with a log-normal fit, median and P5/P95. */
 export function histSvg(v: number[], W: number, H: number, small: boolean) {
-  // axis bounds: the 5th and 95th percentiles, on whole 0.25" classes (values beyond are not drawn)
+  // axis from 0 to the largest value, 0.25" classes
   const bw = 0.25,
-    sv = [...v].sort((a, b) => a - b),
-    pq = (p: number) => (sv.length ? sv[Math.min(sv.length - 1, Math.floor(p * (sv.length - 1)))]! : 0),
-    x0 = Math.floor(pq(0.05) / bw) * bw,
-    nb = Math.max(1, Math.ceil((pq(0.95) - x0) / bw + 1e-9)),
-    x1 = x0 + nb * bw,
+    x0 = 0,
+    nb = Math.ceil(Math.max(1, ...v) / bw + 1e-9),
+    x1 = nb * bw,
     c = new Array<number>(nb).fill(0);
-  v.forEach((x) => {
-    if (x >= x0 && x <= x1) c[Math.min(nb - 1, Math.floor((x - x0) / bw))]!++;
-  });
+  v.forEach((x) => c[Math.min(nb - 1, Math.floor(x / bw))]!++);
   const mx = Math.max(...c, 1),
     L = small ? 4 : 34,
     R = small ? 4 : 8,
@@ -383,7 +379,7 @@ export function histSvg(v: number[], W: number, H: number, small: boolean) {
     const xs = x1 - x0 > 12 ? 2 : x1 - x0 > 3 ? 1 : 0.5;
     for (let x = Math.ceil(x0 / xs) * xs; x <= x1 + 1e-9; x += xs)
       g += `<text x="${L + ((x - x0) / bw) * cw}" y="${T + ph + 14}" text-anchor="middle" font-size="11" fill="${C_TXT}">${+x.toFixed(2)}<tspan font-weight="700">″</tspan></text>`;
-    g += `<text x="${L - 4}" y="${T + 8}" text-anchor="end" font-size="10" fill="${C_TXT}">${mx}</text><text x="${L - 4}" y="${T + ph}" text-anchor="end" font-size="10" fill="${C_TXT}">0</text><text x="${L + pw / 2}" y="${H - 2}" text-anchor="middle" font-size="11" fill="${C_TXT}">${tr("seeing mesuré (nuit), classes de 0,25″, du percentile 5 au 95")}</text>`;
+    g += `<text x="${L - 4}" y="${T + 8}" text-anchor="end" font-size="10" fill="${C_TXT}">${mx}</text><text x="${L - 4}" y="${T + ph}" text-anchor="end" font-size="10" fill="${C_TXT}">0</text><text x="${L + pw / 2}" y="${H - 2}" text-anchor="middle" font-size="11" fill="${C_TXT}">${tr("seeing mesuré (nuit), classes de 0,25″")}</text>`;
   }
   return { svg: g, md, q1: q(0.25), q3: q(0.75), n: v.length, mu, sg };
 }

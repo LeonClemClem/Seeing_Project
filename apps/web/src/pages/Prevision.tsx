@@ -2,7 +2,7 @@
  * Per-place forecast. API sites show the real latest run (seeing, Cn², boundary layer); personal places
  * use the fictitious model with the K in use, plus mock measurements.
  */
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { corrChart } from "../charts/lieuCharts";
@@ -22,6 +22,21 @@ export default function Prevision() {
   const showObs = useUi((s) => s.showObs);
   // measurements shown for real sites too (their research history), as in the mock-up
   const OB = showObs;
+  // title and legend of the history: in the header next to the histogram inset (HistPanel)
+  const histHead = (
+    <>
+      <h2>{tr(OB ? "Historique (prévisions et mesures du lieu)" : "Historique des prévisions du lieu")}</h2>
+      <div className="legend">
+        <span>
+          <Sw style={{ width: 16, height: 3, background: "var(--arome)" }} />
+          V2bd
+        </span>
+        {OB && <LegMes />}
+        {OB && <LegMed />}
+        <LegBreak />
+      </div>
+    </>
+  );
 
   return (
     <section>
@@ -60,17 +75,7 @@ export default function Prevision() {
           <KRead place={place} />
         </div>
         <div className="panel">
-          <h2>{tr(OB ? "Historique (prévisions et mesures du lieu)" : "Historique des prévisions du lieu")}</h2>
-          <div className="legend">
-            <span>
-              <Sw style={{ width: 16, height: 3, background: "var(--arome)" }} />
-              V2bd
-            </span>
-            {OB && <LegMes />}
-            {OB && <LegMed />}
-            <LegBreak />
-          </div>
-          {place.real ? <RealHistory place={place} OB={OB} /> : <MockHistory place={place} OB={OB} />}
+          {place.real ? <RealHistory place={place} OB={OB} head={histHead} /> : <MockHistory place={place} OB={OB} head={histHead} />}
         </div>
         <div className="grid2" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1.5fr)", alignItems: "start" }}>
           <div className="panel">
@@ -88,10 +93,16 @@ export default function Prevision() {
 }
 
 /** Research history of a real site (sent by research/envoi_site.py). */
-function RealHistory({ place, OB }: { place: Place; OB: boolean }) {
+function RealHistory({ place, OB, head }: { place: Place; OB: boolean; head: ReactNode }) {
   const data = useSiteHistory(place);
-  if (!data || !data.episodes.length) return <NoData text="Pas de période avec prévision et mesures pour ce lieu." />;
-  return <HistPanel data={data} OB={OB} />;
+  if (!data || !data.episodes.length)
+    return (
+      <>
+        {head}
+        <NoData text="Pas de période avec prévision et mesures pour ce lieu." />
+      </>
+    );
+  return <HistPanel data={data} OB={OB} head={head} />;
 }
 
 function RealCorr({ place }: { place: Place }) {
@@ -178,11 +189,11 @@ function MockCn2({ place }: { place: Place }) {
   );
 }
 
-function MockHistory({ place, OB }: { place: Place; OB: boolean }) {
+function MockHistory({ place, OB, head }: { place: Place; OB: boolean; head: ReactNode }) {
   const K = useUi((s) => s.K);
   const KCAL = useUi((s) => s.KCAL);
   const data = useLangMemo(() => lieuData(place.nom, place.f, K, KCAL), [place, K, KCAL]);
-  return <HistPanel data={data} OB={OB} />;
+  return <HistPanel data={data} OB={OB} head={head} />;
 }
 
 function MockCorr({ place }: { place: Place }) {
