@@ -19,7 +19,7 @@ def test_sites_lists_active_seeded_sites(client, session):
     assert set(sites) == {"saint-veran", "pic-du-midi", "ohp", "cosmodrome"}
     assert sites["saint-veran"]["altitude_m"] == 2930.0
     assert sites["cosmodrome"]["altitude_m"] is None
-    assert set(sites["saint-veran"]) == {"slug", "name", "lat", "lon", "altitude_m", "visibility", "owned", "k"}
+    assert set(sites["saint-veran"]) == {"slug", "name", "lat", "lon", "altitude_m", "visibility", "owned", "k", "cells"}
     assert sites["saint-veran"]["k"] is None and sites["saint-veran"]["owned"] is False
     assert sites["ohp"]["name"] == "OHP" and sites["pic-du-midi"]["name"] == "Pic du Midi"
     assert {s: sites[s]["visibility"] for s in sites} == {

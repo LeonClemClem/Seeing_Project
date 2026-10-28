@@ -16,6 +16,9 @@ class SiteOut(BaseModel):
     owned: bool = False
     # (K_TKE, K_CIS, K_conv): only for the owner, the administrator and the team for its own site.
     k: list[float] | None = None
+    # AROME orography of the 5 x 5 cells around the site (Site.cells); None for another member's shared
+    # place, whose exact position it would give away.
+    cells: dict | None = None
 
 
 class RunOut(BaseModel):

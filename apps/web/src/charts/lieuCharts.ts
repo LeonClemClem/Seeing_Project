@@ -1,6 +1,6 @@
 /** Per-place charts (mockup's lxHist / lxCorr / histSvg / lxMaille) over LieuData. */
 import { tr } from "../i18n";
-import { relief } from "../lib/geo";
+import type { Cells } from "../api";
 import type { LieuData, LieuEpisode, TV } from "../mock/engine";
 import type { UiState } from "../store";
 import {
@@ -404,12 +404,19 @@ const relCol = (f: number): number[] => {
 };
 
 /** 5 × 5 AROME cells (0.025°) around the place, coloured by (fictitious) terrain height. viewBox 0 0 520 420. */
-export function mailleSvg(nom: string, lat: number, lon: number, alt: number | null) {
-  const NG = 5,
-    C = 0.025,
+/** The 5 x 5 AROME grid cells around a place with their real orography (`cells`, written by the batch);
+ * a message until the batch has computed them. viewBox 0 0 520 420. */
+export function mailleSvg(nom: string, lat: number, lon: number, alt: number | null, cells: Cells | null | undefined) {
+  if (!cells)
+    return {
+      svg: `<text x="260" y="210" text-anchor="middle" font-size="13" fill="${C_TXT}">${tr("Altitudes des mailles disponibles après le prochain run AROME.")}</text>`,
+      caption: tr("grille AROME 0,025° · 5 × 5 mailles"),
+    };
+  const NG = cells.alt.length,
+    C = cells.step,
     h = (NG - 1) / 2,
-    cla = Math.round(lat / C) * C,
-    clo = Math.round(lon / C) * C,
+    cla = cells.lat0,
+    clo = cells.lon0,
     kx = 111.32 * Math.cos(cla * D2R) * C,
     ky = 111.2 * C,
     W = 520,
@@ -423,22 +430,23 @@ export function mailleSvg(nom: string, lat: number, lon: number, alt: number | n
     y0 = M;
   const XL = (lo: number) => x0 + ((lo - (clo - (h + 0.5) * C)) / C) * kx * sc,
     YL = (la: number) => y0 + ((cla + (h + 0.5) * C - la) / C) * ky * sc,
-    A: [number, number, number][] = [];
-  for (let a = h; a >= -h; a--)
-    for (let b = -h; b <= h; b++) A.push([a, b, Math.round(relief(cla + a * C, clo + b * C))]);
-  const lo0 = Math.min(...A.map((q) => q[2])),
-    hi0 = Math.max(...A.map((q) => q[2])),
+    A: [number, number, number | null][] = [];
+  // rows north to south, columns west to east
+  cells.alt.forEach((row, i) => row.forEach((v, j) => A.push([h - i, j - h, v == null ? null : Math.round(v)])));
+  const vals = A.map((q) => q[2]).filter((v): v is number => v != null),
+    lo0 = vals.length ? Math.min(...vals) : 0,
+    hi0 = vals.length ? Math.max(...vals) : 0,
     span = Math.max(50, hi0 - lo0);
   let g = "";
   A.forEach(([a, b, al]) => {
     const x = XL(clo + b * C - C / 2),
       y = YL(cla + a * C + C / 2),
       cen = !a && !b,
-      c = relCol((al - lo0) / span),
+      c = al == null ? [70, 76, 92] : relCol((al - lo0) / span),
       dark = c[0]! * 0.3 + c[1]! * 0.59 + c[2]! * 0.11 > 150;
     g +=
       `<rect x="${x}" y="${y}" width="${kx * sc}" height="${ky * sc}" fill="rgb(${c})" stroke="${cen ? "#f2c14e" : "rgba(10,15,29,.7)"}" stroke-width="${cen ? 3 : 0.8}"/>` +
-      `<text x="${x + (kx * sc) / 2}" y="${y + ky * sc - 5}" text-anchor="middle" font-size="10.5" fill="${dark ? "#111" : "#f4f6fb"}" font-weight="${cen ? 700 : 500}">${al} m</text>`;
+      `<text x="${x + (kx * sc) / 2}" y="${y + ky * sc - 5}" text-anchor="middle" font-size="10.5" fill="${dark ? "#111" : "#f4f6fb"}" font-weight="${cen ? 700 : 500}">${al == null ? "–" : `${al} m`}</text>`;
   });
   g += `<text x="${x0 + gw / 2}" y="${y0 - 9}" text-anchor="middle" font-size="11" fill="#f2c14e">${tr(`maille du site (cadre jaune) · centre ${cla.toFixed(3)} N · ${clo.toFixed(3)} E`)}</text>`;
   {
@@ -462,6 +470,6 @@ export function mailleSvg(nom: string, lat: number, lon: number, alt: number | n
   }
   return {
     svg: g,
-    caption: tr(`grille AROME 0,025° · ${NG} × ${NG} mailles · altitudes des mailles fictives dans la maquette`),
+    caption: tr(`grille AROME 0,025° · ${NG} × ${NG} mailles · altitudes du relief AROME`),
   };
 }

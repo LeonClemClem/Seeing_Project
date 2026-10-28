@@ -79,13 +79,13 @@ def site_out(site: Site, user: User | None = None) -> SiteOut:
     owned = user is not None and site.owner_id == user.id
     admin = user is not None and user.role == UserRole.admin
     team = user is not None and user.role == UserRole.team and site.slug == TEAM_SITE
-    lat, lon, name, alt = site.lat, site.lon, site.name, clean(site.altitude_m)
+    lat, lon, name, alt, cells = site.lat, site.lon, site.name, clean(site.altitude_m), site.cells
     if site.owner_id is not None and not owned:
         # Another member's shared place: no name, approximate position (also for the administrator).
         lat, lon = blur(site.slug, site.lat, site.lon)
-        name, alt = "Lieu partagé", None
+        name, alt, cells = "Lieu partagé", None, None
     return SiteOut(
-        slug=site.slug, name=name, lat=lat, lon=lon, altitude_m=alt, visibility=site.visibility, owned=owned,
+        slug=site.slug, name=name, lat=lat, lon=lon, altitude_m=alt, visibility=site.visibility, owned=owned, cells=cells,
         k=[site.k_tke, site.k_cis, site.k_tke_conv] if owned or team or (admin and site.owner_id is None) else None,
     )
 

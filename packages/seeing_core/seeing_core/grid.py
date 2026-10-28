@@ -102,6 +102,9 @@ class GridExtractor:
         self.stride = stride
         self.geometry: GridGeometry | None = None
         self.surface_h: np.ndarray | None = None
+        # full-resolution orography and its geometry (stride 1), for the grid cells around the sites
+        self.surface_h_full: np.ndarray | None = None
+        self.geometry_full: GridGeometry | None = None
         self._fields: dict[int, Fields] = {}
         self._sshf: dict[int, np.ndarray] = {}
         self._covered: dict[str, set[int]] = {p: set() for p in self.packages}
@@ -112,7 +115,7 @@ class GridExtractor:
         self.extras: dict[int, bytes] = {}
         self.failed = False
 
-    def _geometry(self, gid) -> GridGeometry:
+    def _geometry(self, gid, stride: int | None = None) -> GridGeometry:
         ni, nj = int(_get(gid, "Ni")), int(_get(gid, "Nj"))
         lat_first = float(_get(gid, "latitudeOfFirstGridPointInDegrees"))
         lon_first = float(_get(gid, "longitudeOfFirstGridPointInDegrees"))
@@ -120,13 +123,14 @@ class GridExtractor:
         dj = float(_get(gid, "jDirectionIncrementInDegrees"))
         dlat = dj if int(_get(gid, "jScansPositively", 0)) else -dj
         dlon = -di if int(_get(gid, "iScansNegatively", 0)) else di
-        s = self.stride
+        s = self.stride if stride is None else stride
         lon_first = ((lon_first + 180.0) % 360.0) - 180.0
         return GridGeometry(ny=len(range(0, nj, s)), nx=len(range(0, ni, s)), lat0=lat_first, lon0=lon_first, dlat=dlat * s, dlon=dlon * s)
 
-    def _values(self, gid) -> np.ndarray:
+    def _values(self, gid, stride: int | None = None) -> np.ndarray:
         ni, nj = int(_get(gid, "Ni")), int(_get(gid, "Nj"))
-        values = np.asarray(codes_get_array(gid, "values"), dtype=np.float64).reshape(nj, ni)[:: self.stride, :: self.stride]
+        s = self.stride if stride is None else stride
+        values = np.asarray(codes_get_array(gid, "values"), dtype=np.float64).reshape(nj, ni)[::s, ::s]
         out = values.astype(np.float32)
         if int(_get(gid, "bitmapPresent", 0)):
             out[values == float(_get(gid, "missingValue", 9999))] = np.nan
@@ -155,7 +159,9 @@ class GridExtractor:
                         if self.geometry is None:
                             self.geometry = self._geometry(gid)
                         if want_h and short_name == "h" and type_of_level == "surface":
-                            self.surface_h = self._values(gid)
+                            self.surface_h_full = self._values(gid, 1)
+                            self.geometry_full = self._geometry(gid, 1)
+                            self.surface_h = self.surface_h_full[:: self.stride, :: self.stride]
                             want_h = False
                             continue
                         if short_name not in spec.variables or type_of_level not in spec.level_types:
@@ -472,6 +478,22 @@ def decode_split(data: bytes, shape: tuple[int, int]) -> tuple[np.ndarray, np.nd
 
 # Model orography of the map grid (contour lines of the website map): uint16 = altitude + 500 m, 65535 = none.
 RELIEF_LEAD = -1  # map_frames row of a run holding its orography
+
+
+def cells_around(h: np.ndarray, g: GridGeometry, lat: float, lon: float, n: int = 5) -> dict | None:
+    """AROME orography of the n x n grid cells centred on the cell of (lat, lon), full resolution:
+    {"lat0", "lon0": centre of the site's cell, "step": degrees, "alt": rows north to south [m], None where
+    undefined}. None when the site is outside the grid."""
+    r = round((lat - g.lat0) / g.dlat)
+    c = round((lon - g.lon0) / g.dlon)
+    k = n // 2
+    if not (k <= r < g.ny - k and k <= c < g.nx - k):
+        return None
+    rows = []
+    for dr in range(k, -k - 1, -1):  # north to south
+        rr = r + dr if g.dlat > 0 else r - dr
+        rows.append([None if not np.isfinite(v := float(h[rr, c + dc if g.dlon > 0 else c - dc])) else round(v) for dc in range(-k, k + 1)])
+    return {"lat0": round(g.lat0 + r * g.dlat, 5), "lon0": round(g.lon0 + c * g.dlon, 5), "step": abs(g.dlat), "alt": rows}
 
 
 def encode_relief(h: np.ndarray) -> bytes:

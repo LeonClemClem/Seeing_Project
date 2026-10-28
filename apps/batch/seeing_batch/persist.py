@@ -7,7 +7,7 @@ import math
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -31,6 +31,22 @@ def load_sites(session: Session) -> list[tuple[int, SiteSpec]]:
         (s.id, SiteSpec(slug=s.slug, lat=s.lat, lon=s.lon, k_tke_conv=s.k_tke_conv, k_tke=s.k_tke, k_cis=s.k_cis))
         for s in rows
     ]
+
+
+def store_cells(session_factory: sessionmaker, grid, site_rows: list[tuple[int, SiteSpec]]) -> int:
+    """AROME orography of the 5 x 5 grid cells around each active site (full resolution), for the
+    "Mailles AROME autour du lieu" panel. Returns the number of sites updated."""
+    from seeing_core.grid import cells_around
+
+    n = 0
+    with session_factory() as session:
+        for sid, spec in site_rows:
+            cells = cells_around(grid.surface_h_full, grid.geometry_full, spec.lat, spec.lon)
+            if cells is not None:
+                session.execute(update(Site).where(Site.id == sid).values(cells=cells))
+                n += 1
+        session.commit()
+    return n
 
 
 def run_status(session: Session, run_time: datetime) -> RunStatus | None:

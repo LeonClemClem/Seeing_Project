@@ -49,6 +49,9 @@ class Site(Base):
     visibility: Mapped[str] = mapped_column(String(16), default="public", server_default="public")
     # Account owning a personal place (NULL for the curated sites).
     owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # AROME orography of the 5 x 5 grid cells around the site, full resolution (written by the batch):
+    # {"lat0", "lon0": centre of the site's cell, "step": degrees, "alt": rows north to south, metres}.
+    cells: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

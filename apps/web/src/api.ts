@@ -1,5 +1,14 @@
 /** Types and fetchers for the API contract in docs/architecture.md. */
 
+/** AROME orography of the grid cells around a site: centre of the site's cell, cell size [deg], altitudes
+ * [m] in rows north to south (null where undefined). */
+export interface Cells {
+  lat0: number;
+  lon0: number;
+  step: number;
+  alt: (number | null)[][];
+}
+
 export interface Site {
   slug: string;
   name: string;
@@ -13,6 +22,9 @@ export interface Site {
   owned?: boolean;
   /** (K_TKE, K_CIS, K_conv), sent to the owner, the administrator and the team for its own site only. */
   k?: number[] | null;
+  /** AROME orography of the 5 x 5 cells around the site (written by the batch); none for another
+   * member's shared place. */
+  cells?: Cells | null;
 }
 
 /** Line-of-sight Cn2 integrals [m^1/3] per direction at the map K (GET /api/fisheye). */
