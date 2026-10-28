@@ -1,5 +1,5 @@
 /** Chart panels shared by Prévision, Calibrer and Mes lieux. */
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { histChart, histSvg, seeHist } from "../charts/lieuCharts";
 import { cn2Ctx, cn2ProfileSvg, cn2RealSvg } from "../charts/realCharts";
@@ -52,7 +52,9 @@ export function DataChips({ id }: { id: string }) {
 }
 
 /** History chart with horizontal zoom and the auto vertical stretch on the visible part. */
-export function HistPanel({ data, OB, inset = true }: { data: LieuData; OB: boolean; inset?: boolean }) {
+/** `head` (title and legend) goes in the left column of the header, as in the mock-up: the histogram inset on
+ * the right then spans from the top of the panel down to the zoom row. */
+export function HistPanel({ data, OB, inset = true, head }: { data: LieuData; OB: boolean; inset?: boolean; head?: ReactNode }) {
   const mesf = useUi((s) => s.mesf);
   const [zoom, setZoom] = useState(1);
   const [stretch, setStretch] = useState(true);
@@ -98,15 +100,18 @@ export function HistPanel({ data, OB, inset = true }: { data: LieuData; OB: bool
   return (
     <>
       <div className="hghead">
-        <div className="hgleft" style={{ display: "flex", gap: 6, alignItems: "center", margin: "4px 0", flexWrap: "wrap" }}>
-          <span className="small muted">{tr("Zoom :")}</span>
-          <button onClick={() => setZoom((z) => Math.max(1, z * 0.5))}>−</button>
-          <button onClick={() => setZoom((z) => Math.min(16, z * 2))}>+</button>
-          <button onClick={() => setZoom(1)}>{tr("tout voir")}</button>
-          <Chip on={stretch} onToggle={() => setStretch(!stretch)} style={{ margin: "0 0 0 6px" }}>
-            {tr("étirement vertical auto")}
-          </Chip>
-          <span className="small muted">{zoom > 1 ? tr(`× ${zoom} (fais défiler horizontalement)`) : ""}</span>
+        <div className="hgleft">
+          {head}
+          <div style={{ display: "flex", gap: 6, alignItems: "center", margin: "4px 0", flexWrap: "wrap" }}>
+            <span className="small muted">{tr("Zoom :")}</span>
+            <button onClick={() => setZoom((z) => Math.max(1, z * 0.5))}>−</button>
+            <button onClick={() => setZoom((z) => Math.min(16, z * 2))}>+</button>
+            <button onClick={() => setZoom(1)}>{tr("tout voir")}</button>
+            <Chip on={stretch} onToggle={() => setStretch(!stretch)} style={{ margin: "0 0 0 6px" }}>
+              {tr("étirement vertical auto")}
+            </Chip>
+            <span className="small muted">{zoom > 1 ? tr(`× ${zoom} (fais défiler horizontalement)`) : ""}</span>
+          </div>
         </div>
         {OB && small && (
           <div className="hginset" ref={insetRef}>
