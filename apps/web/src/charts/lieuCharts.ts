@@ -150,6 +150,8 @@ export function histChart(l: LieuData, o: HistOpts): { svg: string; note: string
     let seg: number[][] = [];
     const fl = () => {
       if (seg.length > 1) g += pl(seg, `stroke="${C_AR}" stroke-width="1.8"`);
+      // a single forecast hour (e.g. a night piece cut at 17h30) is still shown, as a dot
+      else if (seg.length === 1) g += `<circle cx="${seg[0]![0]}" cy="${seg[0]![1]}" r="2.6" fill="${C_AR}"/>`;
       seg = [];
     };
     e.prevu.forEach((p) => {

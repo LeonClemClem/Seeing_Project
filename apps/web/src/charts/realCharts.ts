@@ -96,6 +96,7 @@ export function prevRealSvg(
     prev = -2;
   const fl = () => {
     if (seg.length > 1) g += pl(seg, `stroke="${C_AR}" stroke-width="2.2"`);
+    else if (seg.length === 1) g += `<circle cx="${seg[0]![0]}" cy="${seg[0]![1]}" r="3" fill="${C_AR}"/>`; // isolated hour
     seg = [];
   };
   sv.forEach(([i, v]) => {
@@ -302,6 +303,7 @@ export function cn2RealSvg(c: Cn2Ctx, runMs: number) {
     prev: number | null = null;
   const fl = () => {
     if (seg.length > 1) g += pl(seg, 'stroke="#fff" stroke-width="5.6"') + pl(seg, 'stroke="#1f6bff" stroke-width="3"');
+    else if (seg.length === 1) g += `<circle cx="${seg[0]![0]}" cy="${seg[0]![1]}" r="3.4" fill="#1f6bff" stroke="#fff" stroke-width="1.3"/>`; // isolated hour
     seg = [];
   };
   SEE.forEach(([i, s]) => {
