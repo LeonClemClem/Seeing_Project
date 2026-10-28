@@ -27,6 +27,9 @@ import { D2R, pad2, runLabel, turbo, turboGradient } from "../lib/util";
 import { KDEF, REF } from "../mock/engine";
 import { useUi, type K3 } from "../store";
 
+/** Compass point of an azimuth (8 directions, French). */
+const dir8 = (az: number) => ["N", "NE", "E", "SE", "S", "SO", "O", "NO"][Math.round(az / 45) % 8]!;
+
 const FN = 520,
   FR = 232,
   FC = FN / 2,
@@ -87,6 +90,7 @@ export default function Fisheye() {
   const [fcur, setFcur] = useState(3);
   const [playing, setPlaying] = useState(false);
   const [cal, setCal] = useState<"mine" | "def">("mine");
+  const [hov, setHov] = useState<{ x: number; y: number; alt: number; az: number; s: number } | null>(null);
   const [opt, setOpt] = useState<Record<OptKey, boolean>>({ cons: true, sol: true, trk: true });
   const [plOn, setPlOn] = useState(() => new Set(["Jupiter", "Saturne", "Mars"]));
   const [tgts, setTgts] = useState<CatObj[]>(() => [CAT[0]!, CAT[9]!]);
@@ -339,7 +343,54 @@ export default function Fisheye() {
       </p>
       <div className="grid2">
         <div className="panel">
-          <canvas ref={cv} width={FN} height={FN} aria-label={tr("Fisheye du seeing avec objets du ciel")} />
+          <div style={{ position: "relative" }} onMouseLeave={() => setHov(null)}>
+            <canvas
+              ref={cv}
+              width={FN}
+              height={FN}
+              aria-label={tr("Fisheye du seeing avec objets du ciel")}
+              style={{ cursor: "crosshair" }}
+              onMouseMove={(e) => {
+                // seeing in the direction under the cursor, same computation as the colours
+                const b = e.currentTarget.getBoundingClientRect(),
+                  x = ((e.clientX - b.left) / b.width) * FN,
+                  y = ((e.clientY - b.top) / b.height) * FN,
+                  dx = x - FC,
+                  dy = FC - y,
+                  r = Math.hypot(dx, dy);
+                if (r > FR) return setHov(null);
+                const alt = 90 - (r / FR) * 90,
+                  az = (Math.atan2(-dx, dy) / D2R + 360) % 360;
+                setHov({ x: e.clientX - b.left, y: e.clientY - b.top, alt, az, s: vis(alt, az) ? seeSky(fcur, alt, az) : NaN });
+              }}
+            />
+            {hov && (
+              <div
+                className="mono small"
+                style={{
+                  position: "absolute",
+                  left: hov.x + 14,
+                  top: hov.y + 14,
+                  transform: hov.x > 300 ? "translateX(calc(-100% - 28px))" : undefined,
+                  pointerEvents: "none",
+                  background: "rgba(10,15,29,.88)",
+                  border: "1px solid #3a4a72",
+                  borderRadius: 6,
+                  padding: "3px 7px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {hov.alt < ELMIN ? (
+                  tr(`sous ${ELMIN}° d'élévation`)
+                ) : (
+                  <>
+                    <b style={{ fontSize: 14 }}>{isNaN(hov.s) ? "–" : hov.s.toFixed(2) + "″"}</b>
+                    {` · ${tr("élév.")} ${Math.round(hov.alt)}° · az ${Math.round(hov.az)}° ${dir8(hov.az)}`}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
           <ColorBar left={'0"'} right={'10"'} gradient={turboGradient()} />
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
             <span className="small muted">{tr("Nuit :")}</span>
