@@ -8,8 +8,8 @@ import { useNavigate } from "react-router-dom";
 import { corrChart, histSvg, mailleSvg, seeHist } from "../charts/lieuCharts";
 import { cn2Svg } from "../charts/mockCharts";
 import { Cn2RealPanel, HistPanel } from "../components/panels";
-import { Chip, Cn2Legend, LegBreak, LegDay, LegMed, LegMes, Sw, SvgChart } from "../components/ui";
-import { useSiteHistory } from "../data/forecast";
+import { Chip, Cn2Legend, LegBreak, LegDay, LegMed, LegMes, Spinner, Sw, SvgChart } from "../components/ui";
+import { usePlaceLoading, useSiteHistory } from "../data/forecast";
 import { kHidden, kTxt, MAX_PLACES, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { C_TXT, ddmm, fmt, pd } from "../lib/util";
@@ -227,6 +227,8 @@ function PlaceDetail({ l }: { l: Place }) {
   const mesf = useUi((s) => s.mesf);
   const hid = kHidden(l, role);
   const real = useSiteHistory(l);
+  const placeLoading = usePlaceLoading(l);
+  const loading = l.real && !real && placeLoading;
   const data = useLangMemo(() => (l.real ? (real ?? null) : lieuData(l.nom, l.f, l.K, l.K)), [l, real]);
   const histo = useLangMemo(() => {
     const v = data ? seeHist(data) : [];
@@ -252,9 +254,17 @@ function PlaceDetail({ l }: { l: Place }) {
               ? tr(
                   `${histo.n.toLocaleString("fr-FR")} mesures de nuit · médiane ${histo.md.toFixed(2)}″ · quartiles ${histo.q1.toFixed(2)}–${histo.q3.toFixed(2)}″ · courbe : loi log-normale ajustée (médiane ${Math.exp(histo.mu).toFixed(2)}″, σ ${histo.sg.toFixed(2)})`,
                 )
-              : tr("Pas de mesure de nuit.")}
+              : loading
+                ? ""
+                : tr("Pas de mesure de nuit.")}
           </p>
-          {histo.n ? <SvgChart html={histo.svg} viewBox="0 0 460 220" label="Histogramme du seeing enregistré" /> : none("Pas de mesure de nuit.", "0 0 460 220", 230, 110)}
+          {histo.n ? (
+            <SvgChart html={histo.svg} viewBox="0 0 460 220" label="Histogramme du seeing enregistré" />
+          ) : loading ? (
+            <Spinner />
+          ) : (
+            none("Pas de mesure de nuit.", "0 0 460 220", 230, 110)
+          )}
         </div>
         <div className="panel">
           <h2>{tr("Mailles AROME autour du lieu")}</h2>
@@ -285,7 +295,7 @@ function PlaceDetail({ l }: { l: Place }) {
           <LegDay />
           <LegBreak />
         </div>
-        {data ? <HistPanel data={data} OB={true} inset={false} /> : none("Pas de période avec prévision et mesures pour ce lieu.", "0 0 1100 240", 550, 120)}
+        {data ? <HistPanel data={data} OB={true} inset={false} /> : loading ? <Spinner /> : none("Pas de période avec prévision et mesures pour ce lieu.", "0 0 1100 240", 550, 120)}
       </div>
       <div className="grid2" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1.6fr)" }}>
         <div className="panel">
@@ -305,7 +315,7 @@ function PlaceDetail({ l }: { l: Place }) {
               {tr("données brutes")}
             </Chip>
           </div>
-          {corr ? <SvgChart html={corr.svg} viewBox="0 0 340 320" label="Corrélation du lieu" /> : none("Pas d'heure de nuit comparée.", "0 0 340 320", 170, 160)}
+          {corr ? <SvgChart html={corr.svg} viewBox="0 0 340 320" label="Corrélation du lieu" /> : loading ? <Spinner /> : none("Pas d'heure de nuit comparée.", "0 0 340 320", 170, 160)}
           <div className="legend">
             <span>
               <Sw style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--night)", border: "1px solid #fff" }} />

@@ -9,8 +9,8 @@ import { corrChart } from "../charts/lieuCharts";
 import { cn2Svg, prevSvg } from "../charts/mockCharts";
 import { PVDEF, PVGRP, prevRealSvg, pvPanel } from "../charts/realCharts";
 import { Cn2RealPanel, DataChips, HistPanel } from "../components/panels";
-import { hourlyMedians, useHourlyMedians, useRawMeasurements, useRealForecast, useSiteHistory, type View } from "../data/forecast";
-import { Cn2Legend, LegArome, LegBreak, LegDay, LegMed, LegMes, Seg, Sw, SvgChart } from "../components/ui";
+import { hourlyMedians, useHourlyMedians, useRawMeasurements, usePlaceLoading, useRealForecast, useSiteHistory, type View } from "../data/forecast";
+import { Cn2Legend, LegArome, LegBreak, LegDay, LegMed, LegMes, Seg, Spinner, Sw, SvgChart } from "../components/ui";
 import { kHidden, kTxt, useCurrentPlace, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { fmt } from "../lib/util";
@@ -95,6 +95,14 @@ export default function Prevision() {
 /** Research history of a real site (sent by research/envoi_site.py). */
 function RealHistory({ place, OB, head }: { place: Place; OB: boolean; head: ReactNode }) {
   const data = useSiteHistory(place);
+  const loading = usePlaceLoading(place);
+  if ((!data || !data.episodes.length) && loading)
+    return (
+      <>
+        {head}
+        <Spinner />
+      </>
+    );
   if (!data || !data.episodes.length)
     return (
       <>
@@ -109,6 +117,8 @@ function RealCorr({ place }: { place: Place }) {
   const data = useSiteHistory(place);
   const corrf = useUi((s) => s.corrf);
   const c = useLangMemo(() => (data && data.paires.length ? corrChart(data, corrf) : null), [data, corrf]);
+  const loading = usePlaceLoading(place);
+  if (!c && loading) return <Spinner />;
   if (!c) return <NoData text="Corrélation : choisis un lieu avec seeing monitor." />;
   return (
     <>
@@ -160,7 +170,7 @@ function RealSeeing({ place }: { place: Place }) {
         : "",
     [forecast.data, place, role, obs, raw, showObs, mesf],
   );
-  if (forecast.isLoading) return <p className="muted small">{tr("Chargement…")}</p>;
+  if (forecast.isLoading) return <Spinner />;
   if (forecast.isError || !forecast.data) return <NoData text="Pas de prévision enregistrée pour ce lieu." />;
   return <SvgChart html={svg} viewBox="0 0 900 220" label="Seeing prévu" />;
 }

@@ -801,9 +801,36 @@ export default function Carte() {
               </button>
             </div>
           </div>
-          <div style={{ border: "1px solid #3a4a72", borderRadius: 12, padding: "10px 12px", marginBottom: 10, background: "var(--panel2)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
-              <b>{tr("Réglage")}</b>
+          <canvas
+            ref={canvas}
+            width={CW}
+            height={CH}
+            style={{ cursor: "grab", touchAction: "none" }}
+            aria-label={tr("Carte globale du seeing de la nuit, déplaçable et zoomable")}
+            onPointerDown={down}
+            onPointerMove={move}
+            onPointerUp={up}
+            onPointerCancel={() => (drag.current = null)}
+            onPointerLeave={() => setTip(null)}
+          />
+          <ColorBar left={tr("bon")} right={tr("mauvais")} gradient={turboGradient()} />
+          <p className="small muted" style={{ margin: "4px 0 0", textAlign: "center" }}>
+            <i>{tr("Les valeurs absolues seront bientôt disponibles, après la calibration globale.")}</i>
+          </p>
+          {tip ? (
+            <p className="tip" dangerouslySetInnerHTML={{ __html: tip }} />
+          ) : (
+            <p className="tip">
+              {tr(
+                "Molette ou boutons + et − pour zoomer, glisser pour se déplacer, clic pour créer un lieu. Le zoom affiche la carte déjà calculée, sans calcul supplémentaire, jusqu'à 100 km de côté.",
+              )}
+            </p>
+          )}
+        </div>
+        <div className="stack">
+          <div className="panel">
+            <h2>{tr("Réglage")}</h2>
+            <div style={{ marginBottom: 10 }}>
               <span className="small muted">
                 run <span className="mono">{runL}</span> · {tr("prévision jusqu'à")} <span className="mono">+{LEADMAX} h</span> (
                 {`${pad2(endL.getUTCDate())}/${pad2(endL.getUTCMonth() + 1)} ${pad2(endL.getUTCHours())}h`} {tr("TU")}) ·{" "}
@@ -870,38 +897,11 @@ export default function Carte() {
                   setMode("h");
                 }}
               />
-              <span className="mono" style={{ minWidth: 210, textAlign: "right", fontWeight: 500 }}>
+              <span className="mono" style={{ flexBasis: "100%", textAlign: "right", fontWeight: 500 }}>
                 {hourLabel}
               </span>
             </div>
           </div>
-          <canvas
-            ref={canvas}
-            width={CW}
-            height={CH}
-            style={{ cursor: "grab", touchAction: "none" }}
-            aria-label={tr("Carte globale du seeing de la nuit, déplaçable et zoomable")}
-            onPointerDown={down}
-            onPointerMove={move}
-            onPointerUp={up}
-            onPointerCancel={() => (drag.current = null)}
-            onPointerLeave={() => setTip(null)}
-          />
-          <ColorBar left={tr("bon")} right={tr("mauvais")} gradient={turboGradient()} />
-          <p className="small muted" style={{ margin: "4px 0 0", textAlign: "center" }}>
-            <i>{tr("Les valeurs absolues seront bientôt disponibles, après la calibration globale.")}</i>
-          </p>
-          {tip ? (
-            <p className="tip" dangerouslySetInnerHTML={{ __html: tip }} />
-          ) : (
-            <p className="tip">
-              {tr(
-                "Molette ou boutons + et − pour zoomer, glisser pour se déplacer, clic pour créer un lieu. Le zoom affiche la carte déjà calculée, sans calcul supplémentaire, jusqu'à 100 km de côté.",
-              )}
-            </p>
-          )}
-        </div>
-        <div className="stack">
           <div className="panel">
             <h2>{tr("Ce que montre la carte")}</h2>
             <div className="legend" style={{ flexDirection: "column", gap: 6 }}>
