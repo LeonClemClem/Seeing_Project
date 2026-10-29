@@ -97,5 +97,9 @@ a.tab{text-decoration:none;display:inline-flex;align-items:center}
 a{color:#9cc7ff}
 .hghead{margin-bottom:4px}
 .loading{padding:24px;color:var(--muted)}
+.spin-wrap{display:flex;align-items:center;justify-content:center;gap:10px;padding:40px 0;color:var(--muted);font-size:13px}
+.spinner{width:22px;height:22px;border:3px solid var(--line);border-top-color:#9cc7ff;border-radius:50%;animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spinner{animation-duration:2.4s}}
 details>summary{list-style-position:inside}
 button:disabled{opacity:.5;cursor:not-allowed}

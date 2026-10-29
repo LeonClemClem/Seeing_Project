@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { ApiError, type UserRole } from "../api";
-import { Seg } from "../components/ui";
+import { Seg, Spinner } from "../components/ui";
 import { useAuthActions, useMe } from "../data/auth";
 import { tr } from "../i18n";
 import { authErrorMessage } from "../lib/authErrors";
@@ -73,7 +73,7 @@ export default function Compte() {
               {tr(verifMsg.text)}
             </p>
           )}
-          {me.isLoading ? <p className="muted">{tr("Chargement…")}</p> : user ? <Account /> : <LoginForm />}
+          {me.isLoading ? <Spinner /> : user ? <Account /> : <LoginForm />}
         </div>
         <div className="panel">
           <h2>{tr("Vie privée et données")}</h2>

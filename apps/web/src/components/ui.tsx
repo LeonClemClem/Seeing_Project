@@ -59,6 +59,16 @@ export function SvgChart(props: { html: string; viewBox: string; label: string; 
 }
 
 /* ---------- legend swatches ---------- */
+/** Turning ring while a panel's data loads. */
+export function Spinner({ label = "Chargement…", style }: { label?: string; style?: CSSProperties }) {
+  return (
+    <div className="spin-wrap" role="status" aria-live="polite" style={style}>
+      <span className="spinner" aria-hidden="true" />
+      {tr(label)}
+    </div>
+  );
+}
+
 export const Sw = ({ style }: { style: CSSProperties }) => <span className="sw" style={style} />;
 
 export const LegArome = ({ label = "AROME V2bd" }: { label?: string }) => (

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useIsFetching, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import { api, queryKeys, type Forecast } from "../api";
@@ -8,6 +8,17 @@ import type { K3 } from "../store";
 import type { Place } from "./places";
 
 export type View = "run" | "week";
+
+/** True while a query of this place (forecast, Cn², history, measurements) loads with no data yet: switching
+ * to another place shows a spinner instead of "no data". Background refreshes do not count. */
+export function usePlaceLoading(place: Place): boolean {
+  const slug = place.slug ?? "";
+  return (
+    useIsFetching({
+      predicate: (q) => !!slug && q.state.data === undefined && q.queryKey.some((k) => k === slug),
+    }) > 0
+  );
+}
 
 /** Forecast and Cn² of an API site (disabled for mock places): the latest run, or ("week") up to 7 days of
  * main runs stitched then the latest run. */

@@ -2,7 +2,7 @@ import { lazy, Suspense } from "react";
 import { Link, Navigate, Route, Routes } from "react-router-dom";
 
 import Header from "./components/Header";
-import { HatchDefs } from "./components/ui";
+import { HatchDefs, Spinner } from "./components/ui";
 import { tr } from "./i18n";
 import Carte from "./pages/Carte";
 import Compte from "./pages/Compte";
@@ -21,7 +21,7 @@ export default function App() {
     <>
       <Header />
       <main>
-        <Suspense fallback={<div className="loading">{tr("Chargement…")}</div>}>
+        <Suspense fallback={<Spinner />}>
           <Routes>
             <Route path="/" element={<Navigate to="/carte" replace />} />
             <Route path="/carte" element={<Carte />} />

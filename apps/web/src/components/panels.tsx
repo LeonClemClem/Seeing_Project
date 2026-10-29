@@ -9,7 +9,7 @@ import { tr } from "../i18n";
 import type { LieuData } from "../mock/engine";
 import { setState, useLangMemo, useUi, type UiState } from "../store";
 import { pad2 } from "../lib/util";
-import { Chip, Seg, SvgChart } from "./ui";
+import { Chip, Seg, Spinner, SvgChart } from "./ui";
 
 /** Measurement display chips ("Données : brutes / médianes horaires / courbe / ☾ médianes nocturnes"). */
 export function DataChips({ id }: { id: string }) {
@@ -233,7 +233,13 @@ export function Cn2RealPanel({
       {profile && <span className="small muted">{tr("survole le panneau : profil à l'heure choisie")}</span>}
     </div>
   );
-  if (cn2.isLoading) return <div style={style}>{controls}<p className="muted small">{tr("Chargement…")}</p></div>;
+  if (cn2.isLoading)
+    return (
+      <div style={style}>
+        {controls}
+        <Spinner />
+      </div>
+    );
   if (cn2.isError || !ctx)
     return (
       <div style={style}>
