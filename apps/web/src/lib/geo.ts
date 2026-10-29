@@ -91,8 +91,9 @@ export function parseCoord(s: string, lat: boolean): number | null {
   return isFinite(v) && Math.abs(v) <= (lat ? 90 : 180) ? v : null;
 }
 
-/** Cities of the research map (research/carte_seeing.py VILLES): white dots, small names. */
-export const VILLES: [string, number, number][] = [
+/** Cities: those of the research map (research/carte_seeing.py VILLES), then the main cities of the other
+ * countries of the AROME domain. White dots, small names; a 4th value 1 = shown only once zoomed in. */
+export const VILLES: [string, number, number, 1?][] = [
   ["Paris", 48.8566, 2.3522], ["Marseille", 43.2965, 5.3698], ["Lyon", 45.764, 4.8357], ["Toulouse", 43.6047, 1.4442],
   ["Nice", 43.7102, 7.262], ["Nantes", 47.2184, -1.5536], ["Montpellier", 43.6108, 3.8767], ["Strasbourg", 48.5734, 7.7521],
   ["Bordeaux", 44.8378, -0.5792], ["Lille", 50.6292, 3.0573], ["Rennes", 48.1173, -1.6778], ["Reims", 49.2583, 4.0317],
@@ -102,4 +103,31 @@ export const VILLES: [string, number, number][] = [
   ["Ajaccio", 41.9192, 8.7386], ["Besançon", 47.2378, 6.0241], ["Poitiers", 46.5802, 0.3404], ["Pau", 43.2951, -0.3708],
   ["Genève", 46.2044, 6.1432], ["Bruxelles", 50.8503, 4.3517], ["Turin", 45.0703, 7.6869], ["Zurich", 47.3769, 8.5417],
   ["Barcelone", 41.3874, 2.1686],
+  // United Kingdom and Ireland
+  ["Londres", 51.5074, -0.1278], ["Birmingham", 52.4862, -1.8904], ["Manchester", 53.4808, -2.2426],
+  ["Bristol", 51.4545, -2.5879], ["Cardiff", 51.4816, -3.1791], ["Newcastle", 54.9783, -1.6178],
+  ["Dublin", 53.3498, -6.2603], ["Belfast", 54.5973, -5.9301], ["Cork", 51.8985, -8.4756],
+  ["Liverpool", 53.4084, -2.9916, 1], ["Leeds", 53.8008, -1.5491, 1], ["Plymouth", 50.3755, -4.1427, 1],
+  ["Southampton", 50.9097, -1.4044, 1], ["Norwich", 52.6309, 1.2974, 1], ["Galway", 53.2707, -9.0568, 1],
+  // Benelux and Germany
+  ["Amsterdam", 52.3676, 4.9041], ["Luxembourg", 49.6116, 6.1319], ["Berlin", 52.52, 13.405], ["Hambourg", 53.5511, 9.9937],
+  ["Munich", 48.1351, 11.582], ["Cologne", 50.9375, 6.9603], ["Francfort", 50.1109, 8.6821], ["Stuttgart", 48.7758, 9.1829],
+  ["Leipzig", 51.3397, 12.3731], ["Rotterdam", 51.9244, 4.4777, 1], ["Anvers", 51.2194, 4.4025, 1], ["Liège", 50.6326, 5.5797, 1],
+  ["Düsseldorf", 51.2277, 6.7735, 1], ["Hanovre", 52.3759, 9.732, 1], ["Brême", 53.0793, 8.8017, 1],
+  ["Nuremberg", 49.4521, 11.0767, 1], ["Dresde", 51.0504, 13.7373, 1],
+  // Alps, Czechia, Austria, Slovenia, Croatia
+  ["Berne", 46.948, 7.4474], ["Prague", 50.0755, 14.4378], ["Innsbruck", 47.2692, 11.4041], ["Ljubljana", 46.0569, 14.5058],
+  ["Zagreb", 45.815, 15.9819], ["Bâle", 47.5596, 7.5886, 1], ["Lausanne", 46.5197, 6.6323, 1], ["Salzbourg", 47.8095, 13.055, 1],
+  ["Graz", 47.0707, 15.4395, 1], ["Rijeka", 45.3271, 14.4422, 1],
+  // Italy
+  ["Rome", 41.9028, 12.4964], ["Milan", 45.4642, 9.19], ["Naples", 40.8518, 14.2681], ["Gênes", 44.4056, 8.9463],
+  ["Florence", 43.7696, 11.2558], ["Venise", 45.4408, 12.3155], ["Cagliari", 39.2238, 9.1217], ["Palerme", 38.1157, 13.3615],
+  ["Bologne", 44.4949, 11.3426, 1], ["Vérone", 45.4384, 10.9916, 1], ["Trieste", 45.6495, 13.7768, 1], ["Pescara", 42.4618, 14.2161, 1],
+  ["Sassari", 40.7259, 8.5557, 1], ["Bastia", 42.6977, 9.4508, 1],
+  // Spain and Portugal
+  ["Madrid", 40.4168, -3.7038], ["Valence", 39.4699, -0.3763], ["Saragosse", 41.6488, -0.8891], ["Bilbao", 43.263, -2.935],
+  ["Palma", 39.5696, 2.6502], ["Lisbonne", 38.7223, -9.1393], ["Porto", 41.1579, -8.6291], ["La Corogne", 43.3623, -8.4115],
+  ["Valladolid", 41.6523, -4.7245, 1], ["Oviedo", 43.3619, -5.8494, 1], ["Saint-Jacques-de-Compostelle", 42.8782, -8.5448, 1],
+  ["Salamanque", 40.9701, -5.6635, 1], ["Tolède", 39.8628, -4.0273, 1], ["Cordoue", 37.8882, -4.7794, 1],
+  ["Alicante", 38.3452, -0.481, 1], ["Murcie", 37.9922, -1.1307, 1], ["Coimbra", 40.2033, -8.4103, 1],
 ];

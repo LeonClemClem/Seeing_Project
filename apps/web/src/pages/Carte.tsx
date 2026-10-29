@@ -171,6 +171,94 @@ function median5(g: MapGrid, a: Float32Array): Float32Array {
   return out;
 }
 
+/** Land of the 5x5-median relief (>= 1 m, the coastline level) without the islets made by the ripples of the
+ * AROME orography over the sea: a connected patch (4-neighbours) is kept only if its raw relief reaches
+ * ISLET_MIN somewhere. The ripples stay below 3 m, real islands (Guernsey, Ouessant...) reach 6 m and more. */
+const ISLET_MIN = 5;
+function landOf(g: MapGrid, med: Float32Array, raw: Float32Array): Uint8Array {
+  const n = g.nx * g.ny,
+    land = new Uint8Array(n),
+    seen = new Uint8Array(n),
+    stack: number[] = [],
+    patch: number[] = [];
+  for (let i0 = 0; i0 < n; i0++) {
+    if (seen[i0] || !(med[i0]! >= 1)) continue;
+    patch.length = 0;
+    let top = -Infinity;
+    stack.push(i0);
+    seen[i0] = 1;
+    while (stack.length) {
+      const i = stack.pop()!,
+        r = Math.floor(i / g.nx),
+        c = i - r * g.nx;
+      patch.push(i);
+      if (raw[i]! > top) top = raw[i]!;
+      for (const j of [c > 0 ? i - 1 : -1, c < g.nx - 1 ? i + 1 : -1, r > 0 ? i - g.nx : -1, r < g.ny - 1 ? i + g.nx : -1])
+        if (j >= 0 && !seen[j] && med[j]! >= 1) {
+          seen[j] = 1;
+          stack.push(j);
+        }
+    }
+    if (top >= ISLET_MIN) for (const i of patch) land[i] = 1;
+  }
+  return land;
+}
+
+type PinKind = "pub" | "sh" | "mine";
+const PIN_FILL: Record<PinKind, string> = { pub: "#fff", sh: "#9cc7ff", mine: "#f2a23a" };
+/** Path of a map pin: tip on (x, y), round head of radius r centred 2.1 r above. */
+function pinPath(r: number) {
+  const d = 2.1 * r,
+    f = Math.acos(r / d),
+    p = (a: number) => `${(r * Math.cos(a)).toFixed(2)},${(-d + r * Math.sin(a)).toFixed(2)}`;
+  return `M0,0 L${p(Math.PI / 2 + f)} A${r},${r} 0 1 1 ${p(Math.PI / 2 - f)} Z`;
+}
+/** Glyph in the pin head: observatory dome (public monitor), dot (shared place), star (my places). */
+function pinGlyph(r: number, kind: PinKind) {
+  const cy = -2.1 * r;
+  if (kind === "pub") {
+    const b = cy + 0.4 * r,
+      dr = 0.55 * r;
+    return `M${-dr},${b} A${dr},${dr} 0 0 1 ${dr},${b} Z M${-0.72 * r},${b} h${1.44 * r} v${0.2 * r} h${-1.44 * r} Z`;
+  }
+  if (kind === "sh") return `M${-0.36 * r},${cy} a${0.36 * r},${0.36 * r} 0 1 0 ${0.72 * r},0 a${0.36 * r},${0.36 * r} 0 1 0 ${-0.72 * r},0 Z`;
+  let s = "";
+  for (let k = 0; k < 10; k++) {
+    const a = -Math.PI / 2 + (k * Math.PI) / 5,
+      rr = k % 2 ? r * 0.27 : r * 0.62;
+    s += `${k ? "L" : "M"}${(rr * Math.cos(a)).toFixed(2)},${(cy + rr * Math.sin(a)).toFixed(2)}`;
+  }
+  return s + "Z";
+}
+/** Map pin of a place, with a soft shadow at the tip. */
+function pin(cx: CanvasRenderingContext2D, x: number, y: number, r: number, kind: PinKind) {
+  cx.save();
+  cx.translate(x, y);
+  cx.beginPath();
+  cx.ellipse(0, 0, 0.6 * r, 0.22 * r, 0, 0, 7);
+  cx.fillStyle = "rgba(0,0,0,.35)";
+  cx.fill();
+  const body = new Path2D(pinPath(r));
+  cx.fillStyle = PIN_FILL[kind];
+  cx.fill(body);
+  cx.strokeStyle = "#000";
+  cx.lineWidth = 1.3;
+  cx.stroke(body);
+  cx.fillStyle = kind === "mine" ? "#fff" : "#0a0f1d";
+  cx.fill(new Path2D(pinGlyph(r, kind)));
+  cx.restore();
+}
+/** The same pin for the legend. */
+function PinIcon({ kind }: { kind: PinKind }) {
+  const r = 5;
+  return (
+    <svg width="14" height="18" viewBox="-7 -16.5 14 18" style={{ flex: "none" }} aria-hidden="true">
+      <path d={pinPath(r)} fill={PIN_FILL[kind]} stroke="#000" strokeWidth="1" />
+      <path d={pinGlyph(r, kind)} fill={kind === "mine" ? "#fff" : "#0a0f1d"} />
+    </svg>
+  );
+}
+
 type ZoneHit = [x: number, y: number, w: number, h: number, i: number];
 
 /** Bilinear sampling of a map grid at (lat, lon), ignoring undefined corners; NaN outside. */
@@ -288,18 +376,26 @@ export default function Carte() {
   const sample = real?.sample ?? null;
   /** Real AROME orography of the map grid, when the run has it, and its 5x5 median (coastline). */
   const relReal = useMemo(() => (gmap?.relief ? sampler(gmap.meta.grid, gmap.relief) : null), [gmap]);
+  /** Land of the AROME relief (coastline without the islets of the sea ripples): no relief drawn or read at sea. */
+  const land = useMemo(() => {
+    if (!gmap?.relief) return null;
+    const g = gmap.meta.grid,
+      med = median5(g, gmap.relief),
+      l = landOf(g, med, gmap.relief);
+    return { med: med.map((v, i) => (l[i] ? v : 0)), at: sampler(g, Float32Array.from(l)) };
+  }, [gmap]);
   /** Contours as research/carte_seeing.py, once per map: domain views = coastline (1 m contour of the 5x5-median
    * relief, black 0.6) + 1000 / 2000 m (white 0.3, alpha 0.6); zoomed views = every 250 m (black 0.4, alpha
    * 0.5) with "… m" labels and no coastline. */
   const contours = useMemo(() => {
-    if (!gmap?.relief) return null;
+    if (!gmap?.relief || !land) return null;
     const g = gmap.meta.grid;
     return {
-      coast: contourSegs(g, median5(g, gmap.relief), 1),
+      coast: contourSegs(g, land.med, 1),
       major: [1000, 2000].map((lv) => contourSegs(g, gmap.relief!, lv)),
       fine: Array.from({ length: 11 }, (_, k) => 250 * (k + 1)).map((lv) => [lv, contourSegs(g, gmap.relief!, lv)] as const),
     };
-  }, [gmap]);
+  }, [gmap, land]);
 
   const toXY = useCallback(
     (la: number, lo: number) => [((lo - VW.lo0) / (VW.lo1 - VW.lo0)) * CW, ((VW.la1 - la) / (VW.la1 - VW.la0)) * CH] as const,
@@ -373,19 +469,8 @@ export default function Carte() {
     }
     // Places shared by the community (the API blurs other members' positions by 5-11 km).
     sh.forEach(({ lat: la, lon: lo }) => {
-      const [x, y] = toXY(la, lo),
-        r = big ? 7 : 5;
-      cx.beginPath();
-      cx.moveTo(x, y - r);
-      cx.lineTo(x + r, y);
-      cx.lineTo(x, y + r);
-      cx.lineTo(x - r, y);
-      cx.closePath();
-      cx.fillStyle = "#9cc7ff";
-      cx.fill();
-      cx.strokeStyle = "#000";
-      cx.lineWidth = 1.4;
-      cx.stroke();
+      const [x, y] = toXY(la, lo);
+      pin(cx, x, y, big ? 8 : 6, "sh");
     });
     cx.font = "500 12px 'IBM Plex Sans',sans-serif";
     const label = (t: string, x: number, y: number) => {
@@ -397,32 +482,14 @@ export default function Carte() {
     };
     pub.forEach((s) => {
       const [x, y] = toXY(s.lat, s.lon);
-      cx.fillStyle = "#fff";
-      cx.strokeStyle = "#000";
-      cx.lineWidth = 2;
-      cx.beginPath();
-      cx.arc(x, y, big ? 6 : 4, 0, 7);
-      cx.fill();
-      cx.stroke();
-      if (big) label(s.nom, x + 9, y + 4);
+      pin(cx, x, y, big ? 9 : 7, "pub");
+      if (big) label(s.nom, x + 10, y - (big ? 14 : 10));
     });
-    const star = (x: number, y: number, r: number) => {
-      cx.beginPath();
-      for (let k = 0; k < 10; k++) {
-        const a = -Math.PI / 2 + (k * Math.PI) / 5,
-          rr = k % 2 ? r * 0.45 : r;
-        cx.lineTo(x + rr * Math.cos(a), y + rr * Math.sin(a));
-      }
-      cx.closePath();
-      cx.fillStyle = "#f2a23a";
-      cx.fill();
-      cx.strokeStyle = "#000";
-      cx.lineWidth = 1.2;
-      cx.stroke();
-    };
     // Cities, as research/carte_seeing.py (ajoute_villes): white dots ringed in black, small translucent names.
     cx.font = `${big ? 11 : 9}px 'IBM Plex Sans',sans-serif`;
-    VILLES.forEach(([nom, la, lo]) => {
+    const domView = VW.la1 - VW.la0 > 12;
+    VILLES.forEach(([nom, la, lo, minor]) => {
+      if (minor && domView) return;
       const [x, y] = toXY(la, lo);
       if (x < -20 || x > CW + 20 || y < -20 || y > CH + 20) return;
       cx.beginPath();
@@ -442,8 +509,8 @@ export default function Carte() {
     // Only real places: the example places of a logged-out visitor are not drawn on the map.
     mine.filter((p) => p.real).forEach((p) => {
       const [x, y] = toXY(p.lat, p.lon);
-      star(x, y, big ? 10 : 7);
-      if (big) label(tr(p.nom), x + 12, y + 4);
+      pin(cx, x, y, big ? 10 : 8, "mine");
+      if (big) label(tr(p.nom), x + 12, y - (big ? 16 : 12));
     });
     const zh: ZoneHit[] = [];
     if (VW.la1 - VW.la0 > 12) {
@@ -471,7 +538,7 @@ export default function Carte() {
             [x0, y0] = toXY(b.la1, b.lo0),
             [x1, y1] = toXY(b.la0, b.lo1);
           cx.setLineDash([6, 4]);
-          cx.strokeStyle = "#f2c14e";
+          cx.strokeStyle = "#000";
           cx.lineWidth = 1.6;
           cx.strokeRect(x0, y0, x1 - x0, y1 - y0);
           cx.setLineDash([]);
@@ -604,7 +671,7 @@ export default function Carte() {
     setTip(
       relReal || onLand(x, y)
         ? `<span class="mono">${la.toFixed(3)} N · ${lo.toFixed(3)} E</span>` +
-            (relReal ? ` · ${tr("relief AROME")} <span class="mono">${Math.round(relReal(la, lo))} m</span>` : "")
+            (relReal && land && land.at(la, lo) >= 0.5 ? ` · ${tr("relief AROME")} <span class="mono">${Math.round(relReal(la, lo))} m</span>` : "")
         : `<span class="mono">${la.toFixed(2)} N · ${lo.toFixed(2)} E</span> · ${tr("hors de la zone du calcul global")}`,
     );
   };
@@ -839,24 +906,16 @@ export default function Carte() {
             <h2>{tr("Ce que montre la carte")}</h2>
             <div className="legend" style={{ flexDirection: "column", gap: 6 }}>
               <span>
-                <span className="sw" style={{ width: 12, height: 12, borderRadius: "50%", background: "#fff", border: "2px solid #000" }} />
+                <PinIcon kind="pub" />
                 {tr("Seeing monitor public (position exacte)")}
               </span>
               <span>
-                <span className="sw" style={{ width: 12, height: 12, background: "#9cc7ff", clipPath: "polygon(50% 0,100% 50%,50% 100%,0 50%)" }} />
+                <PinIcon kind="sh" />
                 {tr("Lieu partagé (")}
                 <b>{tr("position floutée à 5–11 km")}</b>)
               </span>
               <span>
-                <span
-                  className="sw"
-                  style={{
-                    width: 12,
-                    height: 12,
-                    background: "#f2a23a",
-                    clipPath: "polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)",
-                  }}
-                />
+                <PinIcon kind="mine" />
                 {tr("Mes lieux")}
               </span>
               <span>
