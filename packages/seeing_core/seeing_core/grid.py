@@ -111,8 +111,10 @@ class GridExtractor:
         self._done: set[int] = set()
         # encoded seeing map (encode_seeing) of every computed lead hour
         self.frames: dict[int, bytes] = {}
-        # encode_split() of every computed lead hour (fisheye)
+        # encode_split() of every computed lead hour (fisheye), with the cloud cover when SP2 has it
         self.extras: dict[int, bytes] = {}
+        # low / medium / high cloud cover [0-1] of the map lead hours (SP2 lcc / mcc / hcc), fisheye only
+        self._clouds: dict[int, dict[str, np.ndarray]] = {}
         self.failed = False
 
     def _geometry(self, gid, stride: int | None = None) -> GridGeometry:
@@ -164,6 +166,15 @@ class GridExtractor:
                             self.surface_h = self.surface_h_full[:: self.stride, :: self.stride]
                             want_h = False
                             continue
+                        if package == "SP2" and short_name in CLOUDS:
+                            step = _message_step(gid)
+                            if step in wanted:
+                                cover = self._values(gid)
+                                # Météo-France gives % (as research/ciel_seeing.py: a fraction never exceeds 1)
+                                if "%" in str(_get(gid, "units", "")) or np.nanmax(cover, initial=0.0) > 1.5:
+                                    cover = cover / 100.0
+                                self._clouds.setdefault(step, {})[short_name] = np.clip(cover, 0.0, 1.0)
+                            continue
                         if short_name not in spec.variables or type_of_level not in spec.level_types:
                             continue
                         step = _message_step(gid)
@@ -201,7 +212,7 @@ class GridExtractor:
             integrals = self.compute(s)
             shape = np.asarray(self.surface_h).shape
             self.frames[s] = encode_seeing(seeing_from_integrals(integrals, k).reshape(shape))
-            self.extras[s] = encode_split(integrals, k, shape)
+            self.extras[s] = encode_split(integrals, k, shape, self._clouds.pop(s, None))
         return done
 
     def compute(self, step: int) -> np.ndarray:
@@ -444,6 +455,10 @@ def decode_seeing(data: bytes, shape: tuple[int, int]) -> np.ndarray:
 # Low / high turbulence split, one byte each (fisheye): share of the boundary-layer terms (TKE +
 # convection) in the integral, J-weighted heights of the low and high parts.
 H_LOW_STEP, H_HIGH_STEP = 20.0, 100.0  # m per code: low 0-5080 m, high 0-25 400 m
+# AROME cloud layers of SP2 (low / medium / high cover) and the height above the observer they are drawn at
+# in the fisheye (assumed, as research/ciel_seeing.py).
+CLOUDS = ("lcc", "mcc", "hcc")
+CLOUD_HEIGHTS = (1500.0, 4500.0, 8000.0)
 
 
 def split(integrals: np.ndarray, k: tuple[float, float, float] = MAP_K) -> tuple[np.ndarray, ...]:
@@ -458,7 +473,11 @@ def split(integrals: np.ndarray, k: tuple[float, float, float] = MAP_K) -> tuple
     return share, h_low, h_high
 
 
-def encode_split(integrals: np.ndarray, k: tuple[float, float, float], shape: tuple[int, ...]) -> bytes:
+def encode_split(
+    integrals: np.ndarray, k: tuple[float, float, float], shape: tuple[int, ...], clouds: dict[str, np.ndarray] | None = None
+) -> bytes:
+    """3 planes (share, low height, high height), then, when the three cloud layers are given, 3 planes of
+    cloud cover in % (low, medium, high; see CLOUDS)."""
     share, h_low, h_high = split(integrals, k)
 
     def code(v, scale, top=254):
@@ -466,14 +485,27 @@ def encode_split(integrals: np.ndarray, k: tuple[float, float, float], shape: tu
         return np.where(np.isfinite(q), np.clip(q, 0, top), 255).astype(np.uint8).reshape(shape)
 
     planes = [code(share, 254.0), code(h_low, 1 / H_LOW_STEP), code(h_high, 1 / H_HIGH_STEP)]
+    if clouds and all(c in clouds for c in CLOUDS):
+        planes += [code(clouds[c], 100.0, 100) for c in CLOUDS]
     return zlib.compress(np.concatenate([a.reshape(-1) for a in planes]).tobytes(), 6)
 
 
 def decode_split(data: bytes, shape: tuple[int, int]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    a = np.frombuffer(zlib.decompress(data), dtype=np.uint8).reshape(3, *shape).astype(np.float64)
+    n = shape[0] * shape[1]
+    a = np.frombuffer(zlib.decompress(data), dtype=np.uint8)[: 3 * n].reshape(3, *shape).astype(np.float64)
     bad = a == 255
     a[bad] = np.nan
     return a[0] / 254.0, a[1] * H_LOW_STEP, a[2] * H_HIGH_STEP
+
+
+def decode_clouds(data: bytes, shape: tuple[int, int]) -> np.ndarray | None:
+    """Cloud cover [0-1] (3, ny, nx) low / medium / high, or None for frames stored without clouds."""
+    n = shape[0] * shape[1]
+    raw = np.frombuffer(zlib.decompress(data), dtype=np.uint8)
+    if raw.size < 6 * n:
+        return None
+    a = raw[3 * n : 6 * n].reshape(3, *shape).astype(np.float64)
+    return np.where(a == 255, np.nan, a / 100.0)
 
 
 # Model orography of the map grid (contour lines of the website map): uint16 = altitude + 500 m, 65535 = none.

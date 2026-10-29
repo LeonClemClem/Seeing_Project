@@ -135,5 +135,7 @@
 "Trop faible": "Too weak",
 "Correct": "Fair",
 "Bon": "Good",
-"Très bon": "Very good"
+"Très bon": "Very good",
+"nuages": "clouds",
+"Pas de nuages pour ce run : ils arrivent avec le prochain run AROME.": "No clouds for this run: they come with the next AROME run."
 }
