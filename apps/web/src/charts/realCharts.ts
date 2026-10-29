@@ -232,7 +232,8 @@ export function jetStream(c: Cn2Ctx, i: number): { z: number; v: number } | null
   return { z: zj, v: vj };
 }
 
-/** Cn² panel: turbo heatmap (log10, interpolated vertically), boundary layer, night seeing on the right axis. */
+/** Cn² panel: turbo heatmap (log10, interpolated vertically, and in time between two neighbouring hours for the
+ * picture only), boundary layer, night seeing on the right axis. */
 export function cn2RealSvg(c: Cn2Ctx, runMs: number) {
   const { W, L, T, pw, ph, n, za, zb, lo, hi, times, heights: Zh } = c;
   if (!n) return `<text x="450" y="190" text-anchor="middle" font-size="13" fill="${C_TXT}">${tr("Pas de panneau Cn² enregistré pour ce lieu.")}</text>`;
@@ -240,27 +241,40 @@ export function cn2RealSvg(c: Cn2Ctx, runMs: number) {
     Yz = (z: number) => T + ph - ((Math.min(Math.max(z, za), zb) - za) / (zb - za)) * ph;
   let g = `<rect x="${L}" y="${T}" width="${pw}" height="${ph}" fill="#262c3b"/>`;
   {
+    // S image columns per hour: between the centres of two neighbouring hours the log10 Cn² is blended linearly
+    // (display only: hover, profile and values keep the hourly data). Next to a missing hour, the existing hour
+    // fills its own column only, as before: gaps are never filled.
     const NR = Math.max(120, Math.round(ph * 1.5)),
+      S = Math.max(1, Math.min(8, Math.floor(4000 / n))),
+      NW = n * S,
       cv = document.createElement("canvas");
-    cv.width = n;
+    cv.width = NW;
     cv.height = NR;
     const cx = cv.getContext("2d");
     if (cx) {
-      const im = cx.createImageData(n, NR),
+      const im = cx.createImageData(NW, NR),
         D = im.data;
-      for (let i = 0; i < n; i++) {
-        const row = c.lg[i]!;
-        let k = 0;
-        for (let r = NR - 1; r >= 0; r--) {
-          const z = za + ((zb - za) * (NR - 1 - r + 0.5)) / NR;
-          if (z < Zh[0]!) continue;
-          while (k < Zh.length - 2 && Zh[k + 1]! < z) k++;
-          const a = row[k],
-            b = row[k + 1];
-          if (a == null || b == null || z > Zh[Zh.length - 1]!) continue;
-          const v = a + ((b - a) * (z - Zh[k]!)) / (Zh[k + 1]! - Zh[k]!),
-            q = turbo((v - lo) / (hi - lo)),
-            p = (r * n + i) * 4;
+      const at = (i: number, k: number, z: number) => {
+        const row = c.lg[i];
+        const a = row?.[k],
+          b = row?.[k + 1];
+        return a == null || b == null ? null : a + ((b - a) * (z - Zh[k]!)) / (Zh[k + 1]! - Zh[k]!);
+      };
+      let k = 0;
+      for (let r = NR - 1; r >= 0; r--) {
+        const z = za + ((zb - za) * (NR - 1 - r + 0.5)) / NR;
+        if (z < Zh[0]! || z > Zh[Zh.length - 1]!) continue;
+        while (k < Zh.length - 2 && Zh[k + 1]! < z) k++;
+        for (let x = 0; x < NW; x++) {
+          const t = (x + 0.5) / S - 0.5,
+            i0 = Math.floor(t),
+            f = t - i0,
+            a = i0 >= 0 ? at(i0, k, z) : null,
+            b = i0 + 1 < n ? at(i0 + 1, k, z) : null;
+          const v = a != null && b != null ? a + (b - a) * f : f < 0.5 ? a : b;
+          if (v == null) continue;
+          const q = turbo((v - lo) / (hi - lo)),
+            p = (r * NW + x) * 4;
           D[p] = q[0];
           D[p + 1] = q[1];
           D[p + 2] = q[2];
