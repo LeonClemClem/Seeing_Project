@@ -85,3 +85,21 @@ variable "deletion_protection" {
   type    = bool
   default = true
 }
+
+variable "email_verification" {
+  description = "Require the e-mail confirmation of new accounts (Brevo). The brevo-api-key-<env> secret must have a version first."
+  type        = bool
+  default     = false
+}
+
+variable "mail_from" {
+  description = "Sender of the e-mails, on a domain authenticated in Brevo (SPF / DKIM)."
+  type        = string
+  default     = "no-reply@seeingthesky.com"
+}
+
+variable "public_url" {
+  description = "Base URL of the site, for the links in the e-mails."
+  type        = string
+  default     = "https://seeingthesky.com"
+}

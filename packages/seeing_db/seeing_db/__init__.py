@@ -1,7 +1,9 @@
 from seeing_db.config import database_url
 from seeing_db.models import (
+    AuthEvent,
     Base,
     Cn2Profile,
+    EmailToken,
     Forecast,
     MapFrame,
     Measurement,
@@ -16,8 +18,10 @@ from seeing_db.models import (
 from seeing_db.session import make_engine, make_session_factory
 
 __all__ = [
+    "AuthEvent",
     "Base",
     "Cn2Profile",
+    "EmailToken",
     "Forecast",
     "MapFrame",
     "Measurement",

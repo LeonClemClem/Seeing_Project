@@ -5,6 +5,10 @@ env = "prod"
 web_public     = false
 custom_domains = ["seeingthesky.com", "www.seeingthesky.com"]
 
+# E-mail confirmation of new accounts (Brevo). First add the API key to the brevo-api-key-prod secret
+# (gcloud secrets versions add), then set it to true. Sender and links: see variables.tf.
+email_verification = false
+
 iap_members = [
   "user:thomas.hossler@gmail.com",
   "user:QalbalHayya@gmail.com",

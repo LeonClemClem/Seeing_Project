@@ -8,7 +8,7 @@ from seeing_api.db import get_session_factory
 from seeing_api.main import create_app
 from seeing_db import Forecast, ModelRun, RunStatus, Site, User, UserRole
 
-PASSWORD = "correct horse battery"
+PASSWORD = "Correct horse battery 7"
 
 
 @pytest.fixture(autouse=True)

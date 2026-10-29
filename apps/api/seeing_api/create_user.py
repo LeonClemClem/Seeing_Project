@@ -16,7 +16,8 @@ import sys
 
 from sqlalchemy import delete, select
 
-from seeing_api.auth import MIN_PASSWORD_LENGTH, hash_password, normalize_email
+from seeing_api.auth import hash_password, normalize_email, now
+from seeing_api.passwords import MIN_LENGTH, password_problem
 from seeing_db import User, UserRole, UserSession, make_engine, make_session_factory
 
 PASSWORD_ENV = "SEEING_USER_PASSWORD"  # noqa: S105 - the name of an environment variable, not a password
@@ -35,15 +36,25 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def read_password() -> str:
-    """Password from $SEEING_USER_PASSWORD, else prompted twice on the terminal."""
+PROBLEMS = {
+    "too_short": f"Password too short: at least {MIN_LENGTH} characters.",
+    "too_simple": "Password too simple: use 3 of lower-case, upper-case, digits and other characters.",
+    "too_common": "Password too common (a usual word or a keyboard run).",
+    "contains_email": "Password must not contain the e-mail name.",
+}
+
+
+def read_password(email: str) -> str:
+    """Password from $SEEING_USER_PASSWORD, else prompted twice on the terminal; it must follow the
+    rules of seeing_api.passwords."""
     password = os.environ.get(PASSWORD_ENV)
     if password is None:
         password = getpass.getpass("Password: ")
         if getpass.getpass("Repeat password: ") != password:
             sys.exit("Passwords do not match.")
-    if len(password) < MIN_PASSWORD_LENGTH:
-        sys.exit(f"Password too short: at least {MIN_PASSWORD_LENGTH} characters.")
+    problem = password_problem(password, email)
+    if problem:
+        sys.exit(PROBLEMS[problem])
     return password
 
 
@@ -58,9 +69,9 @@ def main(argv: list[str] | None = None) -> None:
                 sys.exit(f"An account already exists for {email} (use --update to change it).")
             if user is None and args.update:
                 sys.exit(f"No account for {email}.")
-            password_hash = hash_password(read_password())
+            password_hash = hash_password(read_password(email))
             if user is None:
-                user = User(email=email)
+                user = User(email=email, email_verified_at=now())  # created by the admin: no e-mail confirmation
                 session.add(user)
             else:
                 # A new password ends every existing session (e.g. one opened by someone else).

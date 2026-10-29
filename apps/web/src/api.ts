@@ -134,6 +134,14 @@ export interface User {
   role: UserRole;
 }
 
+/** Sign-up waiting for the e-mail confirmation (no session yet). */
+export interface Pending {
+  email: string;
+  pending: true;
+  /** false: the e-mail could not be sent (offer to send it again). */
+  sent: boolean;
+}
+
 export interface Me {
   /** Identity asserted by IAP, independent of the app account. */
   email: string | null;
@@ -178,7 +186,9 @@ const post = <T>(path: string, body: unknown = {}) => send<T>("POST", path, body
 
 export const api = {
   me: () => get<Me>("/api/me"),
-  signup: (b: { email: string; password: string; display_name?: string }) => post<User>("/api/auth/signup", b),
+  signup: (b: { email: string; password: string; display_name?: string }) => post<User | Pending>("/api/auth/signup", b),
+  verifyEmail: (token: string) => post<User>("/api/auth/verify", { token }),
+  resendVerification: (email: string) => post<void>("/api/auth/resend", { email }),
   login: (b: { email: string; password: string }) => post<User>("/api/auth/login", b),
   logout: () => post<void>("/api/auth/logout"),
   sites: () => get<Site[]>("/api/sites"),

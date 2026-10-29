@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session  # noqa: E402
 
 from seeing_api.db import get_session_factory  # noqa: E402
 from seeing_api.main import create_app  # noqa: E402
-from seeing_db import Cn2Profile, Forecast, ModelRun, RunStatus, Site  # noqa: E402
+from seeing_db import AuthEvent, Cn2Profile, Forecast, ModelRun, RunStatus, Site  # noqa: E402
 from seeing_db.migrate import alembic_config  # noqa: E402
 
 
@@ -36,6 +36,15 @@ def migrated_db() -> None:
     except Exception as exc:  # pragma: no cover - environment problem, not a test failure
         pytest.exit(f"Postgres not reachable at DATABASE_URL ({exc}). Run `make test-api`.", returncode=2)
     command.upgrade(alembic_config(), "head")
+
+
+@pytest.fixture(autouse=True)
+def no_auth_events() -> Iterator[None]:
+    """Rate limits start afresh in every test (the test client always has the same address)."""
+    with get_session_factory()() as s:
+        s.execute(delete(AuthEvent))
+        s.commit()
+    yield
 
 
 @pytest.fixture

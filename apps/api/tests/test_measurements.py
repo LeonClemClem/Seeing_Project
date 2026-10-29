@@ -9,7 +9,7 @@ from seeing_api.db import get_session_factory
 from seeing_api.main import create_app
 from seeing_db import Forecast, ModelRun, RunStatus, Site, User
 
-PASSWORD = "correct horse battery"
+PASSWORD = "Correct horse battery 7"
 T0 = datetime(2026, 10, 13, 0, tzinfo=UTC)
 
 
