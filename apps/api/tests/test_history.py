@@ -8,7 +8,7 @@ from seeing_api.db import get_session_factory
 from seeing_api.main import create_app
 from seeing_db import ModelRun, SiteHistory, User, UserRole
 
-PASSWORD = "correct horse battery"
+PASSWORD = "Correct horse battery 7"
 HIST = {"nom": "Drôme", "K": [3.94, 49.7, 0.1], "episodes": [{"a": "2026-09-18T18:09", "b": "2026-09-19T04:20",
         "prevu": [["2026-09-18T19:00", 4.14]], "mediane": [["2026-09-18T19:00", 5.0]], "brut": [["2026-09-18T18:39", 5.5]]}],
         "paires": [["2026-09-18T19:00", 4.14, 5.0, True]], "integ": [["2026-09-18T19:00", 1.5e-12, 2.5e-14, 0.0]]}

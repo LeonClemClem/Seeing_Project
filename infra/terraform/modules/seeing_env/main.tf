@@ -13,6 +13,14 @@ locals {
     ENV     = var.env
   }
   db_secret_env = { DB_PASSWORD = var.db_password_secret_id }
+
+  # E-mail confirmation of new accounts (Brevo), wired only once the key has a version.
+  mail_env = var.email_verification ? {
+    EMAIL_VERIFICATION = "true"
+    MAIL_FROM          = var.mail_from
+    PUBLIC_URL         = var.public_url
+  } : {}
+  mail_secret_env = var.email_verification ? { BREVO_API_KEY = google_secret_manager_secret.brevo_api_key.secret_id } : {}
 }
 
 # --- Service accounts: each one can read only this environment's DB password -------------------
@@ -65,15 +73,38 @@ module "web" {
   memory                = "512Mi"
   min_instances         = 0
   max_instances         = var.web_max_instances
-  env                   = local.db_env
-  secret_env            = local.db_secret_env
+  env                   = merge(local.db_env, local.mail_env)
+  secret_env            = merge(local.db_secret_env, local.mail_secret_env)
   iap_members           = var.iap_members
   public                = var.web_public
   custom_domains        = var.custom_domains
   project_id            = var.project_id
   deletion_protection   = var.deletion_protection
 
-  depends_on = [google_secret_manager_secret_iam_member.db_password]
+  depends_on = [google_secret_manager_secret_iam_member.db_password, google_secret_manager_secret_iam_member.brevo_api_key]
+}
+
+# --- Brevo API key (e-mail confirmation of new accounts) -------------------------------------------
+# The secret is created empty: add its value by hand (gcloud secrets versions add brevo-api-key-<env>
+# --data-file=-), then set email_verification = true. The key never goes through Terraform.
+
+resource "google_secret_manager_secret" "brevo_api_key" {
+  secret_id = "brevo-api-key-${var.env}"
+  labels    = { app = "seeing" }
+
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+}
+
+resource "google_secret_manager_secret_iam_member" "brevo_api_key" {
+  secret_id = google_secret_manager_secret.brevo_api_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = google_service_account.web.member
 }
 
 module "migrate" {

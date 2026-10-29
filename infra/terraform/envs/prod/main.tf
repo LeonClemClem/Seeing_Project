@@ -29,6 +29,9 @@ module "env" {
   iap_members                     = var.iap_members
   web_public                      = var.web_public
   custom_domains                  = var.custom_domains
+  email_verification              = var.email_verification
+  mail_from                       = var.mail_from
+  public_url                      = var.public_url
 
   web_image         = var.web_image
   job_image         = var.job_image

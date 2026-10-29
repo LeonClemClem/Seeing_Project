@@ -8,7 +8,7 @@ from seeing_api.create_user import main
 from seeing_api.db import get_session_factory
 from seeing_db import User, UserRole, UserSession
 
-PASSWORD = "an admin password"
+PASSWORD = "Night sky watcher 42"
 
 
 @pytest.fixture(autouse=True)
@@ -41,10 +41,10 @@ def test_refuses_duplicates_unless_update(monkeypatch):
     main(["--email", "team@example.org", "--role", "team"])
     with pytest.raises(SystemExit):
         main(["--email", "team@example.org"])
-    monkeypatch.setenv("SEEING_USER_PASSWORD", "a new team password")
+    monkeypatch.setenv("SEEING_USER_PASSWORD", "Clear dark nights 7")
     main(["--email", "team@example.org", "--role", "admin", "--update"])
     user = get_user()
-    assert user.role == UserRole.admin and verify_password(user.password_hash, "a new team password")
+    assert user.role == UserRole.admin and verify_password(user.password_hash, "Clear dark nights 7")
 
 
 def test_rejects_short_passwords_and_unknown_updates(monkeypatch):

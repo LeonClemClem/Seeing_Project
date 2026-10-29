@@ -27,6 +27,8 @@ export function useAuthActions() {
   const refresh = () => qc.invalidateQueries({ queryKey: queryKeys.me });
   const login = useMutation({ mutationFn: api.login, onSuccess: refresh });
   const signup = useMutation({ mutationFn: api.signup, onSuccess: refresh });
+  const verify = useMutation({ mutationFn: api.verifyEmail, onSuccess: refresh });
+  const resend = useMutation({ mutationFn: api.resendVerification });
   const logout = useMutation({
     mutationFn: api.logout,
     onSuccess: () => {
@@ -34,5 +36,5 @@ export function useAuthActions() {
       return refresh();
     },
   });
-  return { login, signup, logout };
+  return { login, signup, logout, verify, resend };
 }
