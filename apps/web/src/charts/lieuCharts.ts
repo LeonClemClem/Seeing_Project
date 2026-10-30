@@ -72,8 +72,8 @@ export interface HistOpts {
   win: [number, number] | null;
   /** Highlighted night (date of the evening, UTC), or null. */
   sel?: string | null;
-  /** Nights left out of the calibration (shown in red). */
-  out?: ReadonlySet<string>;
+  /** Hours left out of the calibration (filters and nights left out), as hourKey "night|h": in red. */
+  rm?: ReadonlySet<string>;
 }
 
 /** x range (viewBox units) of each night part of the history, for the clicks. */
@@ -145,8 +145,6 @@ export function histChart(l: LieuData, o: HistOpts): { svg: string; note: string
       if (!isNightDate(t)) g += `<rect x="${X(t)}" y="${T}" width="${u / 2 + 0.4}" height="${ph}" fill="${C_DAY}"/>`;
     const nk = nightKey(e.a);
     hits.push({ x0: oo - gap / 2, x1: oo + w + gap / 2, night: nk });
-    if (o.out?.has(nk))
-      g += `<rect x="${oo}" y="${T}" width="${w}" height="${ph}" fill="rgba(255,77,77,.13)"/><rect x="${oo}" y="${T}" width="${w}" height="3" fill="#ff4d4d"/>`;
     if (o.sel === nk)
       g += `<rect x="${oo - 3}" y="${T}" width="${w + 6}" height="${ph}" fill="rgba(242,193,78,.16)" stroke="#f2c14e" stroke-width="1.5"/>`;
     const d0 = ddmm(a);
@@ -189,7 +187,16 @@ export function histChart(l: LieuData, o: HistOpts): { svg: string; note: string
         (p) =>
           p[1] != null &&
           keep(p[0]) &&
-          (g += `<rect x="${X(pd(p[0])) - 2.5}" y="${Y(p[1]) - 2.5}" width="5" height="5" fill="${C_OBSD}"/>`),
+          (g += `<rect x="${X(pd(p[0])) - 2.5}" y="${Y(p[1]) - 2.5}" width="5" height="5" fill="${o.rm?.has(hourKeyOf(p[0])) ? C_RM : C_OBSD}"/>`),
+      );
+    // hours left out of the calibration: red mark at the bottom, as in the night chart of Calibrer
+    if (o.rm?.size)
+      e.mediane.forEach(
+        (p) =>
+          p[1] != null &&
+          keep(p[0]) &&
+          o.rm!.has(hourKeyOf(p[0])) &&
+          (g += `<rect x="${X(pd(p[0])) - u / 2}" y="${T + ph - 4}" width="${u}" height="4" fill="${C_RM}"/>`),
       );
     off += w + gap;
     if (n < E.length - 1)
@@ -206,9 +213,16 @@ export function histChart(l: LieuData, o: HistOpts): { svg: string; note: string
 
 /** Night of a time: date of the evening (UTC), as the calibration nights. */
 export const nightKey = (s: string) => new Date(pd(s).getTime() - 12 * 3600000).toISOString().slice(0, 10);
+/** Calibration hour key "night|h" of a time (h = hours since 12h UTC of the evening), as mock/calibration hourKey. */
+export const hourKeyOf = (s: string) => {
+  const n = nightKey(s);
+  return `${n}|${Math.round((pd(s).getTime() - Date.parse(n + "T12:00:00Z")) / 3600000)}`;
+};
+/** Colour of the hours left out of the calibration (as Calibrer). */
+const C_RM = "#ff4d4d";
 
 /** Forecast vs measured for a place: hourly medians, nightly medians (moons) and raw points. viewBox 0 0 340 320. */
-export function corrChart(l: LieuData, corrf: UiState["corrf"], sel: string | null = null, out?: ReadonlySet<string>) {
+export function corrChart(l: LieuData, corrf: UiState["corrf"], sel: string | null = null, rm?: ReadonlySet<string>) {
   const prevAt = (() => {
     const m = new Map<string, number>();
     l.episodes.forEach((e) => e.prevu.forEach((p) => p[1] != null && m.set(p[0], p[1])));
@@ -284,10 +298,10 @@ export function corrChart(l: LieuData, corrf: UiState["corrf"], sel: string | nu
         cy = Y(y);
       g += `<path d="M${cx + 2},${cy - 9} A9,9 0 1,0 ${cx + 2},${cy + 9} A12,12 0 0,1 ${cx + 2},${cy - 9} Z" fill="#f1efe8" stroke="#0a0f1d" stroke-width="1"/>`;
     });
-  // nights left out of the calibration in red, the highlighted night on top in yellow
-  if (out?.size)
-    P.filter((p) => out.has(nightKey(p[0]))).forEach(
-      (p) => (g += `<circle cx="${X(p[1])}" cy="${Y(p[2])}" r="3.6" fill="#ff4d4d" stroke="#fff" stroke-width="0.6"/>`),
+  // hours left out of the calibration (filters, nights left out) in red, the highlighted night on top in yellow
+  if (rm?.size)
+    P.filter((p) => rm.has(hourKeyOf(p[0]))).forEach(
+      (p) => (g += `<circle cx="${X(p[1])}" cy="${Y(p[2])}" r="3.6" fill="${C_RM}" stroke="#fff" stroke-width="0.6"/>`),
     );
   if (sel && G[sel]) {
     G[sel].forEach((p) => (g += `<circle cx="${X(p[1])}" cy="${Y(p[2])}" r="5" fill="#f2c14e" stroke="#000" stroke-width="1"/>`));
