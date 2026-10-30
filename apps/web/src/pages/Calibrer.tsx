@@ -45,8 +45,23 @@ const FMTS: [DateFmt, string][] = [
 
 /* Imported nights survive tab switches, like in the mockup (they add up, without weighting). */
 let STORE: { nights: Map<string, NightPt[]>; sel: string | null; ne: number } | null = null;
-/* Calibration filters, kept across tab switches too. */
-let FILTERS: CalFilters = NO_FILTER;
+/* Calibration filters and the nights left out, remembered per place (this browser). */
+const filterKey = (id: string) => `seeing-calib:${id}`;
+function loadFilters(id: string): CalFilters {
+  try {
+    const v = JSON.parse(localStorage.getItem(filterKey(id)) ?? "null") as Partial<CalFilters> | null;
+    return v ? { ...NO_FILTER, ...v, out: Array.isArray(v.out) ? v.out.filter((x) => typeof x === "string") : [] } : NO_FILTER;
+  } catch {
+    return NO_FILTER;
+  }
+}
+function saveFilters(id: string, f: CalFilters) {
+  try {
+    localStorage.setItem(filterKey(id), JSON.stringify(f));
+  } catch {
+    /* storage unavailable */
+  }
+}
 const C_RM = "#ff4d4d"; // hours left out of the fit
 function initialStore() {
   if (!STORE) {
@@ -100,6 +115,9 @@ function nightSvg(key: string, pts: NightPt[], K: K3, rm: Set<string>, pred: (K:
   return g;
 }
 
+/** "28/10" of a night key "2026-10-28". */
+const ddmmOf = (n: string) => `${n.slice(8, 10)}/${n.slice(5, 7)}`;
+
 export default function Calibrer() {
   const place = useCurrentPlace();
   const role = useUi((s) => s.role);
@@ -141,8 +159,16 @@ export default function Calibrer() {
   const [err, setErr] = useState("");
   const [drop, setDrop] = useState(false);
   const [saved, setSaved] = useState("");
-  const [filters, setFiltersState] = useState(FILTERS);
-  const setFilters = (f: CalFilters) => setFiltersState((FILTERS = f));
+  const [filters, setFiltersState] = useState(() => loadFilters(place.id));
+  useEffect(() => setFiltersState(loadFilters(place.id)), [place.id]);
+  const setFilters = (f: CalFilters) => {
+    setFiltersState(f);
+    saveFilters(place.id, f);
+  };
+  const outSet = useMemo(() => new Set(filters.out), [filters.out]);
+  const selNight = useUi((s) => s.selNight);
+  const toggleOut = (n: string) =>
+    setFilters({ ...filters, out: filters.out.includes(n) ? filters.out.filter((x) => x !== n) : [...filters.out, n].sort() });
   const fi = useRef<HTMLInputElement>(null);
 
   const refresh = () => {
@@ -187,7 +213,7 @@ export default function Calibrer() {
       editable
         ? realModel
           ? calib(nights, filters, realModel)
-          : { P: [] as CalPair<Terms>[], K: place.K, mode: srvKeys.length ? "pas encore de prévision pour ces nuits" : "aucune mesure", F: { pics: 0, courtes: 0, top: 0, rm: new Set<string>() } }
+          : { P: [] as CalPair<Terms>[], K: place.K, mode: srvKeys.length ? "pas encore de prévision pour ces nuits" : "aucune mesure", F: { pics: 0, courtes: 0, top: 0, out: 0, rm: new Set<string>() } }
         : calib(nights, filters),
     [nightsKey, filters, realModel, editable],
   );
@@ -195,6 +221,7 @@ export default function Calibrer() {
     filters.pics ? `${cal.F.pics} h peu fournie(s) retirée(s)` : "",
     filters.courtes ? `${cal.F.courtes} nuit(s) courte(s) retirée(s)` : "",
     filters.top ? `${cal.F.top} h au-dessus du modèle retirée(s), puis recalage` : "",
+    filters.out.length ? `${cal.F.out} nuit(s) retirée(s) à la main` : "",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -216,7 +243,7 @@ export default function Calibrer() {
   const corr = useLangMemo(() => corrMock(K, KCAL, place.f), [K, KCAL, place.f]);
   const hist = useLangMemo(() => (place.real ? realHist : lieuData(place.nom, place.f, K, KCAL)), [place, K, KCAL, realHist]);
   const corrf = useUi((s) => s.corrf);
-  const corrR = useLangMemo(() => (realHist ? corrChart(realHist, corrf) : null), [realHist, corrf]);
+  const corrR = useLangMemo(() => (realHist ? corrChart(realHist, corrf, selNight, outSet) : null), [realHist, corrf, selNight, outSet]);
   useEffect(() => setSaved(""), [K]);
 
   const kb = (k: "L" | 0 | 1, f: number) => {
@@ -448,6 +475,22 @@ export default function Calibrer() {
                 />
                 <span className="small muted">{tr(fnote)}</span>
               </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
+                <span className="small muted">{tr("Nuits retirées :")}</span>
+                {selNight && (
+                  <button className="small" onClick={() => toggleOut(selNight)}>
+                    {tr(outSet.has(selNight) ? `remettre la nuit du ${ddmmOf(selNight)}` : `retirer la nuit du ${ddmmOf(selNight)}`)}
+                  </button>
+                )}
+                {filters.out.map((n) => (
+                  <span key={n} className="chip on" title={tr("Remettre cette nuit dans le calage")} onClick={() => toggleOut(n)} style={{ cursor: "pointer" }}>
+                    {ddmmOf(n)} ✕
+                  </span>
+                ))}
+                {!filters.out.length && !selNight && (
+                  <span className="small muted">{tr("aucune · clique sur une nuit de l'historique pour pouvoir la retirer")}</span>
+                )}
+              </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
                 <span>{tr("Mode : " + cal.mode)}</span>
                 <span className="mono">{tr(`${cal.P.length} h de nuit comparées`)}</span>
@@ -481,7 +524,7 @@ export default function Calibrer() {
           <div className="panel">
             <h2>{tr("Historique (prévisions avec les K en service et mesures, nuit)")}</h2>
             {hist ? (
-              <HistPanel data={hist} OB={showObs || place.real} inset={false} />
+              <HistPanel data={hist} OB={showObs || place.real} inset={false} out={outSet} />
             ) : (
               <SvgChart
                 html={`<text x="550" y="120" text-anchor="middle" font-size="13" fill="${C_TXT}">${tr("Historique : choisis un lieu avec seeing monitor.")}</text>`}

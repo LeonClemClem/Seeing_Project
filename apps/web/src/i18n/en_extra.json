@@ -164,5 +164,11 @@
 "SO": "SW",
 "O": "W",
 "NO": "NW",
-"Chaque point = une heure de nuit avec mesure, et le vent AROME au moment de la mesure (analyse ou run de moins de 6 h) : direction d'où il vient, distance au centre = sa force. Les nuits s'ajoutent au fil des runs.": "Each dot = one night hour with a measurement, and the AROME wind at the time of the measurement (analysis or run less than 6 h old): direction it comes from, distance from the centre = its speed. Nights add up run after run."
+"Chaque point = une heure de nuit avec mesure, et le vent AROME au moment de la mesure (analyse ou run de moins de 6 h) : direction d'où il vient, distance au centre = sa force. Les nuits s'ajoutent au fil des runs.": "Each dot = one night hour with a measurement, and the AROME wind at the time of the measurement (analysis or run less than 6 h old): direction it comes from, distance from the centre = its speed. Nights add up run after run.",
+"Chaque point = une heure de nuit avec mesure : direction d'où vient le vent AROME, distance au centre = sa force. Les nuits s'ajoutent au fil des runs.": "Each dot = one night hour with a measurement: direction the AROME wind comes from, distance from the centre = its speed. Nights add up run after run.",
+"ne plus surligner": "stop highlighting",
+"· clique sur une nuit pour la surligner ici et dans la corrélation.": "· click a night to highlight it here and in the correlation.",
+"Nuits retirées :": "Nights left out:",
+"Remettre cette nuit dans le calage": "Put this night back into the calibration",
+"aucune · clique sur une nuit de l'historique pour pouvoir la retirer": "none · click a night of the history to be able to leave it out"
 }

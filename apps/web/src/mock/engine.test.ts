@@ -28,7 +28,7 @@ describe("mock model", () => {
     const nights = new Map();
     for (let n = 0; n < 4; n++) parseCsv(exampleCsv(n), { tz: "TU", off: "paris", fmt: "auto" }).nights.forEach((v, k) => nights.set(k, v));
     const all = calib(nights);
-    const f = calib(nights, { pics: false, courtes: false, top: 10 });
+    const f = calib(nights, { pics: false, courtes: false, top: 10, out: [] });
     expect(all.F.rm.size).toBe(0);
     expect(f.F.top).toBe(Math.round(all.P.length * 0.1));
     expect(f.P.length).toBe(all.P.length - f.F.top);
@@ -39,9 +39,19 @@ describe("mock model", () => {
       ["2026-09-28", [{ x: 8, v: 1 }, { x: 10, v: 1 }]], // 20h and 22h UTC: no 3 successive hours
       ["2026-09-29", [6, 7, 8, 9, 10].flatMap((x) => (x === 9 ? [{ x, v: 1 }] : [0, 1, 2, 3].map(() => ({ x, v: 1 }))))],
     ]);
-    const f = calib(nights, { pics: true, courtes: true, top: 0 });
+    const f = calib(nights, { pics: true, courtes: true, top: 0, out: [] });
     expect(f.F.courtes).toBe(1);
     expect(f.F.pics).toBe(1);
     expect(f.P.map((p) => p.key)).toEqual(["2026-09-29|6", "2026-09-29|7", "2026-09-29|8", "2026-09-29|10"]);
+  });
+  it("filters: a night left out by hand is not fitted", () => {
+    const nights = new Map();
+    for (let n = 0; n < 4; n++) parseCsv(exampleCsv(n), { tz: "TU", off: "paris", fmt: "auto" }).nights.forEach((v, k) => nights.set(k, v));
+    const first = [...nights.keys()].sort()[0] as string;
+    const all = calib(nights);
+    const f = calib(nights, { pics: false, courtes: false, top: 0, out: [first] });
+    expect(f.F.out).toBe(1);
+    expect(f.P.some((p) => p.key.startsWith(first + "|"))).toBe(false);
+    expect(f.P.length).toBeLessThan(all.P.length);
   });
 });
