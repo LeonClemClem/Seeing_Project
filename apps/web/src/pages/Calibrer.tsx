@@ -45,7 +45,8 @@ const FMTS: [DateFmt, string][] = [
 
 /* Imported nights survive tab switches, like in the mockup (they add up, without weighting). */
 let STORE: { nights: Map<string, NightPt[]>; sel: string | null; ne: number } | null = null;
-/* Calibration filters and the nights left out, remembered per place (this browser). */
+/* Calibration filters and the nights left out: saved with the place on the server (places the account may
+ * calibrate, remembered on every device and login); in this browser only for the example CSV nights. */
 const filterKey = (id: string) => `seeing-calib:${id}`;
 function loadFilters(id: string): CalFilters {
   try {
@@ -160,10 +161,20 @@ export default function Calibrer() {
   const [drop, setDrop] = useState(false);
   const [saved, setSaved] = useState("");
   const [filters, setFiltersState] = useState(() => loadFilters(place.id));
-  useEffect(() => setFiltersState(loadFilters(place.id)), [place.id]);
+  const cq = useQuery({ queryKey: ["calib", slug], queryFn: () => api.calib(slug), enabled: editable, staleTime: 60_000 });
+  useEffect(() => {
+    if (editable) {
+      if (cq.data) setFiltersState({ ...NO_FILTER, ...cq.data });
+    } else setFiltersState(loadFilters(place.id));
+  }, [place.id, editable, cq.data]);
   const setFilters = (f: CalFilters) => {
     setFiltersState(f);
-    saveFilters(place.id, f);
+    if (editable)
+      api.saveCalib(slug, f).then(
+        () => qc.setQueryData(["calib", slug], f),
+        (e: Error) => setErr(e.message),
+      );
+    else saveFilters(place.id, f);
   };
   const outSet = useMemo(() => new Set(filters.out), [filters.out]);
   const selNight = useUi((s) => s.selNight);
@@ -243,7 +254,7 @@ export default function Calibrer() {
   const corr = useLangMemo(() => corrMock(K, KCAL, place.f), [K, KCAL, place.f]);
   const hist = useLangMemo(() => (place.real ? realHist : lieuData(place.nom, place.f, K, KCAL)), [place, K, KCAL, realHist]);
   const corrf = useUi((s) => s.corrf);
-  const corrR = useLangMemo(() => (realHist ? corrChart(realHist, corrf, selNight, outSet) : null), [realHist, corrf, selNight, outSet]);
+  const corrR = useLangMemo(() => (realHist ? corrChart(realHist, corrf, selNight, cal.F.rm) : null), [realHist, corrf, selNight, cal]);
   useEffect(() => setSaved(""), [K]);
 
   const kb = (k: "L" | 0 | 1, f: number) => {
@@ -410,23 +421,20 @@ export default function Calibrer() {
                       refresh();
                     }}
                   >
-                    {tr(`Nuit du ${k.slice(8)}/${k.slice(5, 7)}`)} · {nights.get(k)!.length} pts{" "}
+                    <span style={outSet.has(k) ? { textDecoration: "line-through", color: "#ff8a7a" } : undefined}>
+                      {tr(`Nuit du ${k.slice(8)}/${k.slice(5, 7)}`)} · {nights.get(k)!.length} pts
+                    </span>{" "}
+                    {/* never a real deletion: the night is only left out of the calibration, and can be put back */}
                     <span
                       role="button"
-                      aria-label={tr("Retirer cette nuit")}
+                      aria-label={tr(outSet.has(k) ? "Remettre cette nuit dans le calage" : "Retirer cette nuit du calage")}
+                      title={tr(outSet.has(k) ? "Remettre cette nuit dans le calage" : "Retirer cette nuit du calage (les mesures restent enregistrées)")}
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (editable) {
-                          if (window.confirm(tr(`Supprimer les mesures de la nuit du ${k.slice(8)}/${k.slice(5, 7)} ?`)))
-                            api.deleteMeasurements(slug, k).then(reloadMeasurements, (er: Error) => setErr(er.message));
-                          return;
-                        }
-                        st.nights.delete(k);
-                        st.sel = [...st.nights.keys()].sort().pop() ?? null;
-                        refresh();
+                        toggleOut(k);
                       }}
                     >
-                      ✕
+                      {outSet.has(k) ? "↺" : "✕"}
                     </span>
                   </span>
                 ))}
@@ -524,7 +532,7 @@ export default function Calibrer() {
           <div className="panel">
             <h2>{tr("Historique (prévisions avec les K en service et mesures, nuit)")}</h2>
             {hist ? (
-              <HistPanel data={hist} OB={showObs || place.real} inset={false} out={outSet} />
+              <HistPanel data={hist} OB={showObs || place.real} inset={false} rm={cal.F.rm} />
             ) : (
               <SvgChart
                 html={`<text x="550" y="120" text-anchor="middle" font-size="13" fill="${C_TXT}">${tr("Historique : choisis un lieu avec seeing monitor.")}</text>`}

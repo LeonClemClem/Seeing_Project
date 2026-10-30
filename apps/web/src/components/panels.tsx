@@ -61,14 +61,14 @@ export function HistPanel({
   OB,
   inset = true,
   head,
-  out,
+  rm,
 }: {
   data: LieuData;
   OB: boolean;
   inset?: boolean;
   head?: ReactNode;
-  /** nights left out of the calibration (Calibrer) */
-  out?: ReadonlySet<string>;
+  /** hours left out of the calibration, hourKey "night|h" (Calibrer) */
+  rm?: ReadonlySet<string>;
 }) {
   const mesf = useUi((s) => s.mesf);
   const sel = useUi((s) => s.selNight);
@@ -99,7 +99,7 @@ export function HistPanel({
     };
   });
 
-  const h = useLangMemo(() => histChart(data, { OB, mesf, zoom, win, sel, out }), [data, OB, mesf, zoom, win, sel, out]);
+  const h = useLangMemo(() => histChart(data, { OB, mesf, zoom, win, sel, rm }), [data, OB, mesf, zoom, win, sel, rm]);
   /** Click on a night: highlight it in the history and the correlation (click again: none). */
   const pick = (e: React.MouseEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect(),
