@@ -8,7 +8,7 @@ import os
 import resource
 import sys
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from seeing_core import compute_from_extracted
@@ -20,17 +20,20 @@ from seeing_batch import monitors, persist
 from seeing_batch.logs import setup_logging
 
 logger = logging.getLogger("seeing_batch")
+# The batch fires every hour: a run started less than this ago by another execution is still being computed
+# (the job is killed after 1 h), so it is left alone; an older "running" row is a dead execution, redone.
+RUNNING_TTL = timedelta(minutes=70)
 
 
 def parse_run_time(value: str) -> datetime:
-    """ISO 8601 (`2026-10-13T00:00Z`, `2026-10-13T00`, ...) -> tz-aware UTC datetime."""
+    """ISO 8601 (`2026-10-13T00:00Z`, `2026-10-13T00`, ...) -> tz-aware UTC datetime of a main cycle."""
     v = value.strip()
     if v.endswith(("Z", "z")):
         v = v[:-1] + "+00:00"
     dt = datetime.fromisoformat(v)
     dt = dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
-    if dt.minute or dt.second or dt.microsecond or dt.hour % 3:
-        raise argparse.ArgumentTypeError(f"not an AROME cycle (00, 03, ..., 21 UTC): {value}")
+    if dt.minute or dt.second or dt.microsecond or dt.hour % 6:
+        raise argparse.ArgumentTypeError(f"not a main AROME cycle (00, 06, 12, 18 UTC): {value}")
     return dt
 
 
@@ -67,9 +70,13 @@ def run_batch(
 
     with session_factory() as session:
         status = persist.run_status(session, run_time)
+        started = persist.run_started_at(session, run_time)
         site_rows = persist.load_sites(session)
     if status == RunStatus.success:
         logger.info("Run %s already stored with success, nothing to do", rt, extra={"run_time": rt})
+        return 0
+    if status == RunStatus.running and started is not None and datetime.now(UTC) - started < RUNNING_TTL:
+        logger.info("Run %s is being computed by another execution, nothing to do", rt, extra={"run_time": rt})
         return 0
     if not site_rows:
         logger.error("No active site in the database")

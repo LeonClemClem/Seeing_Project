@@ -14,9 +14,11 @@ iap_members = [
   "user:QalbalHayya@gmail.com",
 ]
 
-# 4x/day, after the 00/06/12/18 UTC AROME cycles are published (observed ~2h50, ~5h15, ~3h55,
-# ~5h25 after the cycle). A run already stored exits in under a second, so early firings are cheap.
-batch_schedule = "45 3,11,16,23 * * *"
+# Every hour at :45. The 00/06/12/18 UTC AROME cycles are usually published ~2h50, ~5h15, ~3h55 and ~5h25
+# after the cycle; a late one is then computed at most an hour after it appears. A firing with nothing new
+# exits in under a second (a run being computed by another execution is left alone). The monitors are
+# collected once a day, at the 11h45 UTC firing (MONITORS_UTC_HOUR).
+batch_schedule = "45 * * * *"
 
 # Measured: ~364 MB RSS + at most 2 GRIB files (<= 1.6 GB) on the in-memory disk.
 batch_cpu    = "2"
