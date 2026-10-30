@@ -90,12 +90,16 @@ export interface CalFilters {
   pics: boolean;
   courtes: boolean;
   top: number;
+  /** nights (date of the evening) left out of the fit by hand */
+  out: string[];
 }
-export const NO_FILTER: CalFilters = { pics: false, courtes: false, top: 0 };
+export const NO_FILTER: CalFilters = { pics: false, courtes: false, top: 0, out: [] };
 export interface CalRemoved {
   pics: number;
   courtes: number;
   top: number;
+  /** nights left out by hand that had compared hours */
+  out: number;
   rm: Set<string>; // hourKey of every night hour left out of the fit
 }
 
@@ -105,13 +109,18 @@ export function calib<C = Comp>(
   model: CalModel<C> = MOCK_MODEL as unknown as CalModel<C>,
 ): { P: CalPair<C>[]; K: K3; mode: string; F: CalRemoved } {
   const all: CalPair<C>[] = [];
-  const F: CalRemoved = { pics: 0, courtes: 0, top: 0, rm: new Set() };
+  const F: CalRemoved = { pics: 0, courtes: 0, top: 0, out: 0, rm: new Set() };
+  const outs = new Set(f.out ?? []);
   const seeC = model.see;
   nights.forEach((pts, key) => {
     // only the hours with model terms are compared
     const H = chourly(pts).filter((p) => isNx(p.h) && model.comp(key, p.h) !== undefined);
     const usual = med(H.map((p) => p.n));
     let kept = H;
+    if (outs.has(key) && H.length) {
+      F.out++;
+      kept = [];
+    }
     if (f.pics) {
       kept = kept.filter((p) => p.n >= 0.5 * usual);
       F.pics += H.length - kept.length;

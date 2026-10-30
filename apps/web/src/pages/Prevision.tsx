@@ -120,7 +120,8 @@ function RealHistory({ place, OB, head }: { place: Place; OB: boolean; head: Rea
 function RealCorr({ place }: { place: Place }) {
   const data = useSiteHistory(place);
   const corrf = useUi((s) => s.corrf);
-  const c = useLangMemo(() => (data && data.paires.length ? corrChart(data, corrf) : null), [data, corrf]);
+  const sel = useUi((s) => s.selNight);
+  const c = useLangMemo(() => (data && data.paires.length ? corrChart(data, corrf, sel) : null), [data, corrf, sel]);
   const loading = usePlaceLoading(place);
   if (!c && loading) return <Spinner />;
   if (!c) return <NoData text="Corrélation : choisis un lieu avec seeing monitor." />;

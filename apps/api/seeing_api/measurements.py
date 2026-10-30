@@ -43,6 +43,16 @@ def readable_site(session, slug: str, user: User) -> Site:
     return editable_site(session, slug, user)
 
 
+class CalibSettings(BaseModel):
+    """Calibration settings of a place (Calibrer): filters and nights left out by hand. Nothing is deleted:
+    the measurements of a night left out stay stored."""
+
+    pics: bool = False
+    courtes: bool = False
+    top: int = Field(default=0, ge=0, le=50)
+    out: list[Annotated[str, Field(pattern=r"^\d{4}-\d{2}-\d{2}$")]] = Field(default_factory=list, max_length=2000)
+
+
 class MeasurementsIn(BaseModel):
     # [[ISO 8601 UTC time, seeing arcsec], ...]
     points: list[tuple[datetime, float]] = Field(min_length=1, max_length=MAX_POINTS)
@@ -104,6 +114,20 @@ def delete_measurements(
         t0 = datetime.fromisoformat(night).replace(hour=12, tzinfo=UTC)
         q = q.where(Measurement.time >= t0, Measurement.time < t0 + timedelta(days=1))
     session.execute(q)
+    session.commit()
+    return Response(status_code=204)
+
+
+@router.get("/{slug}/calib", response_model=CalibSettings)
+def get_calib(slug: str, session: SessionDep, user: LoggedIn) -> CalibSettings:
+    site = editable_site(session, slug, user)
+    return CalibSettings(**(site.calib or {}))
+
+
+@router.put("/{slug}/calib", status_code=204, dependencies=[Depends(require_json)])
+def put_calib(slug: str, body: CalibSettings, session: SessionDep, user: LoggedIn) -> Response:
+    site = editable_site(session, slug, user)
+    site.calib = body.model_dump() | {"out": sorted(set(body.out))}
     session.commit()
     return Response(status_code=204)
 
