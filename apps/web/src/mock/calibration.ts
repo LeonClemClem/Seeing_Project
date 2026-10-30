@@ -107,10 +107,11 @@ export function calib<C = Comp>(
   nights: Map<string, NightPt[]>,
   f: CalFilters = NO_FILTER,
   model: CalModel<C> = MOCK_MODEL as unknown as CalModel<C>,
-): { P: CalPair<C>[]; K: K3; mode: string; F: CalRemoved } {
+): { P: CalPair<C>[]; K: K3; mode: string; F: CalRemoved; R: CalPair<C>[] } {
   const all: CalPair<C>[] = [];
   const F: CalRemoved = { pics: 0, courtes: 0, top: 0, out: 0, rm: new Set() };
   const outs = new Set(f.out ?? []);
+  const R: CalPair<C>[] = []; // pairs left out of the fit (filters, nights left out)
   const seeC = model.see;
   nights.forEach((pts, key) => {
     // only the hours with model terms are compared
@@ -133,7 +134,10 @@ export function calib<C = Comp>(
     H.forEach((p) => {
       const pair = { c: model.comp(key, p.h)!, m: p.m, key: hourKey(key, p.h) };
       if (keptH.has(p.h)) all.push(pair);
-      else F.rm.add(pair.key);
+      else {
+        F.rm.add(pair.key);
+        R.push(pair);
+      }
     });
   });
   let { P, K, mode } = fit(all, model);
@@ -147,9 +151,10 @@ export function calib<C = Comp>(
     );
     F.top = drop.size;
     drop.forEach((k) => F.rm.add(k));
+    R.push(...P.filter((p) => drop.has(p.key)));
     ({ P, K, mode } = fit(P.filter((p) => !drop.has(p.key)), model));
   }
-  return { P, K, mode, F };
+  return { P, K, mode, F, R };
 }
 
 function fit<C>(P: CalPair<C>[], model: CalModel<C>): { P: CalPair<C>[]; K: K3; mode: string } {
