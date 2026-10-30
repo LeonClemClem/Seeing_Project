@@ -237,7 +237,8 @@ function PlaceDetail({ l }: { l: Place }) {
     return { ...histSvg(v, 460, 220, false), v };
   }, [data]);
   const maille = useLangMemo(() => mailleSvg(tr(l.nom), l.lat, l.lon, l.alt, l.cells), [l]);
-  const corr = useLangMemo(() => (data ? corrChart(data, corrf) : null), [data, corrf]);
+  const selNight = useUi((s) => s.selNight);
+  const corr = useLangMemo(() => (data ? corrChart(data, corrf, selNight) : null), [data, corrf, selNight]);
   const cn2 = useLangMemo(() => (l.real ? "" : cn2Svg(l.K, l.K, true, { mesf }, l.f)), [l, mesf]);
   const first = data?.episodes[0],
     lastE = data?.episodes[data.episodes.length - 1];
@@ -365,6 +366,8 @@ const ROSE_LEVELS: [string, string][] = [
   ["250h", "250 hPa (jet stream)"],
 ];
 type RoseColour = "mes" | "err" | "prev";
+/** Longest lead [h] of the wind kept: the main runs come every 6 h, so H+0 to H+5 normally. */
+const ROSE_MAX_LEAD = 6;
 
 function WindRoses({ place, data }: { place: Place; data: LieuData }) {
   const slug = place.slug ?? "";
@@ -380,7 +383,11 @@ function WindRoses({ place, data }: { place: Place; data: LieuData }) {
   const [colour, setColour] = useState<RoseColour>("mes");
   // night hours with a measured median and the AROME wind of that hour
   const hours = useMemo(() => {
-    const vars = new Map((fq.data?.points ?? []).map((p) => [Date.parse(p.valid_time), p.variables ?? null]));
+    // the wind AT the measured hour: analysis or run issued at most ROSE_MAX_LEAD hours before (the stitched view
+    // takes the latest run before each hour; after missing runs the lead grows: those hours are left out)
+    const vars = new Map(
+      (fq.data?.points ?? []).filter((p) => p.lead_hour <= ROSE_MAX_LEAD).map((p) => [Date.parse(p.valid_time), p.variables ?? null]),
+    );
     return data.paires
       .filter((q): q is [string, number, number, boolean] => q[3] && q[1] != null && q[2] != null)
       .map(([t, prev, mes]) => ({ t: Date.parse(t.length <= 16 ? t + ":00Z" : t), prev, mes, v: vars.get(Date.parse(t.length <= 16 ? t + ":00Z" : t)) }))
@@ -406,7 +413,7 @@ function WindRoses({ place, data }: { place: Place; data: LieuData }) {
       </div>
       <p className="small muted" style={{ margin: "0 0 6px" }}>
         {tr(
-          "Chaque point = une heure de nuit avec mesure : direction d'où vient le vent AROME, distance au centre = sa force. Les nuits s'ajoutent au fil des runs.",
+          "Chaque point = une heure de nuit avec mesure, et le vent AROME au moment de la mesure (analyse ou run de moins de 6 h) : direction d'où il vient, distance au centre = sa force. Les nuits s'ajoutent au fil des runs.",
         )}
       </p>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "0 0 8px" }}>

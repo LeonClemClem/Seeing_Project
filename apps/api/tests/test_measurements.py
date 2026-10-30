@@ -65,6 +65,19 @@ def test_public_sites_readable_without_an_account():
     assert anon.post("/api/sites/ohp/measurements", json={"points": [["2026-10-13T21:00:00Z", 1.2]]}).status_code == 401
 
 
+def test_calibration_settings_saved_with_the_place():
+    ada = client_for("ada@example.org")
+    slug = ada.post("/api/places", json={"name": "Jardin", "lat": 44.3, "lon": 5.3}).json()["slug"]
+    assert ada.get(f"/api/sites/{slug}/calib").json() == {"pics": False, "courtes": False, "top": 0, "out": []}
+    body = {"pics": True, "courtes": False, "top": 5, "out": ["2026-10-28", "2026-10-25", "2026-10-28"]}
+    assert ada.put(f"/api/sites/{slug}/calib", json=body).status_code == 204
+    # remembered (another login, another device): nights sorted, no duplicates
+    again = client_for("bob@example.org")
+    assert again.get(f"/api/sites/{slug}/calib").status_code == 404  # not his place
+    assert ada.get(f"/api/sites/{slug}/calib").json() == {"pics": True, "courtes": False, "top": 5, "out": ["2026-10-25", "2026-10-28"]}
+    assert ada.put(f"/api/sites/{slug}/calib", json={**body, "out": ["28/10/2026"]}).status_code == 422
+
+
 def test_terms_use_the_latest_run_before_each_hour():
     ada = client_for("ada@example.org")
     slug = ada.post("/api/places", json={"name": "Jardin", "lat": 44.3, "lon": 5.3}).json()["slug"]
