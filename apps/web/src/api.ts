@@ -30,6 +30,8 @@ export interface Site {
 /** Line-of-sight Cn2 integrals [m^1/3] per direction at the map K (GET /api/fisheye). */
 export interface Fisheye {
   run_time: string;
+  /** relief elevation [deg] every 2 degrees of azimuth from north (AROME orography); null without relief */
+  horizon?: number[] | null;
   k: number[];
   elevations: number[];
   azimuths: number[];
@@ -207,7 +209,8 @@ export const api = {
     post<{ stored: number; rejected: number }>(`/api/sites/${encodeURIComponent(slug)}/measurements`, { points }),
   deleteMeasurements: (slug: string, night?: string) =>
     send<void>("DELETE", `/api/sites/${encodeURIComponent(slug)}/measurements${night ? `?night=${night}` : ""}`),
-  fisheye: (lat: number, lon: number) => get<Fisheye>(`/api/fisheye?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`),
+  fisheye: (lat: number, lon: number, alt?: number | null) =>
+    get<Fisheye>(`/api/fisheye?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}${alt != null ? `&alt=${Math.round(alt)}` : ""}`),
   /** Research history of a monitored site (periods, hourly pairs); K and integrals only for calibrators. */
   history: (slug: string) => get<SiteHistory>(`/api/sites/${encodeURIComponent(slug)}/history`),
   terms: (slug: string, from: string, to: string) =>
