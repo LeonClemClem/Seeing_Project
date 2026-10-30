@@ -235,7 +235,8 @@ function PlaceDetail({ l }: { l: Place }) {
     return { ...histSvg(v, 460, 220, false), v };
   }, [data]);
   const maille = useLangMemo(() => mailleSvg(tr(l.nom), l.lat, l.lon, l.alt, l.cells), [l]);
-  const corr = useLangMemo(() => (data ? corrChart(data, corrf) : null), [data, corrf]);
+  const selNight = useUi((s) => s.selNight);
+  const corr = useLangMemo(() => (data ? corrChart(data, corrf, selNight) : null), [data, corrf, selNight]);
   const cn2 = useLangMemo(() => (l.real ? "" : cn2Svg(l.K, l.K, true, { mesf }, l.f)), [l, mesf]);
   const first = data?.episodes[0],
     lastE = data?.episodes[data.episodes.length - 1];

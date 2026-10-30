@@ -140,5 +140,10 @@
 "Pas de nuages pour ce run : ils arrivent avec le prochain run AROME.": "No clouds for this run: they come with the next AROME run.",
 "Relief": "Relief",
 "Interpolation temporelle": "Time interpolation",
-"Fondu entre heures voisines, pour l'image seulement": "Blend between neighbouring hours, for the picture only"
+"Fondu entre heures voisines, pour l'image seulement": "Blend between neighbouring hours, for the picture only",
+"ne plus surligner": "stop highlighting",
+"· clique sur une nuit pour la surligner ici et dans la corrélation.": "· click a night to highlight it here and in the correlation.",
+"Nuits retirées :": "Nights left out:",
+"Remettre cette nuit dans le calage": "Put this night back into the calibration",
+"aucune · clique sur une nuit de l'historique pour pouvoir la retirer": "none · click a night of the history to be able to leave it out"
 }

@@ -18,6 +18,8 @@ export interface UiState {
   showObs: boolean;
   mesf: { brut: boolean; horaire: boolean; courbe: boolean };
   corrf: { horaire: boolean; nuit: boolean; brut: boolean };
+  /** Night highlighted in the history and the correlation (date of the evening, UTC), or null. */
+  selNight: string | null;
 }
 
 function initialLang(): Lang {
@@ -38,6 +40,7 @@ let state: UiState = {
   showObs: true,
   mesf: { brut: true, horaire: true, courbe: true },
   corrf: { horaire: true, nuit: true, brut: true },
+  selNight: null,
 };
 setTrLang(state.lang);
 
