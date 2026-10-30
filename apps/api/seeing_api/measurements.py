@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from seeing_api.api import TEAM_SITE, SessionDep, utc
+from seeing_api.api import MAIN_RUN, TEAM_SITE, SessionDep, utc
 from seeing_api.auth import require_json, require_role
 from seeing_db import Forecast, Measurement, ModelRun, RunStatus, Site, User, UserRole
 
@@ -127,7 +127,7 @@ def get_terms(
         )
         .join(ModelRun, ModelRun.id == Forecast.run_id)
         .where(
-            Forecast.site_id == site.id, ModelRun.status == RunStatus.success, Forecast.i_tke.is_not(None),
+            Forecast.site_id == site.id, ModelRun.status == RunStatus.success, MAIN_RUN, Forecast.i_tke.is_not(None),
             Forecast.valid_time >= start, Forecast.valid_time < end,
         )
         .subquery()
