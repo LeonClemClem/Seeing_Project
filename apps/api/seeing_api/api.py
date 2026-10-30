@@ -29,19 +29,18 @@ ViewParam = Annotated[
     ),
 ]
 WEEK = timedelta(days=7)
+# Only the main AROME runs (00, 06, 12, 18 UTC) are shown; a secondary run stored by mistake stays hidden.
+MAIN_RUN = func.mod(func.extract("hour", ModelRun.run_time), 6) == 0
 
 
 def stitched(session: Session, model, site_id: int, run: ModelRun, span: timedelta | None = WEEK):
     """Rows of `model` (Forecast or Cn2Profile) for every valid hour from `span` (7 days; None = all) before
     `run` to the end of `run`: for each hour, the main run (00/06/12/18Z) issued last before it, i.e. the
-    shortest lead, other runs only to fill gaps; runs after `run` are ignored."""
+    shortest lead; secondary runs are never used; runs after `run` are ignored."""
     ranked = (
-        select(model.id, func.row_number().over(
-            partition_by=model.valid_time,
-            order_by=(func.mod(func.extract("hour", ModelRun.run_time), 6) != 0, model.lead_hour),
-        ).label("rk"))
+        select(model.id, func.row_number().over(partition_by=model.valid_time, order_by=model.lead_hour).label("rk"))
         .join(ModelRun, ModelRun.id == model.run_id)
-        .where(model.site_id == site_id, ModelRun.status == RunStatus.success, ModelRun.run_time <= run.run_time,
+        .where(model.site_id == site_id, ModelRun.status == RunStatus.success, MAIN_RUN, ModelRun.run_time <= run.run_time,
                *([model.valid_time >= run.run_time - span] if span is not None else []))
         .subquery()
     )
@@ -109,8 +108,8 @@ def get_site(session: Session, slug: str, user: User | None = None) -> Site:
 
 
 def resolve_run(session: Session, run: str) -> ModelRun:
-    """Only successful runs are ever visible."""
-    query = select(ModelRun).where(ModelRun.status == RunStatus.success)
+    """Only successful main runs are ever visible."""
+    query = select(ModelRun).where(ModelRun.status == RunStatus.success, MAIN_RUN)
     if run == "latest":
         found = session.scalar(query.order_by(ModelRun.run_time.desc()).limit(1))
         if found is None:
@@ -237,7 +236,7 @@ def _map_run(session: Session, run: str) -> ModelRun:
         return resolve_run(session, run)
     found = session.scalar(
         select(ModelRun)
-        .where(ModelRun.status == RunStatus.success, ModelRun.id.in_(select(MapFrame.run_id).where(MapFrame.lead_hour >= 0)))
+        .where(ModelRun.status == RunStatus.success, MAIN_RUN, ModelRun.id.in_(select(MapFrame.run_id).where(MapFrame.lead_hour >= 0)))
         .order_by(ModelRun.run_time.desc())
         .limit(1)
     )
