@@ -341,7 +341,7 @@ function PlaceDetail({ l }: { l: Place }) {
         </div>
         <div className="panel">
           <h2>{tr("Cn² (altitude × temps)")}</h2>
-          <Cn2Legend obs convective={!l.real} seeLabel="Seeing prévu (axe droit)" />
+          <Cn2Legend obs seeLabel="Seeing prévu (axe droit)" />
           {l.real ? <Cn2RealPanel place={l} profile={false} /> : <SvgChart html={cn2} viewBox="0 0 900 270" label="Panneau Cn2 du lieu" />}
         </div>
       </div>

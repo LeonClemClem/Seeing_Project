@@ -52,6 +52,8 @@ class Cn2Out(BaseModel):
     valid_times: list[datetime]
     heights_m: list[float]
     cn2: list[list[float | None]]
+    #: True where the convective closure filled the level (same shape as cn2; False when unknown)
+    conv: list[list[bool]]
 
 
 class MeOut(BaseModel):

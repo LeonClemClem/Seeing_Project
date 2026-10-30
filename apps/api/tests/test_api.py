@@ -102,6 +102,8 @@ def test_cn2_union_grid_padded_with_null(client, session):
     # lead 0 and 2 only have two heights -> padded with null
     assert cn["cn2"][0][2] is None and cn["cn2"][2][2] is None
     assert math.isclose(cn["cn2"][1][2], 1e-17, rel_tol=1e-5)
+    # profiles stored without the convective levels: same shape, all False
+    assert [len(r) for r in cn["conv"]] == [3, 3, 3] and not any(v for r in cn["conv"] for v in r)
 
 
 def test_me_reads_iap_header(client):

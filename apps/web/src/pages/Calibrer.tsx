@@ -475,7 +475,7 @@ export default function Calibrer() {
           )}
           <div className="panel">
             <h2>{tr("Cn² (altitude × temps)")}</h2>
-            <Cn2Legend obs={showObs} convective={!place.real} />
+            <Cn2Legend obs={showObs} />
             {place.real ? <Cn2RealPanel place={place} profile={false} /> : <SvgChart html={p2c} viewBox="0 0 900 270" label="Panneau Cn2 de calibration" />}
           </div>
           <div className="panel">
