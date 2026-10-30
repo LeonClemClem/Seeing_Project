@@ -2,18 +2,20 @@
  * Personal places (mock), public sites (API) and community places (mock, blurred positions):
  * measurement histogram, AROME cells around the place, history, correlation and Cn².
  */
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { corrChart, histSvg, mailleSvg, seeHist } from "../charts/lieuCharts";
+import { corrChart, histSvg, mailleSvg, roseBest, seeHist, windRoseSvg, type RosePt } from "../charts/lieuCharts";
 import { cn2Svg } from "../charts/mockCharts";
 import { Cn2RealPanel, HistPanel } from "../components/panels";
-import { Chip, Cn2Legend, LegBreak, LegDay, LegMed, LegMes, Spinner, Sw, SvgChart } from "../components/ui";
+import { api, queryKeys } from "../api";
+import { Chip, Cn2Legend, ColorBar, LegBreak, LegDay, LegMed, LegMes, Seg, Spinner, Sw, SvgChart } from "../components/ui";
 import { usePlaceLoading, useSiteHistory } from "../data/forecast";
 import { kHidden, kTxt, MAX_PLACES, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
 import { tr } from "../i18n";
-import { C_TXT, ddmm, fmt, pd } from "../lib/util";
-import { lieuData } from "../mock/engine";
+import { C_TXT, ddmm, fmt, pd, turboGradient } from "../lib/util";
+import { lieuData, type LieuData } from "../mock/engine";
 import { setState, useLangMemo, useUi } from "../store";
 
 type Sel = { t: "lx"; id: string };
@@ -297,6 +299,8 @@ function PlaceDetail({ l }: { l: Place }) {
         </div>
         {data ? <HistPanel data={data} OB={true} inset={false} /> : loading ? <Spinner /> : none("Pas de période avec prévision et mesures pour ce lieu.", "0 0 1100 240", 550, 120)}
       </div>
+      {/* wind roses: full width, under the history */}
+      {l.real && data && <WindRoses place={l} data={data} />}
       <div className="grid2" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1.6fr)" }}>
         <div className="panel">
           <h2>{tr("Corrélation prévu / mesuré")}</h2>
@@ -348,3 +352,130 @@ function PlaceDetail({ l }: { l: Place }) {
     </div>
   );
 }
+
+/* ---------- wind roses: AROME wind of the hour vs the night measurements, cumulated night after night ---------- */
+
+/** Levels of the wind roses: [key of the forecast variables (speed u…, direction d…), label]. */
+const ROSE_LEVELS: [string, string][] = [
+  ["10", "10 m au-dessus du sol"],
+  ["100", "100 m au-dessus du sol"],
+  ["500", "500 m au-dessus du sol"],
+  ["700h", "700 hPa (~3 km)"],
+  ["500h", "500 hPa (~5,5 km)"],
+  ["250h", "250 hPa (jet stream)"],
+];
+type RoseColour = "mes" | "err" | "prev";
+
+function WindRoses({ place, data }: { place: Place; data: LieuData }) {
+  const slug = place.slug ?? "";
+  // same query as the site history (cached): every main run stitched, with the model variables of each hour
+  const fq = useQuery({
+    queryKey: queryKeys.forecast(slug, "latest", "all"),
+    queryFn: () => api.forecast(slug, "latest", "all"),
+    enabled: !!slug,
+    retry: false,
+    staleTime: 10 * 60 * 1000,
+  });
+  const [levels, setLevels] = useState(["10", "700h", "250h"]);
+  const [colour, setColour] = useState<RoseColour>("mes");
+  // night hours with a measured median and the AROME wind of that hour
+  const hours = useMemo(() => {
+    const vars = new Map((fq.data?.points ?? []).map((p) => [Date.parse(p.valid_time), p.variables ?? null]));
+    return data.paires
+      .filter((q): q is [string, number, number, boolean] => q[3] && q[1] != null && q[2] != null)
+      .map(([t, prev, mes]) => ({ t: Date.parse(t.length <= 16 ? t + ":00Z" : t), prev, mes, v: vars.get(Date.parse(t.length <= 16 ? t + ":00Z" : t)) }))
+      .filter((h): h is { t: number; prev: number; mes: number; v: Record<string, number | null> } => !!h.v);
+  }, [data, fq.data]);
+  const valOf = (h: (typeof hours)[number]) =>
+    colour === "mes" ? h.mes : colour === "prev" ? h.prev : 100 * (Math.exp(Math.abs(Math.log(h.prev / h.mes))) - 1);
+  const vals = hours.map(valOf).sort((a, b) => a - b);
+  const lo = vals.length ? vals[Math.floor(vals.length * 0.05)]! : 0,
+    hi = vals.length ? vals[Math.min(vals.length - 1, Math.floor(vals.length * 0.95))]! : 1;
+  const unit = colour === "err" ? " %" : "″";
+  const nights = new Set(hours.map((h) => new Date(h.t - 12 * 3600000).toISOString().slice(0, 10))).size;
+
+  return (
+    <div className="panel">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+        <h2>{tr("Vent AROME et seeing")}</h2>
+        <span className="small muted mono">
+          {hours.length
+            ? tr(`${hours.length} h de nuit · ${nights} nuit(s) cumulée(s) · du ${ddmm(new Date(hours[0]!.t))} au ${ddmm(new Date(hours[hours.length - 1]!.t))}`)
+            : ""}
+        </span>
+      </div>
+      <p className="small muted" style={{ margin: "0 0 6px" }}>
+        {tr(
+          "Chaque point = une heure de nuit avec mesure : direction d'où vient le vent AROME, distance au centre = sa force. Les nuits s'ajoutent au fil des runs.",
+        )}
+      </p>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "0 0 8px" }}>
+        <span className="small muted">{tr("Couleur :")}</span>
+        <Seg<RoseColour>
+          value={colour}
+          onChange={setColour}
+          options={[
+            ["mes", tr("seeing mesuré")],
+            ["err", tr("erreur de la prévision")],
+            ["prev", tr("seeing prévu")],
+          ]}
+        />
+      </div>
+      {fq.isLoading ? (
+        <Spinner />
+      ) : !hours.length ? (
+        <p className="muted" style={{ textAlign: "center", padding: "30px 0" }}>
+          {tr("Pas encore d'heure de nuit avec mesure et vent AROME pour ce lieu : les données s'accumulent à chaque nuit.")}
+        </p>
+      ) : (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 16 }}>
+            {levels.map((lv, k) => {
+              const pts: RosePt[] = hours
+                .map((h) => ({ dir: h.v[`d${lv}`] ?? NaN, speed: h.v[`u${lv}`] ?? NaN, val: valOf(h) }))
+                .filter((q) => isFinite(q.dir) && isFinite(q.speed) && isFinite(q.val));
+              const best = roseBest(pts);
+              return (
+                <div key={k} style={{ minWidth: 0 }}>
+                  <select
+                    aria-label={tr("Niveau du vent")}
+                    value={lv}
+                    onChange={(e) => setLevels(levels.map((x, i) => (i === k ? e.target.value : x)))}
+                    style={{ width: "100%" }}
+                  >
+                    {ROSE_LEVELS.map(([v, lab]) => (
+                      <option key={v} value={v}>
+                        {tr(lab)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="small mono" style={{ margin: "4px 0 0", textAlign: "center", color: "#e6ebf6" }}>
+                    {best ? `${tr("meilleur secteur :")} ${tr(best.sect)} (${best.med.toFixed(colour === "err" ? 0 : 2)}${unit}, ${best.n} h)` : tr("pas de secteur avec 5 h")}
+                  </p>
+                  {pts.length ? (
+                    <SvgChart html={windRoseSvg(pts, lo, hi)} viewBox="0 0 300 300" label={`Rose des vents ${levelLabel(lv)}`} />
+                  ) : (
+                    <p className="muted small" style={{ textAlign: "center", padding: "60px 0" }}>
+                      {tr("Pas de vent AROME à ce niveau.")}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <ColorBar
+            left={`${lo.toFixed(colour === "err" ? 0 : 2)}${unit}`}
+            right={`${hi.toFixed(colour === "err" ? 0 : 2)}${unit}`}
+            gradient={turboGradient()}
+          />
+          <p className="small muted" style={{ margin: "4px 0 0", textAlign: "center" }}>
+            {tr(colour === "mes" ? "seeing mesuré (médiane horaire)" : colour === "prev" ? "seeing prévu AROME V2bd" : "erreur |prévu / mesuré|")} ·{" "}
+            {tr("couleurs entre les centiles 5 et 95 · meilleur secteur = médiane la plus basse sur au moins 5 h")}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+const levelLabel = (lv: string) => ROSE_LEVELS.find((q) => q[0] === lv)?.[1] ?? lv;
