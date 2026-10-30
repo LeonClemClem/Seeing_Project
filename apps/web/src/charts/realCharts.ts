@@ -135,6 +135,8 @@ export interface Cn2Ctx {
   heights: number[];
   /** log10 Cn², [time][height], null when missing */
   lg: (number | null)[][];
+  /** Levels filled by the convective closure, [time][height] (hatched). */
+  cv: boolean[][];
   hc: (number | null)[];
   see: (number | null)[];
   /** Measured hourly median seeing at each time, null when none. */
@@ -177,6 +179,11 @@ export function cn2Ctx(
     const k = rowAt.get(tm);
     return k == null ? heights.map(() => null) : cn.cn2[k]!.map((v) => (v != null && v > 0 ? Math.log10(v) : null));
   });
+  const cv = times.map((tm) => {
+    const k = rowAt.get(tm),
+      row = k == null ? undefined : cn.conv?.[k];
+    return heights.map((_, j) => !!row?.[j]);
+  });
   const a: number[] = [];
   lg.forEach((row) => row.forEach((v, k) => v != null && heights[k]! <= 4000 && a.push(v)));
   a.sort((x, y) => x - y);
@@ -198,6 +205,7 @@ export function cn2Ctx(
     times,
     heights,
     lg,
+    cv,
     hc: times.map((t) => byT.get(t)?.h_coulim_m ?? null),
     see: times.map((t) => {
       const s = byT.get(t)?.seeing_arcsec;
@@ -230,6 +238,35 @@ export function jetStream(c: Cn2Ctx, i: number): { z: number; v: number } | null
   const local = ki > 0 && ki < P.length - 1 && vj >= P[ki - 1]![1] && vj >= P[ki + 1]![1];
   if (!local || !low.length || !up.length || vj - Math.min(...low) < 0.3 || vj - Math.min(...up) < 0.3) return null;
   return { z: zj, v: vj };
+}
+
+/** Edges [m] of display level k: halfway to its neighbours (the ground for the first). */
+const levelBand = (Zh: number[], k: number): [number, number] => [
+  k === 0 ? Math.min(0, Zh[0]!) : (Zh[k - 1]! + Zh[k]!) / 2,
+  k === Zh.length - 1 ? Zh[k]! : (Zh[k]! + Zh[k + 1]!) / 2,
+];
+
+/** Hatched rectangles on the levels filled by the convective closure (x0, x1 of each hour column). */
+function convHatch(c: Cn2Ctx, X: (i: number) => number, Yz: (z: number) => number): string {
+  let g = "";
+  c.cv.forEach((row, i) => {
+    let k = 0;
+    while (k < row.length) {
+      if (!row[k]) {
+        k++;
+        continue;
+      }
+      const k0 = k;
+      while (k < row.length && row[k]) k++;
+      const z0 = levelBand(c.heights, k0)[0],
+        z1 = levelBand(c.heights, k - 1)[1];
+      if (z1 < c.za || z0 > c.zb) continue;
+      const y1 = Yz(z1),
+        y0 = Yz(z0);
+      g += `<rect x="${X(i)}" y="${y1}" width="${X(i + 1) - X(i)}" height="${Math.max(1, y0 - y1)}" fill="url(#hh)" opacity=".55"/>`;
+    }
+  });
+  return g;
 }
 
 /** Altitude axis of the Cn² panel (left margin, x < L): ticks, labels and title. */
@@ -314,6 +351,7 @@ export function cn2RealSvg(c: Cn2Ctx, runMs: number) {
       g += `<image href="${cv.toDataURL()}" x="${L}" y="${T}" width="${pw}" height="${ph}" preserveAspectRatio="none" style="image-rendering:pixelated"/>`;
     }
   }
+  g += convHatch(c, X, Yz);
   const hcs: number[][][] = [];
   let sg: number[][] = [];
   for (let i = 0; i < n; i++) {
@@ -418,6 +456,12 @@ export function cn2ProfileSvg(c: Cn2Ctx, i: number, pfW: number) {
     return g + `<text x="${L + pw / 2}" y="${T + ph / 2}" text-anchor="middle" font-size="11" fill="${C_TXT}">${tr("pas de Cn² (H+0 ou trou)")}</text>`;
   for (let q = Math.ceil(x0); q <= Math.floor(x1); q++)
     g += `<line x1="${X(q)}" x2="${X(q)}" y1="${T}" y2="${T + ph}" stroke="#3a4258"/>${(q - Math.ceil(x0)) % 2 ? "" : `<text x="${X(q)}" y="${T + ph + 14}" text-anchor="middle" font-size="8" fill="${C_TXT}">1e${q}</text>`}`;
+  c.cv[i]?.forEach((on, k) => {
+    if (!on) return;
+    const [z0, z1] = levelBand(c.heights, k);
+    if (z1 < c.za || z0 > c.zb) return;
+    g += `<rect x="${L}" y="${Yz(z1)}" width="${pw}" height="${Math.max(1, Yz(z0) - Yz(z1))}" fill="url(#hh)" opacity=".55"/>`;
+  });
   const pts: number[][] = [];
   c.heights.forEach((z, k) => {
     if (z < c.za || z > c.zb) return;

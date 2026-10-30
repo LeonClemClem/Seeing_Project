@@ -143,6 +143,8 @@ class Cn2Profile(Base):
     lead_hour: Mapped[int] = mapped_column(Integer)
     heights_m: Mapped[list[float]] = mapped_column(ARRAY(REAL))
     cn2: Mapped[list[float | None]] = mapped_column(ARRAY(REAL))
+    #: True on the levels filled by the convective closure (hatched on the panel); NULL for older profiles.
+    conv: Mapped[list[bool] | None] = mapped_column(ARRAY(Boolean))
 
     run: Mapped[ModelRun] = relationship(back_populates="cn2_profiles")
     site: Mapped[Site] = relationship()

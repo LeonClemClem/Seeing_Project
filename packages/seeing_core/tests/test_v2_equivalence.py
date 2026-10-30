@@ -64,6 +64,21 @@ def test_physics_matches_v2(extracted, expected):
     assert_matches_v2(forecasts, expected)
 
 
+def test_convective_levels_flagged_by_day_near_the_ground(extracted):
+    """The levels filled by the convective closure are flagged on the display grid (hatched on the panel):
+    by day only (the ground heats), in the boundary layer."""
+    forecasts = compute_from_extracted(extracted, FIXTURE_SITES, forecast_hours=51)
+    flagged = 0
+    for site in FIXTURE_SITES:
+        for h in forecasts[site.slug].hours:
+            assert h.conv is not None and h.conv.shape == h.heights_m.shape and h.conv.dtype == bool
+            if h.conv.any():
+                flagged += 1
+                assert 6 <= h.valid_time.hour <= 18, (site.slug, h.lead_hour)
+                assert h.heights_m[h.conv].max() <= h.h_coulim_m
+    assert flagged > 0
+
+
 def test_v2bd_close_to_v2_with_the_same_k(extracted, expected):
     """V2bd differs from V2 only around H_COULIM (soft transition, shear gradients above H_COULIM):
     with the same K, the hourly seeing stays within 25 % of V2 and the medians within 10 %."""

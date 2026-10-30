@@ -70,7 +70,7 @@ export default function Prevision() {
         </div>
         <div className="panel">
           <h2>{tr("Cn² (altitude × temps)")}</h2>
-          <Cn2Legend obs={OB} convective={!place.real} />
+          <Cn2Legend obs={OB} />
           {place.real ? <Cn2RealPanel place={place} defaultView="run" /> : <MockCn2 place={place} />}
           <KRead place={place} />
         </div>

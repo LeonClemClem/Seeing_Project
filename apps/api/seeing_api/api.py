@@ -204,19 +204,25 @@ def site_cn2(
     heights = sorted({_height_key(h) for p in profiles for h in p.heights_m if h is not None and math.isfinite(h)})
     index = {h: i for i, h in enumerate(heights)}
     matrix: list[list[float | None]] = []
+    conv: list[list[bool]] = []
     for p in profiles:
         row: list[float | None] = [None] * len(heights)
-        for h, v in zip(p.heights_m, p.cn2, strict=False):
+        crow = [False] * len(heights)
+        flags = p.conv or []
+        for k, (h, v) in enumerate(zip(p.heights_m, p.cn2, strict=False)):
             if h is None or not math.isfinite(h):
                 continue
             row[index[_height_key(h)]] = clean(v)
+            crow[index[_height_key(h)]] = bool(flags[k]) if k < len(flags) else False
         matrix.append(row)
+        conv.append(crow)
     return Cn2Out(
         site=site_out(site, user),
         run_time=utc(model_run.run_time),
         valid_times=[utc(p.valid_time) for p in profiles],
         heights_m=heights,
         cn2=matrix,
+        conv=conv,
     )
 
 

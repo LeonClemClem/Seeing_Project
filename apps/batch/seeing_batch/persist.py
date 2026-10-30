@@ -100,6 +100,7 @@ def store_results(
                 profile_rows.append(dict(
                     run_id=run_id, site_id=site_id, valid_time=h.valid_time, lead_hour=h.lead_hour,
                     heights_m=[float(z) for z in h.heights_m], cn2=[_num(c) for c in h.cn2],
+                    conv=None if getattr(h, "conv", None) is None else [bool(c) for c in h.conv],
                 ))
         if forecast_rows:
             session.execute(pg_insert(Forecast), forecast_rows)

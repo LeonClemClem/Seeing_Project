@@ -57,6 +57,8 @@ class HourResult:
     i_cis: float = np.nan
     # Model variables of the hour (seeing_core.variables.model_variables), None where undefined.
     variables: dict | None = None
+    # True on the heights_m levels filled by the convective closure (display only, V2bd); None for V2.
+    conv: np.ndarray | None = None
 
 
 @dataclass
@@ -144,7 +146,8 @@ def compute_hour(
 
 
 def compute_hour_terms(site: SiteSpec, hourly: dict[str, dict], sp3: dict, hour: int, surface_altitude: float):
-    """V2bd compute_hour() plus the (i_tke, i_conv, i_cis) integrals at K = 1 and the model variables."""
+    """V2bd compute_hour() plus the (i_tke, i_conv, i_cis) integrals at K = 1, the model variables and the
+    levels filled by the convective closure (on the display grid)."""
     for pkg in REQUIRED_HOURLY:
         if hour not in hourly[pkg]:
             raise MissingDataError(f"H+{hour} missing from {pkg}")
@@ -181,6 +184,7 @@ def _hour_v2bd(site: SiteSpec, sp3: dict, hour: int, h_coulim: float, hag: dict,
                 cn2_convective(sub(below), w_theta0, h_coulim, potential_temperature(T0, P0), 1.0), nan=0.0
             )
             conv1[~holes] = 0.0
+    filled = conv1 > 0  # levels filled by the convective closure (display: hatched on the Cn² panel)
     shear1 = np.zeros_like(z)
     if np.count_nonzero(~below) >= 2:
         shear1[~below] = cn2_shear(sub(~below), 1.0)
@@ -197,8 +201,11 @@ def _hour_v2bd(site: SiteSpec, sp3: dict, hour: int, h_coulim: float, hag: dict,
         integral, r0, seeing = np.nan, np.nan, np.nan
         terms = (np.nan, np.nan, np.nan)
     cn2 = np.where(cn2 > 0, cn2, np.nan)
-    heights, cn2_display = display_cn2_profile(display_profile_heights(hag, iso), z, cn2)
-    return integral, r0, seeing, h_coulim, heights, cn2_display, terms, model_variables(hag, full, wind10)
+    z_display = display_profile_heights(hag, iso)
+    heights, cn2_display = display_cn2_profile(z_display, z, cn2)
+    # the same placement on the display grid as the Cn², for a 0 / 1 indicator: convective where >= 0.5
+    conv_display = np.nan_to_num(display_cn2_profile(z_display, z, filled.astype(float))[1]) >= 0.5
+    return integral, r0, seeing, h_coulim, heights, cn2_display, terms, model_variables(hag, full, wind10), conv_display
 
 
 def compute_from_extracted(
@@ -221,9 +228,9 @@ def compute_from_extracted(
         hours: list[HourResult] = []
         for hour in range(forecast_hours + 1):
             try:
-                terms, variables = (np.nan, np.nan, np.nan), None
+                terms, variables, conv = (np.nan, np.nan, np.nan), None, None
                 if model == "V2bd":
-                    integral, r0, seeing, h_coulim, heights, cn2, terms, variables = compute_hour_terms(
+                    integral, r0, seeing, h_coulim, heights, cn2, terms, variables, conv = compute_hour_terms(
                         site, hourly, sp3, hour, surface_altitude
                     )
                 else:
@@ -248,6 +255,7 @@ def compute_from_extracted(
                     i_conv=terms[1],
                     i_cis=terms[2],
                     variables=variables,
+                    conv=conv,
                 )
             )
         out[site.slug] = SiteForecast(slug=site.slug, run_time=run.run_time, hours=hours)

@@ -113,6 +113,8 @@ export interface Cn2 {
   valid_times: string[];
   heights_m: number[];
   cn2: (number | null)[][];
+  /** true where the convective closure filled the level (same shape as cn2); absent from older APIs */
+  conv?: boolean[][];
 }
 
 /** Global seeing map of a run (GET /api/map); each frame is fetched as ny * nx bytes. */
