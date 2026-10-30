@@ -204,11 +204,14 @@ export function Cn2RealPanel({
   profile = true,
   style,
   defaultView = "week",
+  rm,
 }: {
   place: Place;
   profile?: boolean;
   style?: CSSProperties;
   defaultView?: View;
+  /** hours left out of the calibration, hourKey "night|h" (Calibrer): veiled in red over their full height */
+  rm?: ReadonlySet<string>;
 }) {
   const [alt, setAlt] = useState("4");
   const [view, setView] = useState<View>(defaultView);
@@ -226,8 +229,8 @@ export function Cn2RealPanel({
     [cn2.data, forecast.data, alt, obs, raw, showObs, zoom, mesf],
   );
   const svg = useLangMemo(
-    () => (ctx && cn2.data ? cn2RealSvg(ctx, Date.parse(cn2.data.run_time), smooth) : ""),
-    [ctx, cn2.data, smooth],
+    () => (ctx && cn2.data ? cn2RealSvg(ctx, Date.parse(cn2.data.run_time), smooth, rm) : ""),
+    [ctx, cn2.data, smooth, rm],
   );
   // zoomed: both vertical axes stay on the edges of the visible part (the drawing scrolls under them)
   const axes = useLangMemo(() => (ctx && ctx.n ? { left: cn2AxisLeft(ctx), right: cn2AxisRight(ctx) } : null), [ctx]);
