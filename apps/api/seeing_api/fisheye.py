@@ -9,6 +9,10 @@ browser can rescale them with other K:  J = K_TKE / K_TKE_map * j_low + K_CIS / 
 Clouds (frames stored with the AROME cloud cover): the low / medium / high layers are put at CLOUD_HEIGHTS
 above the observer (assumed, as research/ciel_seeing.py); the cover of each layer is read where the line
 of sight crosses it, and the cloud cover of the direction is 1 - prod(1 - cover).
+
+Horizon (as research/ciel_seeing.py): for every azimuth, the highest elevation of the AROME orography of the
+map up to HORIZON_KM, seen from the place's altitude (the AROME ground when unknown), with the Earth's
+curvature and standard refraction (k = 0.13).
 """
 
 import math
@@ -19,7 +23,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from seeing_api.api import MAP_SEE_MAX, MAP_SEE_MIN, RunParam, SessionDep, _map_run, utc
+from seeing_api.api import MAP_SEE_MAX, MAP_SEE_MIN, RELIEF_LEAD, RunParam, SessionDep, _map_run, utc
 from seeing_db import MapFrame
 
 router = APIRouter(prefix="/api")
@@ -29,6 +33,9 @@ ELEVATIONS = list(range(10, 91, 5))
 AZIMUTHS = list(range(0, 360, 10))
 H_LOW_STEP, H_HIGH_STEP = 20.0, 100.0  # same as seeing_core.grid
 CLOUD_HEIGHTS = (1500.0, 4500.0, 8000.0)  # low / medium / high layers above the observer, as seeing_core.grid
+HORIZON_AZ_STEP = 2  # degrees
+HORIZON_KM, HORIZON_STEP_KM = 106.0, 1.0
+K_REFR, R_EARTH = 0.13, 6.371e6
 _LN0, _LN1 = math.log(MAP_SEE_MIN), math.log(MAP_SEE_MAX)
 _JC = 0.423 * (2 * math.pi / LAMBDA) ** 2
 
@@ -53,6 +60,8 @@ class FisheyeFrame(BaseModel):
 
 class FisheyeOut(BaseModel):
     run_time: str
+    #: elevation [deg] of the relief every HORIZON_AZ_STEP degrees of azimuth from north; None without relief
+    horizon: list[float] | None = None
     k: list[float]  # map K the integrals are computed with
     elevations: list[int]
     azimuths: list[int]
@@ -77,6 +86,46 @@ def _sampler(buf: bytes, offset: int, ny: int, nx: int, decode):
     return at
 
 
+def horizon_profile(relief: bytes, f, lat: float, lon: float, alt: float | None) -> list[float] | None:
+    """Horizon elevations [deg] (one per HORIZON_AZ_STEP of azimuth) from the uint16 relief plane of the map
+    (altitude + 500 m, 65535 = none). None when the point is outside the map."""
+    ny, nx = f.ny, f.nx
+
+    def h_at(la: float, lo: float) -> float:
+        r, c = (la - f.lat0) / f.dlat, (lo - f.lon0) / f.dlon
+        if not (0 <= r <= ny - 1 and 0 <= c <= nx - 1):
+            return math.nan
+        r0, c0 = int(r), int(c)
+        r1, c1 = min(r0 + 1, ny - 1), min(c0 + 1, nx - 1)
+        fr, fc = r - r0, c - c0
+        s = w = 0.0
+        for rr, cc, ww in ((r0, c0, (1 - fr) * (1 - fc)), (r0, c1, (1 - fr) * fc), (r1, c0, fr * (1 - fc)), (r1, c1, fr * fc)):
+            i = 2 * (rr * nx + cc)
+            v = relief[i] | (relief[i + 1] << 8)
+            if v != 65535 and ww > 0:
+                s += (v - 500.0) * ww
+                w += ww
+        return s / w if w > 0 else math.nan
+
+    ground = h_at(lat, lon)
+    if not math.isfinite(ground):
+        return None
+    z_obs = alt if alt is not None and math.isfinite(alt) else ground
+    coslat = math.cos(math.radians(lat))
+    steps = [HORIZON_STEP_KM * 1000.0 * k for k in range(1, int(HORIZON_KM / HORIZON_STEP_KM) + 1)]
+    out = []
+    for az in range(0, 360, HORIZON_AZ_STEP):
+        ca, sa = math.cos(math.radians(az)), math.sin(math.radians(az))
+        best = 0.0
+        for d in steps:
+            h = h_at(lat + d * ca / 111200.0, lon + d * sa / (111320.0 * coslat))
+            if math.isfinite(h):
+                drop = (1.0 - K_REFR) * d * d / (2.0 * R_EARTH)
+                best = max(best, math.degrees(math.atan2(h - drop - z_obs, d)))
+        out.append(round(best, 2))
+    return out
+
+
 def _round(v: float) -> float | None:
     return None if not math.isfinite(v) else float(f"{v:.4g}")
 
@@ -87,6 +136,7 @@ def fisheye(
     lat: Annotated[float, Query(ge=-90, le=90)],
     lon: Annotated[float, Query(ge=-180, le=180)],
     run: RunParam = "latest",
+    alt: Annotated[float | None, Query(ge=-500, le=9000)] = None,
 ) -> FisheyeOut:
     model_run = _map_run(session, run)
     rows = session.execute(
@@ -148,5 +198,9 @@ def fisheye(
             )
         )
     k = rows[0]
-    return FisheyeOut(run_time=utc(model_run.run_time).isoformat(), k=[k.k_tke, k.k_cis, k.k_conv],
+    rel = session.execute(
+        select(MapFrame).where(MapFrame.run_id == model_run.id, MapFrame.lead_hour == RELIEF_LEAD)
+    ).scalars().first()
+    horizon = horizon_profile(zlib.decompress(rel.data), rel, lat, lon, alt) if rel is not None else None
+    return FisheyeOut(run_time=utc(model_run.run_time).isoformat(), horizon=horizon, k=[k.k_tke, k.k_cis, k.k_conv],
                       elevations=ELEVATIONS, azimuths=AZIMUTHS, frames=frames)

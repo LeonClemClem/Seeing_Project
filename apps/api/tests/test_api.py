@@ -206,3 +206,25 @@ def test_all_view_goes_back_beyond_a_week(client, session):
     assert [p["seeing_arcsec"] for p in wk["points"]] == [1.0, 1.1]
     al = client.get("/api/sites/saint-veran/forecast", params={"view": "all"}).json()
     assert [p["seeing_arcsec"] for p in al["points"]] == [0.5, 0.6, 1.0, 1.1]
+
+
+def test_fisheye_horizon_from_the_relief(client, session):
+    import zlib
+
+    from seeing_db import MapFrame
+
+    run = add_run(session, T0)
+    ny, nx = 40, 60
+    n = ny * nx
+    common = dict(run_id=run.id, ny=ny, nx=nx, lat0=46.0, lon0=4.0, dlat=-0.05, dlon=0.05, k_tke=2.0, k_cis=57.0, k_conv=0.1)
+    session.add(MapFrame(valid_time=T0 + timedelta(hours=20), lead_hour=20, data=zlib.compress(bytes([127] * n)),
+                         extra=zlib.compress(bytes([127] * n + [25] * n + [80] * n)), **common))
+    relief = (1000 + 500).to_bytes(2, "little") * n  # flat ground at 1000 m (stored as altitude + 500)
+    session.add(MapFrame(valid_time=T0, lead_hour=-1, data=zlib.compress(relief), **common))
+    session.commit()
+    low = client.get("/api/fisheye", params={"lat": 45.0, "lon": 5.5, "alt": 0}).json()["horizon"]
+    assert len(low) == 180 and min(low) > 40  # 1000 m higher at 1 km: ~45 degrees everywhere
+    high = client.get("/api/fisheye", params={"lat": 45.0, "lon": 5.5, "alt": 2000}).json()["horizon"]
+    assert max(high) == 0.0
+    # without the place's altitude, the observer stands on the AROME ground: flat horizon
+    assert max(client.get("/api/fisheye", params={"lat": 45.0, "lon": 5.5}).json()["horizon"]) == 0.0

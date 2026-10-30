@@ -34,7 +34,7 @@ const FN = 520,
   FR = 232,
   FC = FN / 2,
   ELMIN = 5;
-/* Only real elements: no fictitious horizon profile; clouds = AROME low / medium / high cover of the run. */
+/* Only real elements: horizon = AROME orography of the run (always drawn); clouds = AROME low / medium / high cover. */
 const OPT0 = {
   cons: ["Constellations", true],
   sol: ["Soleil et Lune", true],
@@ -42,6 +42,23 @@ const OPT0 = {
   nua: ["Nuages", false],
 } as const;
 type OptKey = keyof typeof OPT0;
+
+/** Small symbols of the display options, drawn like the fisheye (16 x 16 SVG). */
+const OPT_ICON: Record<OptKey, string> = {
+  // three stars joined by lines
+  cons:
+    '<path d="M2.5 11.5 L7 4.5 L13 7.5" fill="none" stroke="#e6ebf6" stroke-width="1" opacity=".75"/>' +
+    '<circle cx="2.5" cy="11.5" r="1.6" fill="#fff"/><circle cx="7" cy="4.5" r="1.9" fill="#fff"/><circle cx="13" cy="7.5" r="1.5" fill="#fff"/>',
+  // Sun and crescent Moon
+  sol:
+    '<circle cx="5.5" cy="6" r="3" fill="#f2c14e"/>' +
+    '<path d="M5.5 1.2v1.2M5.5 9.6v1.2M0.7 6h1.2M9.1 6h1.2M2.1 2.6l.8.8M8.1 8.6l.8.8M2.1 9.4l.8-.8M8.1 3.4l.8-.8" stroke="#f2c14e" stroke-width="1"/>' +
+    '<path d="M13.6 9.2a3.6 3.6 0 1 1-3.6-3.9 2.9 2.9 0 0 0 3.6 3.9z" fill="#c9d3e6"/>',
+  // dotted arc of a track with the object on it
+  trk: '<path d="M1.5 13 Q8 0 14.5 13" fill="none" stroke="#9cc7ff" stroke-width="1.3" stroke-dasharray="1.6 1.8"/><circle cx="8" cy="6.6" r="2" fill="#9cc7ff"/>',
+  // cloud
+  nua: '<path d="M4.3 12.5h7.6a2.7 2.7 0 0 0 .3-5.4 3.7 3.7 0 0 0-7.1-.9 2.9 2.9 0 0 0-.8 6.3z" fill="#c4cad6" stroke="#8a93a6" stroke-width=".8"/>',
+};
 
 const LAMBDA = 500e-9;
 const seeOfJ = (J: number) => (J > 0 ? 0.98 * LAMBDA * Math.pow(0.423 * (2 * Math.PI / LAMBDA) ** 2 * J, 0.6) * 206265 : NaN);
@@ -112,7 +129,13 @@ export default function Fisheye() {
   const { lat, lon } = place;
   const tOf = (i: number) => T0 + (FNI * 24 + i) * 3600000;
   // Real fisheye from the global maps of the latest run (any point of the AROME domain).
-  const fq = useQuery({ queryKey: ["fisheye", lat.toFixed(4), lon.toFixed(4), runTime ?? ""], queryFn: () => api.fisheye(lat, lon), retry: false, staleTime: 30 * 60 * 1000 });
+  // the place's altitude (when known) is the observer's height for the horizon, else the AROME ground
+  const fq = useQuery({
+    queryKey: ["fisheye", lat.toFixed(4), lon.toFixed(4), place.alt ?? "", runTime ?? ""],
+    queryFn: () => api.fisheye(lat, lon, place.alt),
+    retry: false,
+    staleTime: 30 * 60 * 1000,
+  });
   const fe = fq.data;
   const frameAt = (i: number) => {
     if (!fe) return undefined;
@@ -120,9 +143,17 @@ export default function Fisheye() {
     return fe.frames.find((f) => f.lead_hour === lead);
   };
   const K: K3 = cal === "mine" ? place.K : fe ? [fe.k[0]!, fe.k[1]!, fe.k[2]!] : KDEF;
-  // az kept so that every caller can pass (alt, az): there is no horizon profile (it was fictitious)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const vis = (alt: number, _az: number) => alt >= ELMIN;
+  /** Elevation of the relief [deg] in a direction (AROME orography of the run, every 2 degrees, interpolated). */
+  const horizonAt = (az: number) => {
+    const h = fe?.horizon;
+    if (!h || !h.length) return 0;
+    const x = ((((az % 360) + 360) % 360) / 360) * h.length,
+      i = Math.floor(x) % h.length,
+      f = x - Math.floor(x);
+    return h[i]! * (1 - f) + h[(i + 1) % h.length]! * f;
+  };
+  /** Sky seen: above the relief and above ELMIN. */
+  const vis = (alt: number, az: number) => alt >= Math.max(ELMIN, horizonAt(az));
   const seeSky = (i: number, alt: number, az: number) => {
     const fr = frameAt(i);
     // no fisheye data (yet) or hour not covered by the run: no value, never a fictitious field
@@ -175,7 +206,9 @@ export default function Fisheye() {
           az = (Math.atan2(-dx, dy) / D2R + 360) % 360;
         const s = vis(alt, az) ? seeSky(fcur, alt, az) : NaN;
         // same colours as the map: turbo, 0-10" with a fixed square-root stretch
-        let col: number[] = isNaN(s) ? [55, 62, 80] : turbo(Math.sqrt(Math.min(Math.max(s, 0), 10) / 10));
+        // relief in dark brown; below ELMIN (or no value) grey
+        let col: number[] =
+          alt < horizonAt(az) ? [62, 52, 42] : isNaN(s) ? [55, 62, 80] : turbo(Math.sqrt(Math.min(Math.max(s, 0), 10) / 10));
         if (opt.nua && vis(alt, az)) {
           // grey veil as research/ciel_seeing.py: light grey and see-through for thin cover, darker when overcast
           const cc = Math.min(Math.max(cloudSky(fcur, alt, az), 0), 1);
@@ -191,6 +224,18 @@ export default function Fisheye() {
         D[p + 3] = 255;
       }
     c.putImageData(img, 0, 0);
+    // skyline of the relief
+    if (fe?.horizon?.length) {
+      c.strokeStyle = "rgba(0,0,0,.85)";
+      c.lineWidth = 1.4;
+      c.beginPath();
+      for (let az = 0; az <= 360; az += 2) {
+        const [x, y] = fxy(Math.max(0, horizonAt(az)), az);
+        if (az) c.lineTo(x, y);
+        else c.moveTo(x, y);
+      }
+      c.stroke();
+    }
     c.strokeStyle = "rgba(255,255,255,.35)";
     c.lineWidth = 1;
     [30, 60].forEach((e) => {
@@ -414,15 +459,17 @@ export default function Fisheye() {
                   whiteSpace: "nowrap",
                 }}
               >
-                {hov.alt < ELMIN ? (
-                  tr(`sous ${ELMIN}° d'élévation`)
+                {/* one value per line: seeing, elevation, azimuth (then clouds when shown) */}
+                {hov.alt < horizonAt(hov.az) ? (
+                  <b>{tr("Relief")}</b>
+                ) : hov.alt < ELMIN ? (
+                  <b>{tr(`sous ${ELMIN}° d'élévation`)}</b>
                 ) : (
-                  <>
-                    <b style={{ fontSize: 14 }}>{isNaN(hov.s) ? "–" : hov.s.toFixed(2) + "″"}</b>
-                    {` · ${tr("élév.")} ${Math.round(hov.alt)}° · az ${Math.round(hov.az)}° ${dir8(hov.az)}`}
-                    {isNaN(hov.c) ? "" : ` · ${tr("nuages")} ${Math.round(hov.c * 100)} %`}
-                  </>
+                  <b style={{ fontSize: 14, display: "block" }}>{isNaN(hov.s) ? "–" : hov.s.toFixed(2) + "″"}</b>
                 )}
+                <div>{`${tr("élév.")} ${Math.round(hov.alt)}°`}</div>
+                <div>{`az ${Math.round(hov.az)}° ${dir8(hov.az)}`}</div>
+                {!isNaN(hov.c) && <div>{`${tr("nuages")} ${Math.round(hov.c * 100)} %`}</div>}
               </div>
             )}
           </div>
@@ -504,6 +551,14 @@ export default function Fisheye() {
             <div>
               {(Object.keys(OPT0) as OptKey[]).map((k) => (
                 <Chip key={k} on={opt[k]} onToggle={() => setOpt({ ...opt, [k]: !opt[k] })}>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    aria-hidden="true"
+                    style={{ verticalAlign: "-3px", marginRight: 4 }}
+                    dangerouslySetInnerHTML={{ __html: OPT_ICON[k] }}
+                  />
                   {tr(OPT0[k][0])}
                 </Chip>
               ))}
@@ -513,7 +568,9 @@ export default function Fisheye() {
                 {tr("Pas de nuages pour ce run : ils arrivent avec le prochain run AROME.")}
               </p>
             )}
-            <h2 style={{ marginTop: 8 }}>{tr("Planètes")}</h2>
+          </div>
+          <div className="panel">
+            <h2>{tr("Planètes")}</h2>
             <div>
               {PL.map(([n, s, col]) => (
                 <Chip
