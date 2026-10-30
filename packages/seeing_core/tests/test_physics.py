@@ -197,3 +197,15 @@ def test_model_variables_of_the_synthetic_profile():
     assert v["tke"] == pytest.approx(0.3)
     assert v["shj"] is not None and v["shj"] > 0
     assert v["dth"] is not None
+    # U > 0, V > 0: the wind blows towards the north-east, so it comes from the south-west
+    assert 180 < v["d10"] < 270 and 180 < v["d500"] < 270
+    assert v["u700h"] is not None and v["d700h"] is not None
+
+
+def test_wind_direction_convention():
+    from seeing_core.variables import wind_dir
+
+    assert wind_dir(0.0, -5.0) == pytest.approx(0.0)  # blowing southwards: from the north
+    assert wind_dir(-5.0, 0.0) == pytest.approx(90.0)  # blowing westwards: from the east
+    assert wind_dir(0.0, 5.0) == pytest.approx(180.0)
+    assert wind_dir(5.0, 0.0) == pytest.approx(270.0)
