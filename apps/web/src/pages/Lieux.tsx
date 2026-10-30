@@ -299,6 +299,8 @@ function PlaceDetail({ l }: { l: Place }) {
         </div>
         {data ? <HistPanel data={data} OB={true} inset={false} /> : loading ? <Spinner /> : none("Pas de période avec prévision et mesures pour ce lieu.", "0 0 1100 240", 550, 120)}
       </div>
+      {/* wind roses: full width, under the history */}
+      {l.real && data && <WindRoses place={l} data={data} />}
       <div className="grid2" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1.6fr)" }}>
         <div className="panel">
           <h2>{tr("Corrélation prévu / mesuré")}</h2>
@@ -347,7 +349,6 @@ function PlaceDetail({ l }: { l: Place }) {
           {l.real ? <Cn2RealPanel place={l} profile={false} /> : <SvgChart html={cn2} viewBox="0 0 900 270" label="Panneau Cn2 du lieu" />}
         </div>
       </div>
-      {l.real && data && <WindRoses place={l} data={data} />}
     </div>
   );
 }
@@ -428,7 +429,7 @@ function WindRoses({ place, data }: { place: Place; data: LieuData }) {
         </p>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 16 }}>
             {levels.map((lv, k) => {
               const pts: RosePt[] = hours
                 .map((h) => ({ dir: h.v[`d${lv}`] ?? NaN, speed: h.v[`u${lv}`] ?? NaN, val: valOf(h) }))
