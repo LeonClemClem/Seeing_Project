@@ -204,3 +204,76 @@ def fisheye(
     horizon = horizon_profile(zlib.decompress(rel.data), rel, lat, lon, alt) if rel is not None else None
     return FisheyeOut(run_time=utc(model_run.run_time).isoformat(), horizon=horizon, k=[k.k_tke, k.k_cis, k.k_conv],
                       elevations=ELEVATIONS, azimuths=AZIMUTHS, frames=frames)
+
+
+# ---- one-off forecast at any point (no place created) -------------------------------------------
+
+
+class PointHour(BaseModel):
+    lead_hour: int
+    valid_time: str
+    seeing_arcsec: float | None
+
+
+class PointOut(BaseModel):
+    run_time: str
+    lat: float
+    lon: float
+    #: AROME ground of the map at the point [m], None without relief
+    ground_m: float | None
+    k: list[float]  # map K
+    points: list[PointHour]
+
+
+@router.get("/point", response_model=PointOut)
+def point_forecast(
+    session: SessionDep,
+    lat: Annotated[float, Query(ge=-90, le=90)],
+    lon: Annotated[float, Query(ge=-180, le=180)],
+    run: RunParam = "latest",
+) -> PointOut:
+    """Seeing at any point of the AROME domain for the map hours (nights 19h-05h UTC), read on the global
+    maps of the run (bilinear in log seeing): a one-off forecast, without creating a place."""
+    model_run = _map_run(session, run)
+    rows = session.execute(
+        select(MapFrame).where(MapFrame.run_id == model_run.id, MapFrame.lead_hour >= 0).order_by(MapFrame.lead_hour)
+    ).scalars().all()
+    if not rows:
+        raise HTTPException(404, "No global map for this run yet")
+    pts = []
+    for f in rows:
+        at = _sampler(zlib.decompress(f.data), 0, f.ny, f.nx, lambda c: _LN0 + c / 254.0 * (_LN1 - _LN0))
+        v = at((lat - f.lat0) / f.dlat, (lon - f.lon0) / f.dlon)
+        pts.append(PointHour(lead_hour=f.lead_hour, valid_time=utc(f.valid_time).isoformat(),
+                             seeing_arcsec=round(math.exp(v), 3) if math.isfinite(v) else None))
+    if all(p.seeing_arcsec is None for p in pts):
+        raise HTTPException(404, "Point outside the AROME map")
+    rel = session.execute(
+        select(MapFrame).where(MapFrame.run_id == model_run.id, MapFrame.lead_hour == RELIEF_LEAD)
+    ).scalars().first()
+    ground = None
+    if rel is not None:
+        raw = zlib.decompress(rel.data)
+        ground = _relief_at(raw, rel, lat, lon)
+    k = rows[0]
+    return PointOut(run_time=utc(model_run.run_time).isoformat(), lat=lat, lon=lon, ground_m=ground,
+                    k=[k.k_tke, k.k_cis, k.k_conv], points=pts)
+
+
+def _relief_at(raw: bytes, f, lat: float, lon: float) -> float | None:
+    """AROME ground [m] of the uint16 relief plane (altitude + 500, 65535 = none), bilinear."""
+    ny, nx = f.ny, f.nx
+    r, c = (lat - f.lat0) / f.dlat, (lon - f.lon0) / f.dlon
+    if not (0 <= r <= ny - 1 and 0 <= c <= nx - 1):
+        return None
+    r0, c0 = int(r), int(c)
+    r1, c1 = min(r0 + 1, ny - 1), min(c0 + 1, nx - 1)
+    fr, fc = r - r0, c - c0
+    s = w = 0.0
+    for rr, cc, ww in ((r0, c0, (1 - fr) * (1 - fc)), (r0, c1, (1 - fr) * fc), (r1, c0, fr * (1 - fc)), (r1, c1, fr * fc)):
+        i = 2 * (rr * nx + cc)
+        v = raw[i] | (raw[i + 1] << 8)
+        if v != 65535 and ww > 0:
+            s += (v - 500.0) * ww
+            w += ww
+    return round(s / w) if w > 0 else None
