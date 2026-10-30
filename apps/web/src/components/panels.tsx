@@ -57,8 +57,22 @@ export function DataChips({ id }: { id: string }) {
 /** History chart with horizontal zoom and the auto vertical stretch on the visible part. */
 /** `head` (title and legend) goes in the left column of the header, as in the mock-up: the histogram inset on
  * the right then spans from the top of the panel down to the zoom row. */
-export function HistPanel({ data, OB, inset = true, head }: { data: LieuData; OB: boolean; inset?: boolean; head?: ReactNode }) {
+export function HistPanel({
+  data,
+  OB,
+  inset = true,
+  head,
+  rm,
+}: {
+  data: LieuData;
+  OB: boolean;
+  inset?: boolean;
+  head?: ReactNode;
+  /** hours left out of the calibration, hourKey "night|h" (Calibrer) */
+  rm?: ReadonlySet<string>;
+}) {
   const mesf = useUi((s) => s.mesf);
+  const sel = useUi((s) => s.selNight);
   const [zoom, setZoom] = useState(1);
   const [stretch, setStretch] = useState(true);
   const [win, setWin] = useState<[number, number] | null>(null);
@@ -86,7 +100,14 @@ export function HistPanel({ data, OB, inset = true, head }: { data: LieuData; OB
     };
   });
 
-  const h = useLangMemo(() => histChart(data, { OB, mesf, zoom, win }), [data, OB, mesf, zoom, win]);
+  const h = useLangMemo(() => histChart(data, { OB, mesf, zoom, win, sel, rm }), [data, OB, mesf, zoom, win, sel, rm]);
+  /** Click on a night: highlight it in the history and the correlation (click again: none). */
+  const pick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect(),
+      x = ((e.clientX - r.left) / r.width) * 1100 * zoom,
+      hit = h.hits.find((q) => x >= q.x0 && x <= q.x1);
+    if (hit) setState({ selNight: sel === hit.night ? null : hit.night });
+  };
   const hv = useMemo(() => (inset ? seeHist(data) : []), [data, inset]);
   // inset as the mock-up: it takes the height of the header row, the histogram fills it
   const insetRef = useRef<HTMLDivElement>(null);
@@ -128,15 +149,22 @@ export function HistPanel({ data, OB, inset = true, head }: { data: LieuData; OB
         )}
       </div>
       <div ref={sc} style={{ overflowX: "auto" }}>
-        <SvgChart
-          html={h.svg}
-          viewBox={`0 0 ${1100 * zoom} 240`}
-          label="Historique du lieu"
-          style={{ width: `${100 * zoom}%`, minWidth: `${700 * zoom}px`, maxWidth: "none" }}
-        />
+        <div onClick={pick} style={{ width: `${100 * zoom}%`, minWidth: `${700 * zoom}px`, cursor: "pointer" }}>
+          <SvgChart html={h.svg} viewBox={`0 0 ${1100 * zoom} 240`} label="Historique du lieu" style={{ width: "100%", maxWidth: "none" }} />
+        </div>
       </div>
       <p className="small muted" style={{ margin: "4px 0 0" }}>
-        {h.note}
+        {h.note}{" "}
+        {sel ? (
+          <>
+            · <b style={{ color: "#f2c14e" }}>{tr(`nuit du ${sel.slice(8, 10)}/${sel.slice(5, 7)} surlignée`)}</b>{" "}
+            <button className="small" onClick={() => setState({ selNight: null })}>
+              {tr("ne plus surligner")}
+            </button>
+          </>
+        ) : (
+          tr("· clique sur une nuit pour la surligner ici et dans la corrélation.")
+        )}
       </p>
     </>
   );
