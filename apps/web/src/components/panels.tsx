@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { histChart, histSvg, seeHist } from "../charts/lieuCharts";
-import { cn2Ctx, cn2ProfileSvg, cn2RealSvg } from "../charts/realCharts";
+import { cn2AxisLeft, cn2AxisRight, cn2Ctx, cn2ProfileSvg, cn2RealSvg, type Cn2Ctx } from "../charts/realCharts";
 import { hourlyMedians, useHourlyMedians, useRawMeasurements, useRealForecast, type View } from "../data/forecast";
 import type { Place } from "../data/places";
 import { tr } from "../i18n";
@@ -143,6 +143,33 @@ export function HistPanel({ data, OB, inset = true, head }: { data: LieuData; OB
 
 /** Real Cn² panel: week (up to 7 days of main runs stitched) or latest forecasts, altitude range, zoom,
  * measured hourly medians, and the profile under the cursor (with the jet stream). */
+/** Copies of the two vertical axes of the zoomed Cn² panel, pinned on the edges of the visible part. Opaque
+ * margins (panel colour) hide the drawing scrolling under them; the right one also keeps the "Seeing (″)" title.
+ * No pointer events: dragging and hovering go through to the drawing. */
+function FixedAxes({ ctx, axes, height }: { ctx: Cn2Ctx; axes: { left: string; right: string }; height: number }) {
+  const k = height / ctx.H,
+    R = ctx.L + ctx.pw,
+    TW = 90, // the right copy starts TW units before the right edge, for the title
+    bg = "fill:var(--panel)";
+  const common: CSSProperties = { position: "absolute", top: 0, height, pointerEvents: "none", maxWidth: "none" };
+  return (
+    <>
+      <SvgChart
+        html={`<rect x="0" y="0" width="${ctx.L}" height="${ctx.H}" style="${bg}"/>${axes.left}`}
+        viewBox={`0 0 ${ctx.L} ${ctx.H}`}
+        label="Axe des altitudes"
+        style={{ ...common, left: 0, width: ctx.L * k }}
+      />
+      <SvgChart
+        html={`<rect x="${R}" y="0" width="${ctx.W - R}" height="${ctx.H}" style="${bg}"/><rect x="${ctx.W - TW}" y="0" width="${TW}" height="${ctx.T - 1}" style="${bg}"/>${axes.right}`}
+        viewBox={`${ctx.W - TW} 0 ${TW} ${ctx.H}`}
+        label="Axe du seeing"
+        style={{ ...common, right: 0, width: TW * k }}
+      />
+    </>
+  );
+}
+
 export function Cn2RealPanel({
   place,
   profile = true,
@@ -169,6 +196,8 @@ export function Cn2RealPanel({
     [cn2.data, forecast.data, alt, obs, raw, showObs, zoom, mesf],
   );
   const svg = useLangMemo(() => (ctx && cn2.data ? cn2RealSvg(ctx, Date.parse(cn2.data.run_time)) : ""), [ctx, cn2.data]);
+  // zoomed: both vertical axes stay on the edges of the visible part (the drawing scrolls under them)
+  const axes = useLangMemo(() => (ctx && ctx.n ? { left: cn2AxisLeft(ctx), right: cn2AxisRight(ctx) } : null), [ctx]);
   const [hover, setHover] = useState<number | null>(null);
   const svgRef = useRef<HTMLDivElement>(null);
   const scRef = useRef<HTMLDivElement>(null);
@@ -270,29 +299,32 @@ export function Cn2RealPanel({
     <div style={style}>
       {controls}
       <div style={{ display: "flex", gap: 2, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div
-          ref={scRef}
-          style={{ flex: "1 1 520px", minWidth: 0, overflowX: "auto", cursor: zoom > 1 ? "grab" : undefined }}
-          onMouseDown={(e) => {
-            if (zoom > 1 && scRef.current) drag.current = { x: e.clientX, s: scRef.current.scrollLeft };
-          }}
-          onMouseMove={(e) => {
-            if (drag.current && scRef.current) scRef.current.scrollLeft = drag.current.s - (e.clientX - drag.current.x);
-          }}
-          onMouseUp={() => (drag.current = null)}
-          onMouseLeave={() => (drag.current = null)}
-        >
+        <div style={{ flex: "1 1 520px", minWidth: 0, position: "relative" }}>
           <div
-            ref={svgRef}
-            style={
-              zoom > 1
-                ? { width: scw * zoom, minWidth: 0, maxWidth: "none" }
-                : { width: "100%", minWidth: 520, maxWidth: "100%" }
-            }
-            onMouseMove={profile ? mm : undefined}
+            ref={scRef}
+            style={{ minWidth: 0, overflowX: "auto", cursor: zoom > 1 ? "grab" : undefined }}
+            onMouseDown={(e) => {
+              if (zoom > 1 && scRef.current) drag.current = { x: e.clientX, s: scRef.current.scrollLeft };
+            }}
+            onMouseMove={(e) => {
+              if (drag.current && scRef.current) scRef.current.scrollLeft = drag.current.s - (e.clientX - drag.current.x);
+            }}
+            onMouseUp={() => (drag.current = null)}
+            onMouseLeave={() => (drag.current = null)}
           >
-            <SvgChart html={svg} viewBox={`0 0 ${ctx.W} ${ctx.H}`} label="Panneau Cn2" style={{ width: "100%", maxWidth: "none" }} />
+            <div
+              ref={svgRef}
+              style={
+                zoom > 1
+                  ? { width: scw * zoom, minWidth: 0, maxWidth: "none" }
+                  : { width: "100%", minWidth: 520, maxWidth: "100%" }
+              }
+              onMouseMove={profile ? mm : undefined}
+            >
+              <SvgChart html={svg} viewBox={`0 0 ${ctx.W} ${ctx.H}`} label="Panneau Cn2" style={{ width: "100%", maxWidth: "none" }} />
+            </div>
           </div>
+          {zoom > 1 && axes && <FixedAxes ctx={ctx} axes={axes} height={hp} />}
         </div>
         {profile && (
           <SvgChart
