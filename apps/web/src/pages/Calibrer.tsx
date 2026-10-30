@@ -410,23 +410,20 @@ export default function Calibrer() {
                       refresh();
                     }}
                   >
-                    {tr(`Nuit du ${k.slice(8)}/${k.slice(5, 7)}`)} · {nights.get(k)!.length} pts{" "}
+                    <span style={outSet.has(k) ? { textDecoration: "line-through", color: "#ff8a7a" } : undefined}>
+                      {tr(`Nuit du ${k.slice(8)}/${k.slice(5, 7)}`)} · {nights.get(k)!.length} pts
+                    </span>{" "}
+                    {/* never a real deletion: the night is only left out of the calibration, and can be put back */}
                     <span
                       role="button"
-                      aria-label={tr("Retirer cette nuit")}
+                      aria-label={tr(outSet.has(k) ? "Remettre cette nuit dans le calage" : "Retirer cette nuit du calage")}
+                      title={tr(outSet.has(k) ? "Remettre cette nuit dans le calage" : "Retirer cette nuit du calage (les mesures restent enregistrées)")}
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (editable) {
-                          if (window.confirm(tr(`Supprimer les mesures de la nuit du ${k.slice(8)}/${k.slice(5, 7)} ?`)))
-                            api.deleteMeasurements(slug, k).then(reloadMeasurements, (er: Error) => setErr(er.message));
-                          return;
-                        }
-                        st.nights.delete(k);
-                        st.sel = [...st.nights.keys()].sort().pop() ?? null;
-                        refresh();
+                        toggleOut(k);
                       }}
                     >
-                      ✕
+                      {outSet.has(k) ? "↺" : "✕"}
                     </span>
                   </span>
                 ))}
