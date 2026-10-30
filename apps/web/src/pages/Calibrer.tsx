@@ -525,11 +525,6 @@ export default function Calibrer() {
             </div>
           )}
           <div className="panel">
-            <h2>{tr("Cn² (altitude × temps)")}</h2>
-            <Cn2Legend obs={showObs} />
-            {place.real ? <Cn2RealPanel place={place} profile={false} /> : <SvgChart html={p2c} viewBox="0 0 900 270" label="Panneau Cn2 de calibration" />}
-          </div>
-          <div className="panel">
             <h2>{tr("Historique (prévisions avec les K en service et mesures, nuit)")}</h2>
             {hist ? (
               <HistPanel data={hist} OB={showObs || place.real} inset={false} rm={cal.F.rm} />
@@ -540,6 +535,11 @@ export default function Calibrer() {
                 label="Historique du lieu"
               />
             )}
+          </div>
+          <div className="panel">
+            <h2>{tr("Cn² (altitude × temps)")}</h2>
+            <Cn2Legend obs={showObs} />
+            {place.real ? <Cn2RealPanel place={place} profile={false} /> : <SvgChart html={p2c} viewBox="0 0 900 270" label="Panneau Cn2 de calibration" />}
           </div>
           <div className="panel grid2" style={{ gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr)" }}>
             <div>
