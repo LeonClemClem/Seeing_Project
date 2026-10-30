@@ -1,7 +1,7 @@
 import { Link, NavLink, useLocation } from "react-router-dom";
 
 import { useMe, useSyncRole } from "../data/auth";
-import { kHidden, selectPlace, useCurrentPlace, usePlaces } from "../data/places";
+import { kHidden, selectPlace, TEAM_SITE, useCurrentPlace, usePlaces } from "../data/places";
 import { tr } from "../i18n";
 import { useLatestRunTime } from "../lib/hooks";
 import { fmt, pad2, runLabel } from "../lib/util";
@@ -40,7 +40,22 @@ export default function Header() {
   const loc = useLocation();
 
   const runMs = runTime ? Date.parse(runTime) : null;
-  const realView = loc.pathname.startsWith("/prevision") && place.real;
+  // Data badge: real AROME data wherever the page shows them; "mock-up" only where something fictitious is still
+  // shown (Calibrer without the right to calibrate the place uses example nights); none on the text pages.
+  const path = loc.pathname;
+  const canCalibrate =
+    place.real && !!user && (place.kind === "mine" || user.role === "admin" || (user.role === "team" && place.slug === TEAM_SITE));
+  const badge: "real" | "mock" | null = ["/compte", "/tutoriel", "/a-propos", "/seeing-monitor"].some((x) => path.startsWith(x))
+    ? null
+    : path.startsWith("/carte") || path.startsWith("/fisheye")
+      ? "real"
+      : path.startsWith("/calibrer")
+        ? canCalibrate
+          ? "real"
+          : "mock"
+        : place.real
+          ? "real"
+          : "mock";
   const hid = kHidden(place, role);
 
   return (
@@ -139,11 +154,8 @@ export default function Header() {
             <b className="mono">{tr(`${fmt(K[0])} / ${fmt(K[1])} / ${fmt(K[2])} · ${kmode === "A" ? "calés" : "manuels"}`)}</b>
           </span>
         )}
-        {realView ? (
-          <span className="pill p-ok">{tr("Données réelles")} · AROME</span>
-        ) : (
-          <span className="pill p-warn">{tr("Maquette : données fictives")}</span>
-        )}
+        {badge === "real" && <span className="pill p-ok">{tr("Données réelles")} · AROME</span>}
+        {badge === "mock" && <span className="pill p-warn">{tr("Maquette : données fictives")}</span>}
       </div>
     </header>
   );
