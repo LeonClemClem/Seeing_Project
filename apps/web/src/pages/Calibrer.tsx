@@ -228,6 +228,15 @@ export default function Calibrer() {
         : calib(nights, filters),
     [nightsKey, filters, realModel, editable],
   );
+  // In "K calés" mode, the K in service follow the auto calibration: every filter or night left out refits at once
+  useEffect(() => {
+    if (lock || kmode !== "A") return;
+    const cur = getState().KCAL;
+    if (cal.K.some((v, i) => Math.abs(v - cur[i]!) > 1e-9)) {
+      setState({ KCAL: [...cal.K] });
+      setK(cal.K, "A");
+    }
+  }, [cal, kmode, lock]);
   const fnote = [
     filters.pics ? `${cal.F.pics} h peu fournie(s) retirée(s)` : "",
     filters.courtes ? `${cal.F.courtes} nuit(s) courte(s) retirée(s)` : "",
@@ -439,66 +448,6 @@ export default function Calibrer() {
                   </span>
                 ))}
               </div>
-              <div
-                id="calfilt"
-                style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", borderTop: "1px solid var(--line)", paddingTop: 6, marginTop: 6 }}
-              >
-                <span className="small muted">{tr("Filtres du calage :")}</span>
-                {(
-                  [
-                    ["pics", "pics peu fournis", "heures dont la médiane repose sur beaucoup moins de mesures que d'habitude"],
-                    ["courtes", "nuits < 3 h successives", "nuits sans au moins 3 heures comparées successives"],
-                  ] as const
-                ).map(([k, lab, title]) => (
-                  <span
-                    key={k}
-                    className={"chip" + (filters[k] ? " on" : "")}
-                    role="switch"
-                    aria-checked={filters[k]}
-                    tabIndex={0}
-                    title={tr(title)}
-                    onClick={() => setFilters({ ...filters, [k]: !filters[k] })}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setFilters({ ...filters, [k]: !filters[k] });
-                      }
-                    }}
-                  >
-                    {tr(lab)}
-                  </span>
-                ))}
-                <span className="small muted" style={{ marginLeft: 4 }}>
-                  {tr("heures au-dessus du modèle :")}
-                </span>
-                <Seg
-                  value={filters.top}
-                  onChange={(top) => setFilters({ ...filters, top })}
-                  options={[
-                    [0, "0"],
-                    [1, "1 %"],
-                    [5, "5 %"],
-                    [10, "10 %"],
-                  ]}
-                />
-                <span className="small muted">{tr(fnote)}</span>
-              </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
-                <span className="small muted">{tr("Nuits retirées :")}</span>
-                {selNight && (
-                  <button className="small" onClick={() => toggleOut(selNight)}>
-                    {tr(outSet.has(selNight) ? `remettre la nuit du ${ddmmOf(selNight)}` : `retirer la nuit du ${ddmmOf(selNight)}`)}
-                  </button>
-                )}
-                {filters.out.map((n) => (
-                  <span key={n} className="chip on" title={tr("Remettre cette nuit dans le calage")} onClick={() => toggleOut(n)} style={{ cursor: "pointer" }}>
-                    {ddmmOf(n)} ✕
-                  </span>
-                ))}
-                {!filters.out.length && !selNight && (
-                  <span className="small muted">{tr("aucune · clique sur une nuit de l'historique pour pouvoir la retirer")}</span>
-                )}
-              </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
                 <span>{tr("Mode : " + cal.mode)}</span>
                 <span className="mono">{tr(`${cal.P.length} h de nuit comparées`)}</span>
@@ -539,7 +488,11 @@ export default function Calibrer() {
           <div className="panel">
             <h2>{tr("Cn² (altitude × temps)")}</h2>
             <Cn2Legend obs={showObs} />
-            {place.real ? <Cn2RealPanel place={place} profile={false} /> : <SvgChart html={p2c} viewBox="0 0 900 270" label="Panneau Cn2 de calibration" />}
+            {place.real ? (
+              <Cn2RealPanel place={place} profile={false} rm={cal.F.rm} />
+            ) : (
+              <SvgChart html={p2c} viewBox="0 0 900 270" label="Panneau Cn2 de calibration" />
+            )}
           </div>
           <div className="panel grid2" style={{ gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr)" }}>
             <div>
@@ -593,7 +546,80 @@ export default function Calibrer() {
           </div>
         </div>
         <div className="stack side">
-          <KPanel place={place} lock={lock} autoK={cal.K} stats={s} kmode={kmode} saved={saved} setSaved={setSaved} krow={krow} />
+          <KPanel
+            place={place}
+            lock={lock}
+            autoK={cal.K}
+            stats={s}
+            kmode={kmode}
+            saved={saved}
+            setSaved={setSaved}
+            krow={krow}
+            filtersUi={
+              <>
+                <div
+                  id="calfilt"
+                  style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", borderTop: "1px solid var(--line)", paddingTop: 6, marginTop: 6 }}
+                >
+                  <span className="small muted">{tr("Filtres du calage :")}</span>
+                  {(
+                    [
+                      ["pics", "pics peu fournis", "heures dont la médiane repose sur beaucoup moins de mesures que d'habitude"],
+                      ["courtes", "nuits < 3 h successives", "nuits sans au moins 3 heures comparées successives"],
+                    ] as const
+                  ).map(([k, lab, title]) => (
+                    <span
+                      key={k}
+                      className={"chip" + (filters[k] ? " on" : "")}
+                      role="switch"
+                      aria-checked={filters[k]}
+                      tabIndex={0}
+                      title={tr(title)}
+                      onClick={() => setFilters({ ...filters, [k]: !filters[k] })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setFilters({ ...filters, [k]: !filters[k] });
+                        }
+                      }}
+                    >
+                      {tr(lab)}
+                    </span>
+                  ))}
+                  <span className="small muted" style={{ marginLeft: 4 }}>
+                    {tr("heures au-dessus du modèle :")}
+                  </span>
+                  <Seg
+                    value={filters.top}
+                    onChange={(top) => setFilters({ ...filters, top })}
+                    options={[
+                      [0, "0"],
+                      [1, "1 %"],
+                      [5, "5 %"],
+                      [10, "10 %"],
+                    ]}
+                  />
+                  <span className="small muted">{tr(fnote)}</span>
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
+                  <span className="small muted">{tr("Nuits retirées :")}</span>
+                  {selNight && (
+                    <button className="small" onClick={() => toggleOut(selNight)}>
+                      {tr(outSet.has(selNight) ? `remettre la nuit du ${ddmmOf(selNight)}` : `retirer la nuit du ${ddmmOf(selNight)}`)}
+                    </button>
+                  )}
+                  {filters.out.map((n) => (
+                    <span key={n} className="chip on" title={tr("Remettre cette nuit dans le calage")} onClick={() => toggleOut(n)} style={{ cursor: "pointer" }}>
+                      {ddmmOf(n)} ✕
+                    </span>
+                  ))}
+                  {!filters.out.length && !selNight && (
+                    <span className="small muted">{tr("aucune · clique sur une nuit de l'historique pour pouvoir la retirer")}</span>
+                  )}
+                </div>
+              </>
+            }
+          />
         </div>
       </div>
     </section>
@@ -609,6 +635,8 @@ function KPanel(p: {
   saved: string;
   setSaved: (s: string) => void;
   krow: (lab: string, k: "L" | 0 | 1) => JSX.Element;
+  /** calibration filters and nights left out: in this panel, which stays in view while scrolling */
+  filtersUi: JSX.Element;
 }) {
   const K = useUi((s) => s.K);
   const { r, b, q } = p.stats;
@@ -665,6 +693,7 @@ function KPanel(p: {
               <span className="okmsg">{p.saved}</span>
             </div>
           </div>
+          {p.filtersUi}
         </>
       )}
       <div className="res" style={{ borderTop: "1px solid var(--line)", marginTop: 10, paddingTop: 10 }}>

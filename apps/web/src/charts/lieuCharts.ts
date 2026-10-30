@@ -189,14 +189,14 @@ export function histChart(l: LieuData, o: HistOpts): { svg: string; note: string
           keep(p[0]) &&
           (g += `<rect x="${X(pd(p[0])) - 2.5}" y="${Y(p[1]) - 2.5}" width="5" height="5" fill="${o.rm?.has(hourKeyOf(p[0])) ? C_RM : C_OBSD}"/>`),
       );
-    // hours left out of the calibration: red mark at the bottom, as in the night chart of Calibrer
+    // hours left out of the calibration: red veil over the full height and red mark at the bottom
     if (o.rm?.size)
       e.mediane.forEach(
         (p) =>
           p[1] != null &&
           keep(p[0]) &&
           o.rm!.has(hourKeyOf(p[0])) &&
-          (g += `<rect x="${X(pd(p[0])) - u / 2}" y="${T + ph - 4}" width="${u}" height="4" fill="${C_RM}"/>`),
+          (g += `<rect x="${X(pd(p[0])) - u / 2}" y="${T}" width="${u}" height="${ph}" fill="rgba(255,77,77,.16)"/><rect x="${X(pd(p[0])) - u / 2}" y="${T + ph - 4}" width="${u}" height="4" fill="${C_RM}"/>`),
       );
     off += w + gap;
     if (n < E.length - 1)

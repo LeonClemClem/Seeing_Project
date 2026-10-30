@@ -300,7 +300,7 @@ export function cn2AxisRight(c: Cn2Ctx): string {
 
 /** Cn² panel: turbo heatmap (log10, interpolated vertically; in time only with `smooth`, between two neighbouring
  * hours, for the picture only), boundary layer, night seeing on the right axis. */
-export function cn2RealSvg(c: Cn2Ctx, runMs: number, smooth = false) {
+export function cn2RealSvg(c: Cn2Ctx, runMs: number, smooth = false, rm?: ReadonlySet<string>) {
   const { L, T, pw, ph, n, za, zb, lo, hi, times, heights: Zh } = c;
   if (!n) return `<text x="450" y="190" text-anchor="middle" font-size="13" fill="${C_TXT}">${tr("Pas de panneau Cn² enregistré pour ce lieu.")}</text>`;
   const X = (i: number) => L + (i / n) * pw,
@@ -352,6 +352,14 @@ export function cn2RealSvg(c: Cn2Ctx, runMs: number, smooth = false) {
     }
   }
   g += convHatch(c, X, Yz);
+  // hours left out of the calibration (Calibrer): red veil over the full height and red mark on top
+  if (rm?.size)
+    times.forEach((t, i) => {
+      const night = new Date(t - 12 * HOUR).toISOString().slice(0, 10),
+        h = Math.round((t - Date.parse(night + "T12:00:00Z")) / HOUR);
+      if (rm.has(`${night}|${h}`))
+        g += `<rect x="${X(i)}" y="${T}" width="${X(i + 1) - X(i)}" height="${ph}" fill="rgba(255,77,77,.22)"/><rect x="${X(i)}" y="${T}" width="${X(i + 1) - X(i)}" height="4" fill="#ff4d4d"/>`;
+    });
   const hcs: number[][][] = [];
   let sg: number[][] = [];
   for (let i = 0; i < n; i++) {
