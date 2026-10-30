@@ -232,10 +232,39 @@ export function jetStream(c: Cn2Ctx, i: number): { z: number; v: number } | null
   return { z: zj, v: vj };
 }
 
+/** Altitude axis of the Cn² panel (left margin, x < L): ticks, labels and title. */
+export function cn2AxisLeft(c: Cn2Ctx): string {
+  const { L, T, ph, za, zb } = c,
+    Yz = (z: number) => T + ph - ((Math.min(Math.max(z, za), zb) - za) / (zb - za)) * ph;
+  let g = "";
+  const step = zb - za > 8000 ? 2000 : zb - za > 2000 ? 500 : 100;
+  for (let z = Math.ceil(za / step) * step; z <= zb; z += step)
+    g += `<line x1="${L - 4}" x2="${L}" y1="${Yz(z)}" y2="${Yz(z)}" stroke="${C_TXT}"/><text x="${L - 7}" y="${Yz(z) + 5}" text-anchor="end" font-size="13" fill="${C_TXT}">${z >= 1000 ? z / 1000 : z}<tspan font-weight="700"> ${z >= 1000 ? "km" : "m"}</tspan></text>`;
+  return g + `<text x="13" y="${T + ph / 2}" text-anchor="middle" font-size="13" fill="${C_TXT}" transform="rotate(-90 13 ${T + ph / 2})" font-weight="700">${tr("Altitude au-dessus du sol")}</text>`;
+}
+
+/** Top of the seeing axis: 1.2 x the largest forecast or measured median, at least 2". */
+function cn2SeeMax(c: Cn2Ctx): number {
+  const v = [...c.see, ...c.obs].filter((s): s is number => s != null);
+  return Math.max(2, Math.max(...v, 0) * 1.2);
+}
+
+/** Seeing axis of the Cn² panel (right margin, x > L + pw): labels and title. */
+export function cn2AxisRight(c: Cn2Ctx): string {
+  const { W, L, T, pw, ph } = c,
+    smax = cn2SeeMax(c),
+    YS = (v: number) => T + ph - (Math.min(v, smax) / smax) * ph,
+    sst = smax > 8 ? 2 : smax > 3 ? 1 : 0.5;
+  let g = "";
+  for (let v = 0; v <= smax; v += sst)
+    g += `<text x="${L + pw + 3}" y="${YS(v) + 5}" font-size="13" fill="${C_TXT}">${+v.toFixed(1)}<tspan font-weight="700">″</tspan></text>`;
+  return g + `<text x="${W - 1}" y="${T - 7}" text-anchor="end" font-size="13" font-weight="700" fill="${C_TXT}">Seeing (″)</text>`;
+}
+
 /** Cn² panel: turbo heatmap (log10, interpolated vertically, and in time between two neighbouring hours for the
  * picture only), boundary layer, night seeing on the right axis. */
 export function cn2RealSvg(c: Cn2Ctx, runMs: number) {
-  const { W, L, T, pw, ph, n, za, zb, lo, hi, times, heights: Zh } = c;
+  const { L, T, pw, ph, n, za, zb, lo, hi, times, heights: Zh } = c;
   if (!n) return `<text x="450" y="190" text-anchor="middle" font-size="13" fill="${C_TXT}">${tr("Pas de panneau Cn² enregistré pour ce lieu.")}</text>`;
   const X = (i: number) => L + (i / n) * pw,
     Yz = (z: number) => T + ph - ((Math.min(Math.max(z, za), zb) - za) / (zb - za)) * ph;
@@ -302,10 +331,7 @@ export function cn2RealSvg(c: Cn2Ctx, runMs: number) {
     if (lab)
       g += `<text x="${lab[0]! + 4}" y="${lab[1]! - 6}" font-size="12" font-weight="500" fill="#ff2bd6" stroke="#000" stroke-width="3" paint-order="stroke">boundary layer</text>`;
   }
-  const step = zb - za > 8000 ? 2000 : zb - za > 2000 ? 500 : 100;
-  for (let z = Math.ceil(za / step) * step; z <= zb; z += step)
-    g += `<line x1="${L - 4}" x2="${L}" y1="${Yz(z)}" y2="${Yz(z)}" stroke="${C_TXT}"/><text x="${L - 7}" y="${Yz(z) + 5}" text-anchor="end" font-size="13" fill="${C_TXT}">${z >= 1000 ? z / 1000 : z}<tspan font-weight="700"> ${z >= 1000 ? "km" : "m"}</tspan></text>`;
-  g += `<text x="13" y="${T + ph / 2}" text-anchor="middle" font-size="13" fill="${C_TXT}" transform="rotate(-90 13 ${T + ph / 2})" font-weight="700">${tr("Altitude au-dessus du sol")}</text>`;
+  g += cn2AxisLeft(c);
   const tstep = n > 96 ? 3 : 1,
     lstep = n > 96 ? 12 : n > 36 ? 3 : 2;
   for (let i = 0; i <= n; i++) {
@@ -320,7 +346,7 @@ export function cn2RealSvg(c: Cn2Ctx, runMs: number) {
   }
   const SEE = c.see.map((s, i) => [i, s] as const).filter((q): q is readonly [number, number] => q[1] != null);
   const OBS = c.obs.map((s, i) => [i, s] as const).filter((q): q is readonly [number, number] => q[1] != null);
-  const smax = Math.max(2, Math.max(...SEE.map((p) => p[1]), ...OBS.map((p) => p[1]), 0) * 1.2),
+  const smax = cn2SeeMax(c),
     YS = (v: number) => T + ph - (Math.min(v, smax) / smax) * ph;
   let seg: number[][] = [],
     prev: number | null = null;
@@ -351,10 +377,7 @@ export function cn2RealSvg(c: Cn2Ctx, runMs: number) {
     if (p)
       g += `<text x="${p[0] + 6}" y="${p[1] - 10}" font-size="13" font-weight="700" fill="#1f6bff" stroke="#fff" stroke-width="3.5" paint-order="stroke">Seeing AROME</text>`;
   }
-  const sst = smax > 8 ? 2 : smax > 3 ? 1 : 0.5;
-  for (let v = 0; v <= smax; v += sst)
-    g += `<text x="${L + pw + 3}" y="${YS(v) + 5}" font-size="13" fill="${C_TXT}">${+v.toFixed(1)}<tspan font-weight="700">″</tspan></text>`;
-  g += `<text x="${W - 1}" y="${T - 7}" text-anchor="end" font-size="13" font-weight="700" fill="${C_TXT}">Seeing (″)</text>`;
+  g += cn2AxisRight(c);
   const xl = X((runMs - (times[0] ?? 0)) / HOUR);
   if (xl >= L && xl <= L + pw)
     g += `<line x1="${xl}" x2="${xl}" y1="${T}" y2="${T + ph}" stroke="#f2c14e" stroke-width="1.6" stroke-dasharray="5 3"/><text x="${xl + 5}" y="${T + 15}" font-size="12" fill="#f2c14e" stroke="#000" stroke-width="3" paint-order="stroke">${tr("dernier run")} ${runLabel(runMs)}</text>`;
