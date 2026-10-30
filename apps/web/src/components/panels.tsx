@@ -184,6 +184,7 @@ export function Cn2RealPanel({
   const [alt, setAlt] = useState("4");
   const [view, setView] = useState<View>(defaultView);
   const [zoom, setZoom] = useState(1);
+  const [smooth, setSmooth] = useState(false);
   const { forecast, cn2 } = useRealForecast(place, view);
   const histMed = useHourlyMedians(place);
   const raw = useRawMeasurements(place);
@@ -195,7 +196,10 @@ export function Cn2RealPanel({
     () => (cn2.data ? cn2Ctx(cn2.data, forecast.data, alt, showObs ? obs : undefined, zoom, showObs ? raw : [], mesf) : null),
     [cn2.data, forecast.data, alt, obs, raw, showObs, zoom, mesf],
   );
-  const svg = useLangMemo(() => (ctx && cn2.data ? cn2RealSvg(ctx, Date.parse(cn2.data.run_time)) : ""), [ctx, cn2.data]);
+  const svg = useLangMemo(
+    () => (ctx && cn2.data ? cn2RealSvg(ctx, Date.parse(cn2.data.run_time), smooth) : ""),
+    [ctx, cn2.data, smooth],
+  );
   // zoomed: both vertical axes stay on the edges of the visible part (the drawing scrolls under them)
   const axes = useLangMemo(() => (ctx && ctx.n ? { left: cn2AxisLeft(ctx), right: cn2AxisRight(ctx) } : null), [ctx]);
   const [hover, setHover] = useState<number | null>(null);
@@ -259,6 +263,9 @@ export function Cn2RealPanel({
       <button onClick={() => setZoomC(0.5)}>−</button>
       <button onClick={() => setZoomC(2)}>+</button>
       <button onClick={() => setZoomC(0)}>{tr("tout voir")}</button>
+      <Chip on={smooth} onToggle={() => setSmooth(!smooth)} title={tr("Fondu entre heures voisines, pour l'image seulement")}>
+        {tr("Interpolation temporelle")}
+      </Chip>
       {profile && <span className="small muted">{tr("survole le panneau : profil à l'heure choisie")}</span>}
     </div>
   );

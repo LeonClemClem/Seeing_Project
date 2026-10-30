@@ -139,6 +139,8 @@
 "nuages": "clouds",
 "Pas de nuages pour ce run : ils arrivent avec le prochain run AROME.": "No clouds for this run: they come with the next AROME run.",
 "Relief": "Relief",
+"Interpolation temporelle": "Time interpolation",
+"Fondu entre heures voisines, pour l'image seulement": "Blend between neighbouring hours, for the picture only",
 "Vent AROME et seeing": "AROME wind and seeing",
 "Chaque point = une heure de nuit avec mesure : direction d'où vient le vent AROME, distance au centre = sa force. Les nuits s'ajoutent au fil des runs.": "Each dot = one night hour with a measurement: direction the AROME wind comes from, distance from the centre = its speed. Nights add up run after run.",
 "Couleur :": "Colour:",
