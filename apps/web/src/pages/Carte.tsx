@@ -14,6 +14,7 @@ import { tr } from "../i18n";
 import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, parseCoord, SARD, VILLES, ZONES, type Box } from "../lib/geo";
 import { useGlobalMap, useLatestRunTime } from "../lib/hooks";
 import type { MapGrid } from "../api";
+import { canvasToPng, downloadBlob, encodeGif } from "../lib/export";
 import { D2R, esc, fmt, pad2, runLabel, turbo, turboGradient } from "../lib/util";
 import { REF } from "../mock/engine";
 import { setState, useUi } from "../store";
@@ -346,6 +347,36 @@ export default function Carte() {
     [frameT, RUN0],
   );
   const night = NIGHTS[Math.min(MNI, NIGHTS.length - 1)] ?? { i0: 0, i1: NH - 1, lab: "" };
+  /** File name stamp: run and, hour by hour, the hour shown. */
+  const fileStamp = () =>
+    `run${new Date(RUN0).toISOString().slice(0, 13).replace(/[-T]/g, "")}Z_` +
+    (mode === "m" ? `nuit_${night.lab.replace(/[^0-9]+/g, "-")}` : frameT(MI).toISOString().slice(0, 13).replace(/[-T]/g, "") + "h");
+  const [gifBusy, setGifBusy] = useState(false);
+  /** Animated GIF of the night: every hour of the chosen night, drawn one by one on the map canvas (the frames are
+   * already loaded, each hour is drawn on the next paint), then the view is put back. */
+  const exportGif = async () => {
+    const cv = canvas.current?.getContext("2d");
+    if (!cv) return;
+    setGifBusy(true);
+    const keep = { mode, MI, playing };
+    setPlaying(false);
+    setMode("h");
+    const frames: ImageData[] = [];
+    const paint = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+    try {
+      for (let i = night.i0; i <= night.i1; i++) {
+        setMI(i);
+        await paint();
+        frames.push(cv.getImageData(0, 0, CW, CH));
+      }
+      downloadBlob(encodeGif(frames, 90), `carte_seeing_run${new Date(RUN0).toISOString().slice(0, 13).replace(/[-T]/g, "")}Z_nuit_${night.lab.replace(/[^0-9]+/g, "-")}.gif`);
+    } finally {
+      setMode(keep.mode);
+      setMI(keep.MI);
+      setPlaying(keep.playing);
+      setGifBusy(false);
+    }
+  };
 
 
   /* Real map: the frame of the chosen hour, or the mean seeing of the night's frames. Hours the run
@@ -798,6 +829,12 @@ export default function Carte() {
               </button>
               <button aria-label={tr("Dézoomer")} onClick={() => zoomAt(CW / 2, CH / 2, 1.5)}>
                 −
+              </button>
+              <button title={tr("Télécharger la carte affichée (PNG)")} onClick={() => canvas.current && canvasToPng(canvas.current, `carte_seeing_${fileStamp()}.png`)}>
+                ⤓ PNG
+              </button>
+              <button title={tr("Télécharger l'animation des heures de la nuit choisie (GIF)")} disabled={gifBusy} onClick={() => void exportGif()}>
+                {gifBusy ? tr("GIF…") : "⤓ GIF"}
               </button>
             </div>
           </div>
