@@ -23,14 +23,14 @@ logger = logging.getLogger("seeing_batch")
 
 
 def parse_run_time(value: str) -> datetime:
-    """ISO 8601 (`2026-10-13T00:00Z`, `2026-10-13T00`, ...) -> tz-aware UTC datetime."""
+    """ISO 8601 (`2026-10-13T00:00Z`, `2026-10-13T00`, ...) -> tz-aware UTC datetime of a main cycle."""
     v = value.strip()
     if v.endswith(("Z", "z")):
         v = v[:-1] + "+00:00"
     dt = datetime.fromisoformat(v)
     dt = dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
-    if dt.minute or dt.second or dt.microsecond or dt.hour % 3:
-        raise argparse.ArgumentTypeError(f"not an AROME cycle (00, 03, ..., 21 UTC): {value}")
+    if dt.minute or dt.second or dt.microsecond or dt.hour % 6:
+        raise argparse.ArgumentTypeError(f"not a main AROME cycle (00, 06, 12, 18 UTC): {value}")
     return dt
 
 

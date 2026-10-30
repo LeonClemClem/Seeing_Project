@@ -162,9 +162,11 @@ def test_run_batch_no_hours_is_failure(db, monkeypatch, tmp_path):
 def test_parse_run_time():
     assert parse_run_time("2026-10-13T00:00Z") == RUN
     assert parse_run_time("2026-10-13T02:00+02:00") == RUN
-    assert parse_run_time("2026-10-13T03") == RUN + timedelta(hours=3)
+    assert parse_run_time("2026-10-13T06") == RUN + timedelta(hours=6)
     with pytest.raises(Exception):
         parse_run_time("2026-10-13T04:00Z")
+    with pytest.raises(Exception):  # secondary cycle: never computed
+        parse_run_time("2026-10-13T03:00Z")
 
 
 def test_run_batch_stores_map_frames(db, monkeypatch, tmp_path):

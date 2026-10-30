@@ -13,12 +13,21 @@ def test_cycle_urls():
     assert urls[-1].endswith("/2026-10-13T00:00:00Z/arome/0025/HP1/arome__0025__HP1__49H51H__2026-10-13T00:00:00Z.grib2")
 
 
-def test_latest_complete_cycle_falls_back(monkeypatch):
+def test_latest_complete_cycle_falls_back_to_the_previous_main_cycle(monkeypatch):
     latest = RUN + timedelta(hours=6)
     monkeypatch.setattr(arome.Arome0025, "get_latest_forecast_time", classmethod(lambda cls, paquet: pd.Timestamp(latest)))
-    # The 06Z cycle misses IP4, 03Z is complete.
+    # The 06Z cycle misses IP4: 00Z, never the secondary 03Z.
     monkeypatch.setattr(arome, "are_downloadable", lambda urls: not ("IP4" in urls[0] and "T06" in urls[0]))
-    assert arome.latest_complete_cycle() == RUN + timedelta(hours=3)
+    assert arome.latest_complete_cycle() == RUN
+
+
+def test_latest_complete_cycle_never_secondary(monkeypatch):
+    # the latest published cycle is the secondary 09Z: the main 06Z is computed
+    monkeypatch.setattr(
+        arome.Arome0025, "get_latest_forecast_time", classmethod(lambda cls, paquet: pd.Timestamp(RUN + timedelta(hours=9)))
+    )
+    monkeypatch.setattr(arome, "are_downloadable", lambda urls: True)
+    assert arome.latest_complete_cycle() == RUN + timedelta(hours=6)
 
 
 def test_download_and_extract_streams_and_deletes(monkeypatch, tmp_path):
