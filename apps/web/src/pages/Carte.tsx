@@ -316,10 +316,17 @@ export default function Carte() {
   const [playing, setPlaying] = useState(false);
   const [MZH, setMZH] = useState(-1);
   const [tip, setTip] = useState<string | null>(null);
-  const [newPt, setNewPt] = useState<[number, number] | null>(null);
   const loc = useLocation();
-  const [showNew, setShowNew] = useState(() => !!(loc.state as { newPlace?: boolean } | null)?.newPlace);
-  const [nl, setNl] = useState({ lat: "", lon: "", name: "Nouveau lieu", share: false });
+  // "Créer un lieu ici" of the one-off forecast (Prévision) brings the coordinates
+  const st0 = loc.state as { newPlace?: boolean; lat?: number; lon?: number } | null;
+  const [newPt, setNewPt] = useState<[number, number] | null>(() => (st0?.lat != null && st0.lon != null ? [st0.lat, st0.lon] : null));
+  const [showNew, setShowNew] = useState(() => !!st0?.newPlace);
+  const [nl, setNl] = useState(() => ({
+    lat: st0?.lat != null ? st0.lat.toFixed(5) : "",
+    lon: st0?.lon != null ? st0.lon.toFixed(5) : "",
+    name: "Nouveau lieu",
+    share: false,
+  }));
   const [nlMsg, setNlMsg] = useState<{ ok: boolean; t: string } | null>(null);
 
   const frameT = useCallback(

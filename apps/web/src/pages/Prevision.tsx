@@ -2,8 +2,9 @@
  * Per-place forecast. API sites show the real latest run (seeing, Cn², boundary layer); personal places
  * use the fictitious model with the K in use, plus mock measurements.
  */
-import { useMemo, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 import { corrChart } from "../charts/lieuCharts";
 import { cn2Svg, prevSvg } from "../charts/mockCharts";
@@ -11,8 +12,10 @@ import { PVDEF, PVGRP, prevRealSvg, pvPanel } from "../charts/realCharts";
 import { Cn2RealPanel, DataChips, HistPanel } from "../components/panels";
 import { hourlyMedians, useHourlyMedians, useRawMeasurements, usePlaceLoading, useRealForecast, useSiteHistory, type View } from "../data/forecast";
 import { Cn2Legend, LegArome, LegBreak, LegDay, LegMed, LegMes, Seg, Spinner, Sw, SvgChart } from "../components/ui";
+import { api, type Forecast } from "../api";
 import { kHidden, kTxt, useCurrentPlace, type Place } from "../data/places";
 import { tr } from "../i18n";
+import { parseCoord } from "../lib/geo";
 import { fmt } from "../lib/util";
 import { lieuData } from "../mock/engine";
 import { useLangMemo, useUi } from "../store";
@@ -51,6 +54,7 @@ export default function Prevision() {
       <div id="popts">
         <DataChips id="popts" />
       </div>
+      <PointPanel />
       <div className="stack">
         <div className="panel">
           <h2>{tr("Seeing prévu")}</h2>
@@ -304,5 +308,87 @@ function ModelVars({ place }: { place: Place }) {
         {tr("Variables du modèle AROME au point du lieu : vent et température au-dessus du sol (10 m, 100 m, 500 m), stabilité 10–100 m, cisaillement du jet-stream (6–14 km).")}
       </p>
     </>
+  );
+}
+
+/** One-off forecast at coordinates: the seeing of the global maps of the latest run at that point (nights only,
+ * map K), without creating a place. */
+function PointPanel() {
+  const nav = useNavigate();
+  const mesf = useUi((s) => s.mesf);
+  const [open, setOpen] = useState(false);
+  const [txt, setTxt] = useState({ lat: "", lon: "" });
+  const [pt, setPt] = useState<[number, number] | null>(null);
+  const [err, setErr] = useState("");
+  const q = useQuery({
+    queryKey: ["point", pt?.[0].toFixed(4), pt?.[1].toFixed(4)],
+    queryFn: () => api.point(pt![0], pt![1]),
+    enabled: !!pt,
+    retry: false,
+  });
+  const svg = useLangMemo(() => {
+    if (!q.data) return "";
+    // the forecast curve of the site, fed with the map values of the point
+    const fc = {
+      run_time: q.data.run_time,
+      points: q.data.points.map((p) => ({ ...p, r0_m: null, integral_cn2: null, h_coulim_m: null })),
+    } as unknown as Forecast;
+    return prevRealSvg(fc, "", undefined, [], mesf);
+  }, [q.data, mesf]);
+  const go = (e: FormEvent) => {
+    e.preventDefault();
+    const la = parseCoord(txt.lat, true),
+      lo = parseCoord(txt.lon, false);
+    if (la == null || lo == null) return setErr("Coordonnées invalides : par ex. 44.18 et 5.47, ou 44°11'N et 5°28'E.");
+    setErr("");
+    setPt([la, lo]);
+  };
+  return (
+    <div className="panel" style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <h2 style={{ margin: 0 }}>{tr("Prévision ponctuelle à des coordonnées")}</h2>
+        <button className="small" onClick={() => setOpen(!open)}>
+          {tr(open ? "fermer" : "ouvrir")}
+        </button>
+      </div>
+      {open && (
+        <>
+          <p className="small muted" style={{ margin: "6px 0" }}>
+            {tr(
+              "Seeing lu sur la carte globale du dernier run (mailles de ~5 km, K de la carte, nuits seulement), sans créer de lieu. Pour le Cn², l'historique et la calibration, crée un lieu.",
+            )}
+          </p>
+          <form onSubmit={go} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <input aria-label={tr("Latitude")} placeholder={tr("latitude (44.18)")} value={txt.lat} onChange={(e) => setTxt({ ...txt, lat: e.target.value })} style={{ width: 150 }} />
+            <input aria-label={tr("Longitude")} placeholder={tr("longitude (5.47)")} value={txt.lon} onChange={(e) => setTxt({ ...txt, lon: e.target.value })} style={{ width: 150 }} />
+            <button className="primary" type="submit">
+              {tr("Voir la prévision")}
+            </button>
+            {pt && (
+              <button type="button" className="small" onClick={() => nav("/carte", { state: { newPlace: true, lat: pt[0], lon: pt[1] } })}>
+                {tr("Créer un lieu ici")}
+              </button>
+            )}
+          </form>
+          {err && <p className="err">{tr(err)}</p>}
+          {pt &&
+            (q.isLoading ? (
+              <Spinner />
+            ) : q.isError || !q.data ? (
+              <p className="muted" style={{ textAlign: "center", padding: "20px 0" }}>
+                {tr("Pas de prévision ici : point hors du domaine AROME, ou carte du run pas encore calculée.")}
+              </p>
+            ) : (
+              <>
+                <p className="small mono" style={{ margin: "8px 0 2px" }}>
+                  {pt[0].toFixed(4)} N · {pt[1].toFixed(4)} E
+                  {q.data.ground_m != null ? ` · ${tr("sol AROME")} ${q.data.ground_m} m` : ""} · run {q.data.run_time.slice(0, 13).replace("T", " ")}Z
+                </p>
+                <SvgChart html={svg} viewBox="0 0 900 220" label="Seeing prévu au point" />
+              </>
+            ))}
+        </>
+      )}
+    </div>
   );
 }

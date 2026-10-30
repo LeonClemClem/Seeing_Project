@@ -107,6 +107,16 @@ export interface Forecast {
   points: ForecastPoint[];
 }
 
+/** One-off forecast at any point, read on the global maps (GET /api/point). */
+export interface PointForecast {
+  run_time: string;
+  lat: number;
+  lon: number;
+  ground_m: number | null;
+  k: number[];
+  points: { lead_hour: number; valid_time: string; seeing_arcsec: number | null }[];
+}
+
 export interface Cn2 {
   site: Site;
   run_time: string;
@@ -211,6 +221,7 @@ export const api = {
     post<{ stored: number; rejected: number }>(`/api/sites/${encodeURIComponent(slug)}/measurements`, { points }),
   deleteMeasurements: (slug: string, night?: string) =>
     send<void>("DELETE", `/api/sites/${encodeURIComponent(slug)}/measurements${night ? `?night=${night}` : ""}`),
+  point: (lat: number, lon: number) => get<PointForecast>(`/api/point?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`),
   fisheye: (lat: number, lon: number, alt?: number | null) =>
     get<Fisheye>(`/api/fisheye?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}${alt != null ? `&alt=${Math.round(alt)}` : ""}`),
   /** Research history of a monitored site (periods, hourly pairs); K and integrals only for calibrators. */

@@ -167,6 +167,28 @@ def test_fisheye_from_the_map(client, session):
     assert client.get("/api/fisheye", params={"lat": 30.0, "lon": 5.5}).status_code == 404
 
 
+def test_point_forecast_from_the_maps(client, session):
+    import math
+    import zlib
+
+    from seeing_db import MapFrame
+
+    run = add_run(session, T0)
+    ny, nx = 40, 60
+    n = ny * nx
+    common = dict(run_id=run.id, ny=ny, nx=nx, lat0=46.0, lon0=4.0, dlat=-0.05, dlon=0.05, k_tke=1.0, k_cis=35.0, k_conv=0.1)
+    for lead in (19, 20):
+        session.add(MapFrame(valid_time=T0 + timedelta(hours=lead), lead_hour=lead, data=zlib.compress(bytes([127] * n)), **common))
+    session.add(MapFrame(valid_time=T0, lead_hour=-1, data=zlib.compress((1234 + 500).to_bytes(2, "little") * n), **common))
+    session.commit()
+    body = client.get("/api/point", params={"lat": 45.0, "lon": 5.5}).json()
+    assert [p["lead_hour"] for p in body["points"]] == [19, 20]
+    # code 127: the geometric middle of 0.2-10 arcsec
+    assert body["points"][0]["seeing_arcsec"] == pytest.approx(math.sqrt(0.2 * 10.0), rel=1e-3)
+    assert body["ground_m"] == 1234 and body["k"] == [1.0, 35.0, 0.1]
+    assert client.get("/api/point", params={"lat": 30.0, "lon": 5.5}).status_code == 404
+
+
 def test_fisheye_cloud_cover(client, session):
     import zlib
 

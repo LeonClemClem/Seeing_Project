@@ -140,5 +140,18 @@
 "Pas de nuages pour ce run : ils arrivent avec le prochain run AROME.": "No clouds for this run: they come with the next AROME run.",
 "Relief": "Relief",
 "Interpolation temporelle": "Time interpolation",
-"Fondu entre heures voisines, pour l'image seulement": "Blend between neighbouring hours, for the picture only"
+"Fondu entre heures voisines, pour l'image seulement": "Blend between neighbouring hours, for the picture only",
+"Prévision ponctuelle à des coordonnées": "One-off forecast at coordinates",
+"fermer": "close",
+"ouvrir": "open",
+"Seeing lu sur la carte globale du dernier run (mailles de ~5 km, K de la carte, nuits seulement), sans créer de lieu. Pour le Cn², l'historique et la calibration, crée un lieu.": "Seeing read on the global map of the latest run (~5 km cells, map K, nights only), without creating a place. For the Cn², the history and the calibration, create a place.",
+"Latitude": "Latitude",
+"Longitude": "Longitude",
+"latitude (44.18)": "latitude (44.18)",
+"longitude (5.47)": "longitude (5.47)",
+"Voir la prévision": "Show the forecast",
+"Créer un lieu ici": "Create a place here",
+"Coordonnées invalides : par ex. 44.18 et 5.47, ou 44°11'N et 5°28'E.": "Invalid coordinates: e.g. 44.18 and 5.47, or 44°11'N and 5°28'E.",
+"Pas de prévision ici : point hors du domaine AROME, ou carte du run pas encore calculée.": "No forecast here: point outside the AROME domain, or map of the run not computed yet.",
+"sol AROME": "AROME ground"
 }
