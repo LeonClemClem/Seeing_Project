@@ -34,15 +34,20 @@ const FN = 520,
   FR = 232,
   FC = FN / 2,
   ELMIN = 5;
-/* Only real elements: no fictitious horizon profile nor clouds (the mock-up's were synthetic). */
-const OPT0 = { cons: ["Constellations", true], sol: ["Soleil et Lune", true], trk: ["Course des objets", true] } as const;
+/* Only real elements: no fictitious horizon profile; clouds = AROME low / medium / high cover of the run. */
+const OPT0 = {
+  cons: ["Constellations", true],
+  sol: ["Soleil et Lune", true],
+  trk: ["Course des objets", true],
+  nua: ["Nuages", false],
+} as const;
 type OptKey = keyof typeof OPT0;
 
 const LAMBDA = 500e-9;
 const seeOfJ = (J: number) => (J > 0 ? 0.98 * LAMBDA * Math.pow(0.423 * (2 * Math.PI / LAMBDA) ** 2 * J, 0.6) * 206265 : NaN);
 
-/** Seeing of one direction from the real fisheye frame (bilinear in elevation / azimuth), rescaled to K. */
-function realSee(d: FisheyeData, fr: FisheyeData["frames"][number], K: K3, alt: number, az: number): number {
+/** Bilinear sampler in elevation / azimuth of the [elevation][azimuth] grids of a fisheye response. */
+function dirSampler(d: FisheyeData, alt: number, az: number) {
   const e = d.elevations,
     a = d.azimuths,
     de = e[1]! - e[0]!,
@@ -55,8 +60,14 @@ function realSee(d: FisheyeData, fr: FisheyeData["frames"][number], K: K3, alt: 
     j1 = (j + 1) % a.length,
     fj = x - Math.floor(x);
   const g = (m: (number | null)[][], r: number, c: number) => m[r]?.[c] ?? NaN;
-  const bil = (m: (number | null)[][]) =>
+  return (m: (number | null)[][]) =>
     (1 - fi) * ((1 - fj) * g(m, i, j) + fj * g(m, i, j1)) + fi * ((1 - fj) * g(m, i + 1, j) + fj * g(m, i + 1, j1));
+}
+
+/** Seeing of one direction from the real fisheye frame (bilinear in elevation / azimuth), rescaled to K. */
+function realSee(d: FisheyeData, fr: FisheyeData["frames"][number], K: K3, alt: number, az: number): number {
+  const e = d.elevations,
+    bil = dirSampler(d, alt, az);
   // below the lowest computed elevation: same direction, longer path (1 / sin)
   const low = alt < e[0]! ? Math.sin(e[0]! * D2R) / Math.sin(Math.max(alt, 2) * D2R) : 1;
   return seeOfJ(((K[0] / d.k[0]!) * bil(fr.j_low) + (K[1] / d.k[1]!) * bil(fr.j_high)) * low);
@@ -90,8 +101,8 @@ export default function Fisheye() {
   const [fcur, setFcur] = useState(3);
   const [playing, setPlaying] = useState(false);
   const [cal, setCal] = useState<"mine" | "def">("mine");
-  const [hov, setHov] = useState<{ x: number; y: number; alt: number; az: number; s: number } | null>(null);
-  const [opt, setOpt] = useState<Record<OptKey, boolean>>({ cons: true, sol: true, trk: true });
+  const [hov, setHov] = useState<{ x: number; y: number; alt: number; az: number; s: number; c: number } | null>(null);
+  const [opt, setOpt] = useState<Record<OptKey, boolean>>({ cons: true, sol: true, trk: true, nua: false });
   const [plOn, setPlOn] = useState(() => new Set(["Jupiter", "Saturne", "Mars"]));
   const [tgts, setTgts] = useState<CatObj[]>(() => [CAT[0]!, CAT[9]!]);
   const [q, setQ] = useState("");
@@ -117,6 +128,12 @@ export default function Fisheye() {
     // no fisheye data (yet) or hour not covered by the run: no value, never a fictitious field
     return fe && fr ? realSee(fe, fr, K, alt, az) : NaN;
   };
+  /** Cloud cover 0-1 seen in a direction (NaN: run stored without clouds). */
+  const cloudSky = (i: number, alt: number, az: number) => {
+    const fr = frameAt(i);
+    return fe && fr?.cloud ? dirSampler(fe, alt, az)(fr.cloud) : NaN;
+  };
+  const hasClouds = !!fe?.frames.some((f) => f.cloud);
   const best = (o: CatObj) => {
     let b: [number, number] | null = null;
     for (let k = 0; k <= 10; k++) {
@@ -158,7 +175,16 @@ export default function Fisheye() {
           az = (Math.atan2(-dx, dy) / D2R + 360) % 360;
         const s = vis(alt, az) ? seeSky(fcur, alt, az) : NaN;
         // same colours as the map: turbo, 0-10" with a fixed square-root stretch
-        const col: number[] = isNaN(s) ? [55, 62, 80] : turbo(Math.sqrt(Math.min(Math.max(s, 0), 10) / 10));
+        let col: number[] = isNaN(s) ? [55, 62, 80] : turbo(Math.sqrt(Math.min(Math.max(s, 0), 10) / 10));
+        if (opt.nua && vis(alt, az)) {
+          // grey veil as research/ciel_seeing.py: light grey and see-through for thin cover, darker when overcast
+          const cc = Math.min(Math.max(cloudSky(fcur, alt, az), 0), 1);
+          if (cc > 0) {
+            const a = 0.82 * cc,
+              grey = [204 - 97 * cc, 204 - 97 * cc, 214 - 94 * cc];
+            col = col.map((v, k) => v * (1 - a) + grey[k]! * a);
+          }
+        }
         D[p] = col[0]!;
         D[p + 1] = col[1]!;
         D[p + 2] = col[2]!;
@@ -361,7 +387,15 @@ export default function Fisheye() {
                 if (r > FR) return setHov(null);
                 const alt = 90 - (r / FR) * 90,
                   az = (Math.atan2(-dx, dy) / D2R + 360) % 360;
-                setHov({ x: e.clientX - b.left, y: e.clientY - b.top, alt, az, s: vis(alt, az) ? seeSky(fcur, alt, az) : NaN });
+                const on = vis(alt, az);
+                setHov({
+                  x: e.clientX - b.left,
+                  y: e.clientY - b.top,
+                  alt,
+                  az,
+                  s: on ? seeSky(fcur, alt, az) : NaN,
+                  c: on && opt.nua ? cloudSky(fcur, alt, az) : NaN,
+                });
               }}
             />
             {hov && (
@@ -386,6 +420,7 @@ export default function Fisheye() {
                   <>
                     <b style={{ fontSize: 14 }}>{isNaN(hov.s) ? "–" : hov.s.toFixed(2) + "″"}</b>
                     {` · ${tr("élév.")} ${Math.round(hov.alt)}° · az ${Math.round(hov.az)}° ${dir8(hov.az)}`}
+                    {isNaN(hov.c) ? "" : ` · ${tr("nuages")} ${Math.round(hov.c * 100)} %`}
                   </>
                 )}
               </div>
@@ -473,6 +508,11 @@ export default function Fisheye() {
                 </Chip>
               ))}
             </div>
+            {opt.nua && fe && !hasClouds && (
+              <p className="small muted" style={{ margin: "4px 0 0" }}>
+                {tr("Pas de nuages pour ce run : ils arrivent avec le prochain run AROME.")}
+              </p>
+            )}
             <h2 style={{ marginTop: 8 }}>{tr("Planètes")}</h2>
             <div>
               {PL.map(([n, s, col]) => (

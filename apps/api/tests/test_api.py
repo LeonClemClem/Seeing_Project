@@ -161,7 +161,27 @@ def test_fisheye_from_the_map(client, session):
     assert f["j_low"][-1][0] + f["j_high"][-1][0] == pytest.approx(j, rel=1e-3)  # zenith
     el = body["elevations"].index(30)
     assert f["j_high"][el][9] == pytest.approx(j / 2 / math.sin(math.radians(30)), rel=1e-3)
+    assert f["cloud"] is None  # frame stored without cloud cover
     assert client.get("/api/fisheye", params={"lat": 30.0, "lon": 5.5}).status_code == 404
+
+
+def test_fisheye_cloud_cover(client, session):
+    import zlib
+
+    from seeing_db import MapFrame
+
+    run = add_run(session, T0)
+    ny, nx = 40, 60
+    n = ny * nx
+    # split planes, then cloud cover in %: low 50, medium 0, high 20 everywhere
+    extra = bytes([127] * n + [25] * n + [80] * n + [50] * n + [0] * n + [20] * n)
+    session.add(MapFrame(run_id=run.id, valid_time=T0 + timedelta(hours=20), lead_hour=20, ny=ny, nx=nx,
+                         lat0=46.0, lon0=4.0, dlat=-0.05, dlon=0.05, k_tke=2.0, k_cis=57.0, k_conv=0.1,
+                         data=zlib.compress(bytes([127] * n)), extra=zlib.compress(extra)))
+    session.commit()
+    f = client.get("/api/fisheye", params={"lat": 45.0, "lon": 5.5}).json()["frames"][0]
+    # clear sky = (1 - 0.5) * (1 - 0) * (1 - 0.2) = 0.4 in every direction
+    assert {v for row in f["cloud"] for v in row} == {0.6}
 
 
 def test_week_view_stitches_main_runs(client, session):

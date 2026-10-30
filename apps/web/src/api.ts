@@ -33,7 +33,14 @@ export interface Fisheye {
   k: number[];
   elevations: number[];
   azimuths: number[];
-  frames: { lead_hour: number; valid_time: string; j_low: (number | null)[][]; j_high: (number | null)[][] }[];
+  frames: {
+    lead_hour: number;
+    valid_time: string;
+    j_low: (number | null)[][];
+    j_high: (number | null)[][];
+    /** cloud cover 0-1 seen in each direction; null for runs stored without clouds */
+    cloud?: (number | null)[][] | null;
+  }[];
 }
 
 export interface SiteHistory {

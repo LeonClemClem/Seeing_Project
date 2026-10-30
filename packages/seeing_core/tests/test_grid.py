@@ -113,3 +113,16 @@ def test_cells_around_north_to_south_west_to_east():
     assert cells["alt"][2][2] == 505  # the site's cell
     assert cells["alt"][4] == [700 + c for c in range(3, 8)]  # south row = row 7
     assert cells_around(h, g, lat=45.0, lon=5.0) is None  # too close to the edge
+
+
+def test_clouds_roundtrip_and_frames_without_clouds():
+    from seeing_core.grid import decode_clouds, decode_split, encode_split
+
+    i, shape = np.full((6, 6), 1e-14), (2, 3)
+    low = np.array([[0.0, 0.5, 1.0], [np.nan, 0.25, 0.333]])
+    blob = encode_split(i, MAP_K, shape, {"lcc": low, "mcc": np.zeros(shape), "hcc": np.ones(shape)})
+    c = decode_clouds(blob, shape)
+    np.testing.assert_allclose(c[0], [[0, 0.5, 1], [np.nan, 0.25, 0.33]], atol=0.006)
+    np.testing.assert_allclose(c[2], 1.0)
+    assert decode_split(blob, shape)[0].shape == shape  # the split planes are unchanged
+    assert decode_clouds(encode_split(i, MAP_K, shape), shape) is None  # older frames: no clouds
