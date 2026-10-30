@@ -190,5 +190,11 @@
 "Créer un lieu ici": "Create a place here",
 "Coordonnées invalides : par ex. 44.18 et 5.47, ou 44°11'N et 5°28'E.": "Invalid coordinates: e.g. 44.18 and 5.47, or 44°11'N and 5°28'E.",
 "Pas de prévision ici : point hors du domaine AROME, ou carte du run pas encore calculée.": "No forecast here: point outside the AROME domain, or map of the run not computed yet.",
-"sol AROME": "AROME ground"
+"sol AROME": "AROME ground",
+"Nuit précédente": "Previous night",
+"Nuit suivante": "Next night",
+"Remettre toutes les nuits dans le calage": "Put every night back into the calibration",
+"toutes les nuits": "all nights",
+"toutes les nuits sont dans le calage": "every night is in the calibration",
+"prévu (K en service)": "forecast (K in use)"
 }

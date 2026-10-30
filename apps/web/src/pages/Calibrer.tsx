@@ -19,7 +19,7 @@ import { kHidden, selectPlace, TEAM_SITE, useCurrentPlace, usePlaceActions, useP
 import { tr } from "../i18n";
 import { parseCsv, type CsvOpts, type DateFmt, type NightPt } from "../lib/csv";
 import { C_AR, C_DAY, C_LINE, C_OBS, C_OBSD, C_TXT, dnText, fmt, pl, yaxis } from "../lib/util";
-import { calib, chourly, comp, cstats, exampleCsv, hourKey, NO_FILTER, seeC, type CalFilters, type CalPair } from "../mock/calibration";
+import { calib, chourly, comp, cstats, exampleCsv, hourKey, isNx, NO_FILTER, seeC, type CalFilters, type CalPair } from "../mock/calibration";
 import { nightPointsToIso, nightsFromTimes, seeTerms, termsModel, type Terms } from "../lib/realCalib";
 import { KDEF, lieuData } from "../mock/engine";
 import { getState, setK, setState, useLangMemo, useUi, type K3 } from "../store";
@@ -79,10 +79,21 @@ function addTo(st: NonNullable<typeof STORE>, txt: string, o: CsvOpts) {
   return true;
 }
 
-/** pred(K, i): model seeing at hour index i (0 = 12h UTC) for K, NaN when unknown; K0 = dashed curve. */
-function nightSvg(key: string, pts: NightPt[], K: K3, rm: Set<string>, pred: (K: K3, i: number) => number, K0: K3) {
+/** pred(K, i): model seeing at hour index i (0 = 12h UTC) for K, NaN when unknown; K0 = dashed curve.
+ * Night only (17h30-06h UTC), as everywhere on the site. `stored`: the forecast recorded for the hours without
+ * model terms (they cannot be rescaled to other K), as [hour index, seeing]. */
+function nightSvg(
+  key: string,
+  allPts: NightPt[],
+  K: K3,
+  rm: Set<string>,
+  pred: (K: K3, i: number) => number,
+  K0: K3,
+  stored: [number, number][] = [],
+) {
+  const pts = allPts.filter((p) => isNx(p.x));
   const idx = [...Array(25).keys()],
-    H = chourly(pts),
+    H = chourly(pts).filter((p) => isNx(p.h)),
     P0 = idx.map((i) => pred(K0, i)),
     P1 = idx.map((i) => pred(K, i));
   const W = 700,
@@ -93,7 +104,7 @@ function nightSvg(key: string, pts: NightPt[], K: K3, rm: Set<string>, pred: (K:
     B = 30,
     pw = W - L - R,
     ph = Hh - T - B;
-  const ymax = Math.max(3, Math.ceil(Math.max(...[...P0, ...P1].filter((v) => !isNaN(v)), ...H.map((p) => p.m)) * 1.2));
+  const ymax = Math.max(3, Math.ceil(Math.max(...[...P0, ...P1].filter((v) => !isNaN(v)), ...H.map((p) => p.m), ...stored.map((q) => q[1])) * 1.2));
   const X = (x: number) => L + (x * pw) / 24,
     Y = (v: number) => T + ph - (Math.min(v, ymax) / ymax) * ph;
   let g = `<rect x="${X(0)}" y="${T}" width="${X(5.5) - X(0)}" height="${ph}" fill="${C_DAY}"/><rect x="${X(18)}" y="${T}" width="${X(24) - X(18)}" height="${ph}" fill="${C_DAY}"/>`;
@@ -110,10 +121,71 @@ function nightSvg(key: string, pts: NightPt[], K: K3, rm: Set<string>, pred: (K:
   const line = (P: number[]) => idx.filter((i) => !isNaN(P[i]!)).map((i) => [X(i), Y(P[i]!)] as [number, number]);
   g += pl(line(P0), `stroke="${C_AR}" stroke-width="1.5" stroke-dasharray="5 4"`);
   g += pl(line(P1), `stroke="${C_AR}" stroke-width="2.2"`);
+  // recorded forecast on the night hours without terms (thin, see-through)
+  const st = stored.filter(([i, v]) => isNx(i) && v > 0 && isNaN(P1[Math.round(i)] ?? NaN)).sort((a, b) => a[0] - b[0]);
+  if (st.length) g += pl(st.map(([i, v]) => [X(i), Y(v)] as [number, number]), `stroke="${C_AR}" stroke-width="1.6" opacity=".55"`);
   pts.forEach((p) => (g += `<circle cx="${X(p.x)}" cy="${Y(p.v)}" r="1.9" fill="${C_OBS}"/>`));
   H.forEach((p) => (g += `<rect x="${X(p.h) - 3.5}" y="${Y(p.m) - 3.5}" width="7" height="7" fill="${rm.has(hourKey(key, p.h)) ? C_RM : C_OBSD}"/>`));
   g += `<text x="${W - R}" y="${Hh - 2}" text-anchor="end" font-size="11" fill="${C_TXT}">${tr("heure TU")}</text>`;
   return g;
+}
+
+/** Correlation of the calibration: every compared night hour, forecast with the K in service (x) vs measured (y);
+ * the hours kept in the fit in blue (with the night medians), the hours left out in red. Statistics on the kept
+ * hours only, so they follow the filters and the nights left out. */
+function calCorr<C>(P: CalPair<C>[], R: CalPair<C>[], K: K3, see: (K: K3, c: C) => number) {
+  const pts = P.map((p) => [see(K, p.c), p.m] as const).filter(([x, y]) => isFinite(x) && x > 0 && y > 0),
+    out = R.map((p) => [see(K, p.c), p.m] as const).filter(([x, y]) => isFinite(x) && x > 0 && y > 0);
+  if (!pts.length && !out.length) return null;
+  const byNight = new Map<string, [number, number][]>();
+  P.forEach((p) => {
+    const x = see(K, p.c);
+    if (isFinite(x) && x > 0) (byNight.get(p.key.split("|")[0]!) ?? byNight.set(p.key.split("|")[0]!, []).get(p.key.split("|")[0]!)!).push([x, p.m]);
+  });
+  const med = (a: number[]) => {
+    const s2 = [...a].sort((u, v) => u - v);
+    return s2.length % 2 ? s2[(s2.length - 1) / 2]! : (s2[s2.length / 2 - 1]! + s2[s2.length / 2]!) / 2;
+  };
+  const moons = [...byNight.values()].filter((a) => a.length >= 2).map((a) => [med(a.map((q) => q[0])), med(a.map((q) => q[1]))] as const);
+  const W = 340,
+    H = 320,
+    L = 34,
+    T = 8,
+    B = 32,
+    R0 = 10,
+    pw = W - L - R0,
+    ph = H - T - B,
+    m = Math.max(2, Math.ceil(Math.max(...[...pts, ...out].map((q) => Math.max(q[0], q[1]))) * 1.08)),
+    X = (v: number) => L + (Math.min(v, m) / m) * pw,
+    Y = (v: number) => T + ph - (Math.min(v, m) / m) * ph,
+    st = m > 8 ? 2 : 1;
+  let g = "";
+  for (let v = 0; v <= m; v += st)
+    g += `<line x1="${L}" x2="${W - R0}" y1="${Y(v)}" y2="${Y(v)}" stroke="${C_LINE}" stroke-width="0.6"/><line y1="${T}" y2="${T + ph}" x1="${X(v)}" x2="${X(v)}" stroke="${C_LINE}" stroke-width="0.6"/><text x="${L - 5}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="${C_TXT}">${v}"</text><text x="${X(v)}" y="${T + ph + 14}" text-anchor="middle" font-size="11" fill="${C_TXT}">${v}"</text>`;
+  g += `<line x1="${X(0)}" y1="${Y(0)}" x2="${X(m)}" y2="${Y(m)}" stroke="${C_TXT}" stroke-dasharray="4 3"/>`;
+  out.forEach(([x, y]) => (g += `<circle cx="${X(x)}" cy="${Y(y)}" r="3.4" fill="${C_RM}" stroke="#fff" stroke-width="0.5" opacity=".85"/>`));
+  pts.forEach(([x, y]) => (g += `<circle cx="${X(x)}" cy="${Y(y)}" r="3.6" fill="#2a78d6" stroke="#fff" stroke-width="0.6"/>`));
+  moons.forEach(([x, y]) => {
+    const cx = X(x),
+      cy = Y(y);
+    g += `<path d="M${cx + 2},${cy - 9} A9,9 0 1,0 ${cx + 2},${cy + 9} A12,12 0 0,1 ${cx + 2},${cy - 9} Z" fill="#f1efe8" stroke="#0a0f1d" stroke-width="1"/>`;
+  });
+  g += `<text x="${L + pw / 2}" y="${H - 2}" text-anchor="middle" font-size="11" fill="${C_TXT}">${tr("prévu (K en service)")}</text><text x="10" y="${T + ph / 2}" text-anchor="middle" font-size="11" fill="${C_TXT}" transform="rotate(-90 10 ${T + ph / 2})">${tr("mesuré")}</text>`;
+  const xs = pts.map((q) => q[0]),
+    ys = pts.map((q) => q[1]),
+    n = xs.length,
+    mx = xs.reduce((a, b) => a + b, 0) / (n || 1),
+    my = ys.reduce((a, b) => a + b, 0) / (n || 1),
+    cov = xs.reduce((a, x, i) => a + (x - mx) * (ys[i]! - my), 0),
+    r = n > 2 ? cov / Math.sqrt(xs.reduce((a, x) => a + (x - mx) ** 2, 0) * ys.reduce((a, y) => a + (y - my) ** 2, 0)) : NaN,
+    bias = n ? mx - my : NaN,
+    rms = n ? Math.sqrt(xs.reduce((a, x, i) => a + (x - ys[i]!) ** 2, 0) / n) : NaN;
+  const f2 = (v: number) => (isNaN(v) ? "–" : v.toFixed(2));
+  return {
+    svg: g,
+    ct: tr(`r = ${f2(r)} · n = ${n} h retenues · biais ${isNaN(bias) ? "–" : (bias >= 0 ? "+" : "") + bias.toFixed(2)}" · précision ± ${f2(rms)}"${out.length ? ` · ${out.length} h retirées (rouge)` : ""}`),
+    tiles: { rn: f2(r), rj: isNaN(bias) ? "–" : `${bias >= 0 ? "+" : ""}${bias.toFixed(2)}"` },
+  };
 }
 
 /** "28/10" of a night key "2026-10-28". */
@@ -178,6 +250,18 @@ export default function Calibrer() {
   };
   const outSet = useMemo(() => new Set(filters.out), [filters.out]);
   const selNight = useUi((s) => s.selNight);
+  /** Select the previous (-1) or next (+1) night of the list. */
+  const stepNight = (d: number) => {
+    const keys = [...nights.keys()].sort();
+    if (!keys.length) return;
+    const i = night ? keys.indexOf(night) : -1,
+      k = keys[Math.min(keys.length - 1, Math.max(0, i < 0 ? keys.length - 1 : i + d))]!;
+    if (editable) setSelR(k);
+    else {
+      st.sel = k;
+      refresh();
+    }
+  };
   const toggleOut = (n: string) =>
     setFilters({ ...filters, out: filters.out.includes(n) ? filters.out.filter((x) => x !== n) : [...filters.out, n].sort() });
   const fi = useRef<HTMLInputElement>(null);
@@ -224,7 +308,7 @@ export default function Calibrer() {
       editable
         ? realModel
           ? calib(nights, filters, realModel)
-          : { P: [] as CalPair<Terms>[], K: place.K, mode: srvKeys.length ? "pas encore de prévision pour ces nuits" : "aucune mesure", F: { pics: 0, courtes: 0, top: 0, out: 0, rm: new Set<string>() } }
+          : { P: [] as CalPair<Terms>[], K: place.K, mode: srvKeys.length ? "pas encore de prévision pour ces nuits" : "aucune mesure", F: { pics: 0, courtes: 0, top: 0, out: 0, rm: new Set<string>() }, R: [] as CalPair<Terms>[] }
         : calib(nights, filters),
     [nightsKey, filters, realModel, editable],
   );
@@ -248,6 +332,7 @@ export default function Calibrer() {
   const s = editable ? cstats(cal.P as CalPair<Terms>[], K, seeTerms) : cstats(cal.P as CalPair[], K);
   const selKey = editable ? selR : st.sel;
   const night = selKey && nights.has(selKey) ? selKey : editable ? (srvKeys[srvKeys.length - 1] ?? null) : null;
+  const realHist = useSiteHistory(place);
   const cch = useLangMemo(() => {
     if (!night) return "";
     const pred = editable
@@ -256,13 +341,24 @@ export default function Calibrer() {
           return c ? seeTerms(k, c) : NaN;
         }
       : (k: K3, i: number) => seeC(k, comp(night)[i]!);
-    return nightSvg(night, nights.get(night)!, K, cal.F.rm, pred, editable ? place.K : KDEF);
-  }, [night, nightsKey, K, cal, realModel, editable]);
+    const noonMs = Date.parse(night + "T12:00:00Z"),
+      stored: [number, number][] = [];
+    realHist?.episodes.forEach((e) =>
+      e.prevu.forEach(([t, v]) => {
+        const x = (Date.parse(t.length <= 16 ? t + ":00Z" : t) - noonMs) / 3600000;
+        if (v != null && x >= 0 && x <= 24) stored.push([x, v]);
+      }),
+    );
+    return nightSvg(night, nights.get(night)!, K, cal.F.rm, pred, editable ? place.K : KDEF, stored);
+  }, [night, nightsKey, K, cal, realModel, editable, realHist]);
   const p2c = useLangMemo(() => (place.real ? "" : cn2Svg(K, KCAL, showObs, { mesf }, place.f)), [place, K, KCAL, showObs, mesf]);
-  const realHist = useSiteHistory(place);
   const corr = useLangMemo(() => corrMock(K, KCAL, place.f), [K, KCAL, place.f]);
   const hist = useLangMemo(() => (place.real ? realHist : lieuData(place.nom, place.f, K, KCAL)), [place, K, KCAL, realHist]);
   const corrf = useUi((s) => s.corrf);
+  const calC = useLangMemo(
+    () => (editable && realModel ? calCorr(cal.P as CalPair<Terms>[], cal.R as CalPair<Terms>[], K, seeTerms) : null),
+    [editable, realModel, cal, K],
+  );
   const corrR = useLangMemo(() => (realHist ? corrChart(realHist, corrf, selNight, cal.F.rm) : null), [realHist, corrf, selNight, cal]);
   useEffect(() => setSaved(""), [K]);
 
@@ -448,6 +544,25 @@ export default function Calibrer() {
                   </span>
                 ))}
               </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
+                <button className="small" title={tr("Nuit précédente")} aria-label={tr("Nuit précédente")} onClick={() => stepNight(-1)}>
+                  ◀
+                </button>
+                <button className="small" title={tr("Nuit suivante")} aria-label={tr("Nuit suivante")} onClick={() => stepNight(1)}>
+                  ▶
+                </button>
+                {night && (
+                  <button className="small" onClick={() => toggleOut(night)}>
+                    {tr(outSet.has(night) ? `remettre la nuit du ${ddmmOf(night)}` : `retirer la nuit du ${ddmmOf(night)}`)}
+                  </button>
+                )}
+                <button className="small" disabled={!filters.out.length} title={tr("Remettre toutes les nuits dans le calage")} onClick={() => setFilters({ ...filters, out: [] })}>
+                  {tr("toutes les nuits")}
+                </button>
+                <span className="small muted">
+                  {filters.out.length ? tr(`${filters.out.length} nuit(s) retirée(s) du calage`) : tr("toutes les nuits sont dans le calage")}
+                </span>
+              </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
                 <span>{tr("Mode : " + cal.mode)}</span>
                 <span className="mono">{tr(`${cal.P.length} h de nuit comparées`)}</span>
@@ -497,7 +612,12 @@ export default function Calibrer() {
           <div className="panel grid2" style={{ gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr)" }}>
             <div>
               <h2>{tr("Corrélation prévu / mesuré")}</h2>
-              {place.real && corrR ? (
+              {calC ? (
+                <>
+                  <p className="small muted mono">{calC.ct}</p>
+                  <SvgChart html={calC.svg} viewBox="0 0 340 320" label="Corrélation du calage" />
+                </>
+              ) : place.real && corrR ? (
                 <>
                   <p className="small muted mono">{corrR.ct}</p>
                   <SvgChart html={corrR.svg} viewBox="0 0 340 320" label="Corrélation" />
@@ -533,12 +653,12 @@ export default function Calibrer() {
               <div className="tiles">
                 <div className="tile">
                   <div className="l">{tr("r nuit")}</div>
-                  <div className="v">{place.real ? (corrR?.tiles.rn ?? "–") : corr.rDayNight}</div>
+                  <div className="v">{calC ? calC.tiles.rn : place.real ? (corrR?.tiles.rn ?? "–") : corr.rDayNight}</div>
                 </div>
                 <div className="tile">
                   <div className="l">{tr("Biais · écart moyen")}</div>
                   <div className="v" style={{ fontSize: 16 }}>
-                    {place.real ? (corrR?.tiles.rj ?? "–") : corr.bias}
+                    {calC ? calC.tiles.rj : place.real ? (corrR?.tiles.rj ?? "–") : corr.bias}
                   </div>
                 </div>
               </div>
@@ -600,22 +720,6 @@ export default function Calibrer() {
                     ]}
                   />
                   <span className="small muted">{tr(fnote)}</span>
-                </div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
-                  <span className="small muted">{tr("Nuits retirées :")}</span>
-                  {selNight && (
-                    <button className="small" onClick={() => toggleOut(selNight)}>
-                      {tr(outSet.has(selNight) ? `remettre la nuit du ${ddmmOf(selNight)}` : `retirer la nuit du ${ddmmOf(selNight)}`)}
-                    </button>
-                  )}
-                  {filters.out.map((n) => (
-                    <span key={n} className="chip on" title={tr("Remettre cette nuit dans le calage")} onClick={() => toggleOut(n)} style={{ cursor: "pointer" }}>
-                      {ddmmOf(n)} ✕
-                    </span>
-                  ))}
-                  {!filters.out.length && !selNight && (
-                    <span className="small muted">{tr("aucune · clique sur une nuit de l'historique pour pouvoir la retirer")}</span>
-                  )}
                 </div>
               </>
             }
@@ -701,15 +805,15 @@ function KPanel(p: {
         <div className="tiles">
           <div className="tile">
             <div className="l">{tr("r (nuits)")}</div>
-            <div className="v">{isNaN(r) || p.place.real ? "–" : r.toFixed(2)}</div>
+            <div className="v">{isNaN(r) ? "–" : r.toFixed(2)}</div>
           </div>
           <div className="tile">
             <div className="l">{tr("Biais")}</div>
-            <div className="v">{isNaN(b) || p.place.real ? "–" : (b >= 0 ? "+" : "") + b.toFixed(2) + '"'}</div>
+            <div className="v">{isNaN(b) ? "–" : (b >= 0 ? "+" : "") + b.toFixed(2) + '"'}</div>
           </div>
           <div className="tile">
             <div className="l">{tr("Précision horaire")}</div>
-            <div className="v">{isNaN(q) || p.place.real ? "–" : "± " + q.toFixed(2) + '"'}</div>
+            <div className="v">{isNaN(q) ? "–" : "± " + q.toFixed(2) + '"'}</div>
           </div>
         </div>
       </div>
