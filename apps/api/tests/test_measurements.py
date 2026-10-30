@@ -53,6 +53,18 @@ def test_upload_read_delete_measurements():
     assert bob.get("/api/sites/saint-veran/measurements").status_code == 200
 
 
+def test_public_sites_readable_without_an_account():
+    ada = client_for("ada@example.org")
+    slug = ada.post("/api/places", json={"name": "Jardin", "lat": 44.3, "lon": 5.3, "shared": True}).json()["slug"]
+    anon = TestClient(create_app(static_dir="/nonexistent"), base_url="https://testserver")
+    for public in ("ohp", "saint-veran", "pic-du-midi"):
+        assert anon.get(f"/api/sites/{public}/measurements").status_code == 200, public
+    # shared CosmoDrôme, hidden monitors, members' places: account needed
+    for other in ("cosmodrome", "verclause", "copernic-gap", slug):
+        assert anon.get(f"/api/sites/{other}/measurements").status_code == 401, other
+    assert anon.post("/api/sites/ohp/measurements", json={"points": [["2026-10-13T21:00:00Z", 1.2]]}).status_code == 401
+
+
 def test_terms_use_the_latest_run_before_each_hour():
     ada = client_for("ada@example.org")
     slug = ada.post("/api/places", json={"name": "Jardin", "lat": 44.3, "lon": 5.3}).json()["slug"]

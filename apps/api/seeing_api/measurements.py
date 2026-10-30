@@ -1,7 +1,9 @@
 """Seeing measurements of a site and the V2bd terms used to calibrate its K.
 
 Writing: the owner of a personal place, the administrator for every site, and the team account for its
-site. Reading: the same, plus every logged-in user for the public sites (their monitors are public). Calibration itself runs in the browser (the K fit is a small grid search).
+site. Reading: the same, plus every logged-in user for the sites without owner, and everyone, even without an
+account, for the public sites (their monitors are public). Calibration itself runs in the browser (the K fit is
+a small grid search).
 """
 
 from datetime import UTC, datetime, timedelta
@@ -13,7 +15,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from seeing_api.api import TEAM_SITE, SessionDep, utc
-from seeing_api.auth import require_json, require_role
+from seeing_api.auth import CurrentUser, require_json, require_role
 from seeing_db import Forecast, Measurement, ModelRun, RunStatus, Site, User, UserRole
 
 router = APIRouter(prefix="/api/sites")
@@ -41,6 +43,12 @@ def readable_site(session, slug: str, user: User) -> Site:
     if site is not None and site.owner_id is None:
         return site
     return editable_site(session, slug, user)
+
+
+def public_site(session, slug: str) -> Site | None:
+    """Site readable without an account: a public site (visibility "public", no owner)."""
+    site = session.scalar(select(Site).where(Site.slug == slug, Site.active.is_(True)))
+    return site if site is not None and site.owner_id is None and site.visibility == "public" else None
 
 
 class MeasurementsIn(BaseModel):
@@ -80,10 +88,15 @@ def add_measurements(slug: str, body: MeasurementsIn, session: SessionDep, user:
 
 @router.get("/{slug}/measurements", response_model=MeasurementsOut)
 def get_measurements(
-    slug: str, session: SessionDep, user: LoggedIn,
+    slug: str, session: SessionDep, user: CurrentUser,
     start: Annotated[datetime | None, Query(alias="from")] = None, end: Annotated[datetime | None, Query(alias="to")] = None,
 ) -> MeasurementsOut:
-    site = readable_site(session, slug, user)
+    if user is None:  # without an account: the public sites only
+        site = public_site(session, slug)
+        if site is None:
+            raise HTTPException(401, "Not logged in")
+    else:
+        site = readable_site(session, slug, user)
     q = select(Measurement.time, Measurement.seeing_arcsec).where(Measurement.site_id == site.id)
     if start:
         q = q.where(Measurement.time >= start)
