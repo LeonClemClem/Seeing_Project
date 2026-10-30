@@ -21,6 +21,7 @@ import {
   medCurve,
   pd,
   pl,
+  turbo,
   yaxis,
 } from "../lib/util";
 
@@ -502,4 +503,64 @@ export function mailleSvg(nom: string, lat: number, lon: number, alt: number | n
     svg: g,
     caption: tr(`grille AROME 0,025° · ${NG} × ${NG} mailles · altitudes du relief AROME`),
   };
+}
+
+/* ---------- wind roses (Mes lieux) ---------- */
+
+export const ROSE_SECT = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
+
+/** One hour of a wind rose: direction the wind comes from [deg], speed [km/h], colour value. */
+export type RosePt = { dir: number; speed: number; val: number };
+
+/** Sector (8 points of the compass) of a direction. */
+export const roseSector = (dir: number) => ROSE_SECT[Math.floor((((dir + 22.5) % 360) + 360) % 360 / 45)]!;
+
+/** Best sector: lowest median colour value over the sectors with at least `minH` hours. */
+export function roseBest(pts: RosePt[], minH = 5): { sect: string; med: number; n: number } | null {
+  const by = new Map<string, number[]>();
+  pts.forEach((p) => (by.get(roseSector(p.dir)) ?? by.set(roseSector(p.dir), []).get(roseSector(p.dir))!).push(p.val));
+  let best: { sect: string; med: number; n: number } | null = null;
+  by.forEach((v, sect) => {
+    if (v.length < minH) return;
+    const m = med(v);
+    if (!best || m < best.med) best = { sect, med: m, n: v.length };
+  });
+  return best;
+}
+
+/** Polar scatter (north up, clockwise): angle = direction the wind comes from, radius = speed [km/h], colour =
+ * value on turbo between lo and hi (low = blue = good, high = red = bad, as the map), white outlines. Dark-panel style of the site. */
+export function windRoseSvg(pts: RosePt[], lo: number, hi: number): string {
+  const S = 300,
+    C = S / 2,
+    R = 118;
+  const vmax = Math.max(10, ...pts.map((p) => p.speed));
+  const step = vmax > 120 ? 40 : vmax > 60 ? 20 : vmax > 30 ? 10 : 5,
+    top = Math.ceil(vmax / step) * step,
+    rr = (v: number) => (Math.min(v, top) / top) * R,
+    xy = (dir: number, v: number) => [C + rr(v) * Math.sin(dir * D2R), C - rr(v) * Math.cos(dir * D2R)] as const;
+  let g = `<circle cx="${C}" cy="${C}" r="${R}" fill="#1b2438" stroke="#3a4258"/>`;
+  for (let v = step; v < top; v += step) g += `<circle cx="${C}" cy="${C}" r="${rr(v)}" fill="none" stroke="#3a4258" stroke-width="0.7"/>`;
+  ROSE_SECT.forEach((lab, k) => {
+    const a = k * 45,
+      [x, y] = xy(a, top),
+      lx = C + (R + 15) * Math.sin(a * D2R),
+      ly = C - (R + 15) * Math.cos(a * D2R) + 4;
+    g += `<line x1="${C}" y1="${C}" x2="${x}" y2="${y}" stroke="#3a4258" stroke-width="0.7"/>`;
+    g += `<text x="${lx}" y="${ly}" text-anchor="middle" font-size="11" font-weight="${k % 2 ? 400 : 600}" fill="${k % 2 ? C_TXT : "#e6ebf6"}">${tr(lab)}</text>`;
+  });
+  for (let v = step; v <= top; v += step) {
+    const [x, y] = xy(22.5, v);
+    g += `<text x="${x + 2}" y="${y}" font-size="9" fill="${C_TXT}">${v}</text>`;
+  }
+  g += `<text x="${C + R * 0.42}" y="${C - R - 16}" font-size="9" fill="${C_TXT}">km/h</text>`;
+  // worst values drawn last, on top
+  [...pts]
+    .sort((a, b) => a.val - b.val)
+    .forEach((p) => {
+      const [x, y] = xy(p.dir, p.speed),
+        c = turbo(Math.min(1, Math.max(0, (p.val - lo) / (hi - lo || 1))));
+      g += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.8" fill="rgb(${c})" stroke="#fff" stroke-width="0.8"/>`;
+    });
+  return g;
 }
