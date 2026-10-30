@@ -298,20 +298,20 @@ export function cn2AxisRight(c: Cn2Ctx): string {
   return g + `<text x="${W - 1}" y="${T - 7}" text-anchor="end" font-size="13" font-weight="700" fill="${C_TXT}">Seeing (″)</text>`;
 }
 
-/** Cn² panel: turbo heatmap (log10, interpolated vertically, and in time between two neighbouring hours for the
- * picture only), boundary layer, night seeing on the right axis. */
-export function cn2RealSvg(c: Cn2Ctx, runMs: number) {
+/** Cn² panel: turbo heatmap (log10, interpolated vertically; in time only with `smooth`, between two neighbouring
+ * hours, for the picture only), boundary layer, night seeing on the right axis. */
+export function cn2RealSvg(c: Cn2Ctx, runMs: number, smooth = false) {
   const { L, T, pw, ph, n, za, zb, lo, hi, times, heights: Zh } = c;
   if (!n) return `<text x="450" y="190" text-anchor="middle" font-size="13" fill="${C_TXT}">${tr("Pas de panneau Cn² enregistré pour ce lieu.")}</text>`;
   const X = (i: number) => L + (i / n) * pw,
     Yz = (z: number) => T + ph - ((Math.min(Math.max(z, za), zb) - za) / (zb - za)) * ph;
   let g = `<rect x="${L}" y="${T}" width="${pw}" height="${ph}" fill="#262c3b"/>`;
   {
-    // S image columns per hour: between the centres of two neighbouring hours the log10 Cn² is blended linearly
-    // (display only: hover, profile and values keep the hourly data). Next to a missing hour, the existing hour
-    // fills its own column only, as before: gaps are never filled.
+    // smooth: S image columns per hour, between the centres of two neighbouring hours the log10 Cn² is blended
+    // linearly (display only: hover, profile and values keep the hourly data). Next to a missing hour, the existing
+    // hour fills its own column only: gaps are never filled. Without it (default), S = 1: one block per hour.
     const NR = Math.max(120, Math.round(ph * 1.5)),
-      S = Math.max(1, Math.min(8, Math.floor(4000 / n))),
+      S = smooth ? Math.max(1, Math.min(8, Math.floor(4000 / n))) : 1,
       NW = n * S,
       cv = document.createElement("canvas");
     cv.width = NW;

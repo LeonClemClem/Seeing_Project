@@ -21,6 +21,7 @@ import {
   medCurve,
   pd,
   pl,
+  turbo,
   yaxis,
 } from "../lib/util";
 
@@ -69,10 +70,17 @@ export interface HistOpts {
   zoom: number;
   /** Visible x window in viewBox units when zoomed and auto-stretched, else null. */
   win: [number, number] | null;
+  /** Highlighted night (date of the evening, UTC), or null. */
+  sel?: string | null;
+  /** Hours left out of the calibration (filters and nights left out), as hourKey "night|h": in red. */
+  rm?: ReadonlySet<string>;
 }
 
+/** x range (viewBox units) of each night part of the history, for the clicks. */
+export type HistHit = { x0: number; x1: number; night: string };
+
 /** History of forecasts and measurements on a compressed time axis. viewBox 0 0 (1100·zoom) 240. */
-export function histChart(l: LieuData, o: HistOpts): { svg: string; note: string } {
+export function histChart(l: LieuData, o: HistOpts): { svg: string; note: string; hits: HistHit[] } {
   const W = 1100 * o.zoom,
     H = 240,
     L = 36,
@@ -88,6 +96,7 @@ export function histChart(l: LieuData, o: HistOpts): { svg: string; note: string
     return {
       svg: `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" font-size="14" fill="${C_TXT}">${tr("Pas de période avec prévision et mesures pour ce lieu.")}</text>`,
       note: "",
+      hits: [],
     };
   const span = (e: LieuEpisode) => (pd(e.b).getTime() - pd(e.a).getTime()) / 3600000,
     tot = E.reduce((s, e) => s + span(e), 0),
@@ -123,6 +132,7 @@ export function histChart(l: LieuData, o: HistOpts): { svg: string; note: string
   let g = yaxis(Y, L, W - R, ymax, yst, ymin),
     off = L,
     lastDay = "";
+  const hits: HistHit[] = [];
   if (str)
     for (let v = Math.ceil(ymin / yst - 1e-9) * yst; v <= ymax + 1e-9; v = +(v + yst).toFixed(6))
       g += `<text x="${xa + 6}" y="${Y(v) - 3}" font-size="10" fill="#e6ebf6" stroke="#0a0f1d" stroke-width="3" paint-order="stroke">${+v.toFixed(1)}"</text>`;
@@ -133,6 +143,10 @@ export function histChart(l: LieuData, o: HistOpts): { svg: string; note: string
       w = span(e) * u;
     for (let t = new Date(a); t < pd(e.b); t = new Date(t.getTime() + 1800000))
       if (!isNightDate(t)) g += `<rect x="${X(t)}" y="${T}" width="${u / 2 + 0.4}" height="${ph}" fill="${C_DAY}"/>`;
+    const nk = nightKey(e.a);
+    hits.push({ x0: oo - gap / 2, x1: oo + w + gap / 2, night: nk });
+    if (o.sel === nk)
+      g += `<rect x="${oo - 3}" y="${T}" width="${w + 6}" height="${ph}" fill="rgba(242,193,78,.16)" stroke="#f2c14e" stroke-width="1.5"/>`;
     const d0 = ddmm(a);
     if (d0 !== lastDay && w > 18) {
       g += `<text x="${oo + 2}" y="${T + ph + 14}" font-size="10" fill="#e6ebf6" font-weight="500">${d0}</text>`;
@@ -173,7 +187,16 @@ export function histChart(l: LieuData, o: HistOpts): { svg: string; note: string
         (p) =>
           p[1] != null &&
           keep(p[0]) &&
-          (g += `<rect x="${X(pd(p[0])) - 2.5}" y="${Y(p[1]) - 2.5}" width="5" height="5" fill="${C_OBSD}"/>`),
+          (g += `<rect x="${X(pd(p[0])) - 2.5}" y="${Y(p[1]) - 2.5}" width="5" height="5" fill="${o.rm?.has(hourKeyOf(p[0])) ? C_RM : C_OBSD}"/>`),
+      );
+    // hours left out of the calibration: red mark at the bottom, as in the night chart of Calibrer
+    if (o.rm?.size)
+      e.mediane.forEach(
+        (p) =>
+          p[1] != null &&
+          keep(p[0]) &&
+          o.rm!.has(hourKeyOf(p[0])) &&
+          (g += `<rect x="${X(pd(p[0])) - u / 2}" y="${T + ph - 4}" width="${u}" height="4" fill="${C_RM}"/>`),
       );
     off += w + gap;
     if (n < E.length - 1)
@@ -184,13 +207,22 @@ export function histChart(l: LieuData, o: HistOpts): { svg: string; note: string
     note: tr(
       `${E.length} période(s) avec prévision et mesures, du ${ddmm(pd(E[0]!.a))} au ${ddmm(pd(E[E.length - 1]!.b))} ; axe compressé (seules ces périodes sont montrées).`,
     ),
+    hits,
   };
 }
 
-const nightKey = (s: string) => new Date(pd(s).getTime() - 12 * 3600000).toISOString().slice(0, 10);
+/** Night of a time: date of the evening (UTC), as the calibration nights. */
+export const nightKey = (s: string) => new Date(pd(s).getTime() - 12 * 3600000).toISOString().slice(0, 10);
+/** Calibration hour key "night|h" of a time (h = hours since 12h UTC of the evening), as mock/calibration hourKey. */
+export const hourKeyOf = (s: string) => {
+  const n = nightKey(s);
+  return `${n}|${Math.round((pd(s).getTime() - Date.parse(n + "T12:00:00Z")) / 3600000)}`;
+};
+/** Colour of the hours left out of the calibration (as Calibrer). */
+const C_RM = "#ff4d4d";
 
 /** Forecast vs measured for a place: hourly medians, nightly medians (moons) and raw points. viewBox 0 0 340 320. */
-export function corrChart(l: LieuData, corrf: UiState["corrf"]) {
+export function corrChart(l: LieuData, corrf: UiState["corrf"], sel: string | null = null, rmHours?: ReadonlySet<string>) {
   const prevAt = (() => {
     const m = new Map<string, number>();
     l.episodes.forEach((e) => e.prevu.forEach((p) => p[1] != null && m.set(p[0], p[1])));
@@ -266,6 +298,19 @@ export function corrChart(l: LieuData, corrf: UiState["corrf"]) {
         cy = Y(y);
       g += `<path d="M${cx + 2},${cy - 9} A9,9 0 1,0 ${cx + 2},${cy + 9} A12,12 0 0,1 ${cx + 2},${cy - 9} Z" fill="#f1efe8" stroke="#0a0f1d" stroke-width="1"/>`;
     });
+  // hours left out of the calibration (filters, nights left out) in red, the highlighted night on top in yellow
+  if (rmHours?.size)
+    P.filter((p) => rmHours.has(hourKeyOf(p[0]))).forEach(
+      (p) => (g += `<circle cx="${X(p[1])}" cy="${Y(p[2])}" r="3.6" fill="${C_RM}" stroke="#fff" stroke-width="0.6"/>`),
+    );
+  if (sel && G[sel]) {
+    G[sel].forEach((p) => (g += `<circle cx="${X(p[1])}" cy="${Y(p[2])}" r="5" fill="#f2c14e" stroke="#000" stroke-width="1"/>`));
+    if (G[sel].length >= 2) {
+      const cx = X(med(G[sel].map((p) => p[1]))),
+        cy = Y(med(G[sel].map((p) => p[2])));
+      g += `<circle cx="${cx}" cy="${cy}" r="11" fill="none" stroke="#f2c14e" stroke-width="2.2"/>`;
+    }
+  }
   g += `<text x="${L + pw / 2}" y="${H - 2}" text-anchor="middle" font-size="11" fill="${C_TXT}">${tr("prévu ")}${esc(l.modele)}</text><text x="10" y="${T + ph / 2}" text-anchor="middle" font-size="11" fill="${C_TXT}" transform="rotate(-90 10 ${T + ph / 2})">${tr("mesuré")}</text>`;
   const rr = corr(
       P.map((p) => p[2]),
@@ -472,4 +517,64 @@ export function mailleSvg(nom: string, lat: number, lon: number, alt: number | n
     svg: g,
     caption: tr(`grille AROME 0,025° · ${NG} × ${NG} mailles · altitudes du relief AROME`),
   };
+}
+
+/* ---------- wind roses (Mes lieux) ---------- */
+
+export const ROSE_SECT = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
+
+/** One hour of a wind rose: direction the wind comes from [deg], speed [km/h], colour value. */
+export type RosePt = { dir: number; speed: number; val: number };
+
+/** Sector (8 points of the compass) of a direction. */
+export const roseSector = (dir: number) => ROSE_SECT[Math.floor((((dir + 22.5) % 360) + 360) % 360 / 45)]!;
+
+/** Best sector: lowest median colour value over the sectors with at least `minH` hours. */
+export function roseBest(pts: RosePt[], minH = 5): { sect: string; med: number; n: number } | null {
+  const by = new Map<string, number[]>();
+  pts.forEach((p) => (by.get(roseSector(p.dir)) ?? by.set(roseSector(p.dir), []).get(roseSector(p.dir))!).push(p.val));
+  let best: { sect: string; med: number; n: number } | null = null;
+  by.forEach((v, sect) => {
+    if (v.length < minH) return;
+    const m = med(v);
+    if (!best || m < best.med) best = { sect, med: m, n: v.length };
+  });
+  return best;
+}
+
+/** Polar scatter (north up, clockwise): angle = direction the wind comes from, radius = speed [km/h], colour =
+ * value on turbo between lo and hi (low = blue = good, high = red = bad, as the map), white outlines. Dark-panel style of the site. */
+export function windRoseSvg(pts: RosePt[], lo: number, hi: number): string {
+  const S = 300,
+    C = S / 2,
+    R = 118;
+  const vmax = Math.max(10, ...pts.map((p) => p.speed));
+  const step = vmax > 120 ? 40 : vmax > 60 ? 20 : vmax > 30 ? 10 : 5,
+    top = Math.ceil(vmax / step) * step,
+    rr = (v: number) => (Math.min(v, top) / top) * R,
+    xy = (dir: number, v: number) => [C + rr(v) * Math.sin(dir * D2R), C - rr(v) * Math.cos(dir * D2R)] as const;
+  let g = `<circle cx="${C}" cy="${C}" r="${R}" fill="#1b2438" stroke="#3a4258"/>`;
+  for (let v = step; v < top; v += step) g += `<circle cx="${C}" cy="${C}" r="${rr(v)}" fill="none" stroke="#3a4258" stroke-width="0.7"/>`;
+  ROSE_SECT.forEach((lab, k) => {
+    const a = k * 45,
+      [x, y] = xy(a, top),
+      lx = C + (R + 15) * Math.sin(a * D2R),
+      ly = C - (R + 15) * Math.cos(a * D2R) + 4;
+    g += `<line x1="${C}" y1="${C}" x2="${x}" y2="${y}" stroke="#3a4258" stroke-width="0.7"/>`;
+    g += `<text x="${lx}" y="${ly}" text-anchor="middle" font-size="11" font-weight="${k % 2 ? 400 : 600}" fill="${k % 2 ? C_TXT : "#e6ebf6"}">${tr(lab)}</text>`;
+  });
+  for (let v = step; v <= top; v += step) {
+    const [x, y] = xy(22.5, v);
+    g += `<text x="${x + 2}" y="${y}" font-size="9" fill="${C_TXT}">${v}</text>`;
+  }
+  g += `<text x="${C + R * 0.42}" y="${C - R - 16}" font-size="9" fill="${C_TXT}">km/h</text>`;
+  // worst values drawn last, on top
+  [...pts]
+    .sort((a, b) => a.val - b.val)
+    .forEach((p) => {
+      const [x, y] = xy(p.dir, p.speed),
+        c = turbo(Math.min(1, Math.max(0, (p.val - lo) / (hi - lo || 1))));
+      g += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.8" fill="rgb(${c})" stroke="#fff" stroke-width="0.8"/>`;
+    });
+  return g;
 }

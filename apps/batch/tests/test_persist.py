@@ -129,6 +129,20 @@ def test_run_batch_success_then_idempotent(db, monkeypatch, tmp_path):
     assert calls == [RUN]
 
 
+def test_run_batch_leaves_a_run_being_computed(db, monkeypatch, tmp_path):
+    monkeypatch.setattr("seeing_batch.cli.compute_from_extracted",
+                        lambda run, sites, fh: fake_forecasts(sites, run_time=run.run_time))
+    calls = []
+    kw = dict(grib_dir=tmp_path, find_cycle=lambda: RUN, fetch=_fake_fetch(calls), retention_days=10**5)
+    persist.start_run(db, RUN)  # another execution started it just now
+    assert run_batch(db, **kw) == 0 and calls == []
+    with db.begin() as s:  # ... or 2 h ago: dead execution (killed after 1 h), computed again
+        s.scalar(select(ModelRun)).started_at = datetime.now(UTC) - timedelta(hours=2)
+    assert run_batch(db, **kw) == 0 and calls == [RUN]
+    with db() as s:
+        assert s.scalar(select(ModelRun.status)) == RunStatus.success
+
+
 def test_run_batch_failure_marks_failed(db, tmp_path):
     def fetch(*a, **k):
         raise RuntimeError("download exploded")
@@ -162,9 +176,11 @@ def test_run_batch_no_hours_is_failure(db, monkeypatch, tmp_path):
 def test_parse_run_time():
     assert parse_run_time("2026-10-13T00:00Z") == RUN
     assert parse_run_time("2026-10-13T02:00+02:00") == RUN
-    assert parse_run_time("2026-10-13T03") == RUN + timedelta(hours=3)
+    assert parse_run_time("2026-10-13T06") == RUN + timedelta(hours=6)
     with pytest.raises(Exception):
         parse_run_time("2026-10-13T04:00Z")
+    with pytest.raises(Exception):  # secondary cycle: never computed
+        parse_run_time("2026-10-13T03:00Z")
 
 
 def test_run_batch_stores_map_frames(db, monkeypatch, tmp_path):

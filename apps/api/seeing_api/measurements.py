@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from seeing_api.api import TEAM_SITE, SessionDep, utc
+from seeing_api.api import MAIN_RUN, TEAM_SITE, SessionDep, utc
 from seeing_api.auth import require_json, require_role
 from seeing_db import Forecast, Measurement, ModelRun, RunStatus, Site, User, UserRole
 
@@ -41,6 +41,16 @@ def readable_site(session, slug: str, user: User) -> Site:
     if site is not None and site.owner_id is None:
         return site
     return editable_site(session, slug, user)
+
+
+class CalibSettings(BaseModel):
+    """Calibration settings of a place (Calibrer): filters and nights left out by hand. Nothing is deleted:
+    the measurements of a night left out stay stored."""
+
+    pics: bool = False
+    courtes: bool = False
+    top: int = Field(default=0, ge=0, le=50)
+    out: list[Annotated[str, Field(pattern=r"^\d{4}-\d{2}-\d{2}$")]] = Field(default_factory=list, max_length=2000)
 
 
 class MeasurementsIn(BaseModel):
@@ -108,6 +118,20 @@ def delete_measurements(
     return Response(status_code=204)
 
 
+@router.get("/{slug}/calib", response_model=CalibSettings)
+def get_calib(slug: str, session: SessionDep, user: LoggedIn) -> CalibSettings:
+    site = editable_site(session, slug, user)
+    return CalibSettings(**(site.calib or {}))
+
+
+@router.put("/{slug}/calib", status_code=204, dependencies=[Depends(require_json)])
+def put_calib(slug: str, body: CalibSettings, session: SessionDep, user: LoggedIn) -> Response:
+    site = editable_site(session, slug, user)
+    site.calib = body.model_dump() | {"out": sorted(set(body.out))}
+    session.commit()
+    return Response(status_code=204)
+
+
 @router.get("/{slug}/terms", response_model=TermsOut)
 def get_terms(
     slug: str, session: SessionDep, user: LoggedIn,
@@ -127,7 +151,7 @@ def get_terms(
         )
         .join(ModelRun, ModelRun.id == Forecast.run_id)
         .where(
-            Forecast.site_id == site.id, ModelRun.status == RunStatus.success, Forecast.i_tke.is_not(None),
+            Forecast.site_id == site.id, ModelRun.status == RunStatus.success, MAIN_RUN, Forecast.i_tke.is_not(None),
             Forecast.valid_time >= start, Forecast.valid_time < end,
         )
         .subquery()

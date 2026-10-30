@@ -187,17 +187,21 @@ def test_fisheye_cloud_cover(client, session):
 
 
 def test_week_view_stitches_main_runs(client, session):
-    # 00Z (3 h), 03Z secondary (3 h), 06Z (3 h): week view = 00Z, 01Z, 02Z from 00Z, 03Z-05Z from 03Z
-    # (fills the gap), 06Z-08Z from 06Z; the run view keeps the 06Z run only.
+    # 00Z (3 h), 03Z secondary (3 h), 06Z (3 h): week view = 00Z-02Z from 00Z, then 06Z-08Z from 06Z; the
+    # secondary 03Z is never used (its hours stay a gap); the run view keeps the 06Z run only.
     add_run(session, T0, seeing=[1.0, 1.1, 1.2])
     add_run(session, T0 + timedelta(hours=3), seeing=[2.0, 2.1, 2.2])
     add_run(session, T0 + timedelta(hours=6), seeing=[3.0, 3.1, 3.2])
     wk = client.get("/api/sites/saint-veran/forecast", params={"view": "week"}).json()
-    assert [p["seeing_arcsec"] for p in wk["points"]] == [1.0, 1.1, 1.2, 2.0, 2.1, 2.2, 3.0, 3.1, 3.2]
+    assert [p["seeing_arcsec"] for p in wk["points"]] == [1.0, 1.1, 1.2, 3.0, 3.1, 3.2]
     run = client.get("/api/sites/saint-veran/forecast").json()
     assert [p["seeing_arcsec"] for p in run["points"]] == [3.0, 3.1, 3.2]
     cn = client.get("/api/sites/saint-veran/cn2", params={"view": "week"}).json()
-    assert len(cn["valid_times"]) == 9 and cn["run_time"] == "2026-10-13T06:00:00Z"
+    assert len(cn["valid_times"]) == 6 and cn["run_time"] == "2026-10-13T06:00:00Z"
+    # a secondary run is never the latest nor readable by its time
+    add_run(session, T0 + timedelta(hours=9), seeing=[4.0])
+    assert client.get("/api/runs/latest").json()["run_time"] == "2026-10-13T06:00:00Z"
+    assert client.get("/api/sites/saint-veran/forecast", params={"run": "2026-10-13T09:00:00Z"}).status_code == 404
     assert client.get("/api/sites/saint-veran/cn2", params={"view": "x"}).status_code == 422
 
 

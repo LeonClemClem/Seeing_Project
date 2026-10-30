@@ -209,6 +209,10 @@ export const api = {
   measurements: (slug: string) => get<Measurements>(`/api/sites/${encodeURIComponent(slug)}/measurements`),
   addMeasurements: (slug: string, points: [string, number][]) =>
     post<{ stored: number; rejected: number }>(`/api/sites/${encodeURIComponent(slug)}/measurements`, { points }),
+  /** Calibration settings saved with the place: filters and nights left out. */
+  calib: (slug: string) => get<{ pics: boolean; courtes: boolean; top: number; out: string[] }>(`/api/sites/${encodeURIComponent(slug)}/calib`),
+  saveCalib: (slug: string, b: { pics: boolean; courtes: boolean; top: number; out: string[] }) =>
+    send<void>("PUT", `/api/sites/${encodeURIComponent(slug)}/calib`, b),
   deleteMeasurements: (slug: string, night?: string) =>
     send<void>("DELETE", `/api/sites/${encodeURIComponent(slug)}/measurements${night ? `?night=${night}` : ""}`),
   fisheye: (lat: number, lon: number, alt?: number | null) =>

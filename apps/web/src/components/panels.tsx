@@ -8,6 +8,7 @@ import type { Place } from "../data/places";
 import { tr } from "../i18n";
 import type { LieuData } from "../mock/engine";
 import { setState, useLangMemo, useUi, type UiState } from "../store";
+import { exportSvgIn, fileSafe } from "../lib/export";
 import { pad2 } from "../lib/util";
 import { Chip, Seg, Spinner, SvgChart } from "./ui";
 
@@ -56,8 +57,22 @@ export function DataChips({ id }: { id: string }) {
 /** History chart with horizontal zoom and the auto vertical stretch on the visible part. */
 /** `head` (title and legend) goes in the left column of the header, as in the mock-up: the histogram inset on
  * the right then spans from the top of the panel down to the zoom row. */
-export function HistPanel({ data, OB, inset = true, head }: { data: LieuData; OB: boolean; inset?: boolean; head?: ReactNode }) {
+export function HistPanel({
+  data,
+  OB,
+  inset = true,
+  head,
+  rm,
+}: {
+  data: LieuData;
+  OB: boolean;
+  inset?: boolean;
+  head?: ReactNode;
+  /** hours left out of the calibration, hourKey "night|h" (Calibrer) */
+  rm?: ReadonlySet<string>;
+}) {
   const mesf = useUi((s) => s.mesf);
+  const sel = useUi((s) => s.selNight);
   const [zoom, setZoom] = useState(1);
   const [stretch, setStretch] = useState(true);
   const [win, setWin] = useState<[number, number] | null>(null);
@@ -85,7 +100,14 @@ export function HistPanel({ data, OB, inset = true, head }: { data: LieuData; OB
     };
   });
 
-  const h = useLangMemo(() => histChart(data, { OB, mesf, zoom, win }), [data, OB, mesf, zoom, win]);
+  const h = useLangMemo(() => histChart(data, { OB, mesf, zoom, win, sel, rm }), [data, OB, mesf, zoom, win, sel, rm]);
+  /** Click on a night: highlight it in the history and the correlation (click again: none). */
+  const pick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect(),
+      x = ((e.clientX - r.left) / r.width) * 1100 * zoom,
+      hit = h.hits.find((q) => x >= q.x0 && x <= q.x1);
+    if (hit) setState({ selNight: sel === hit.night ? null : hit.night });
+  };
   const hv = useMemo(() => (inset ? seeHist(data) : []), [data, inset]);
   // inset as the mock-up: it takes the height of the header row, the histogram fills it
   const insetRef = useRef<HTMLDivElement>(null);
@@ -127,15 +149,22 @@ export function HistPanel({ data, OB, inset = true, head }: { data: LieuData; OB
         )}
       </div>
       <div ref={sc} style={{ overflowX: "auto" }}>
-        <SvgChart
-          html={h.svg}
-          viewBox={`0 0 ${1100 * zoom} 240`}
-          label="Historique du lieu"
-          style={{ width: `${100 * zoom}%`, minWidth: `${700 * zoom}px`, maxWidth: "none" }}
-        />
+        <div onClick={pick} style={{ width: `${100 * zoom}%`, minWidth: `${700 * zoom}px`, cursor: "pointer" }}>
+          <SvgChart html={h.svg} viewBox={`0 0 ${1100 * zoom} 240`} label="Historique du lieu" style={{ width: "100%", maxWidth: "none" }} />
+        </div>
       </div>
       <p className="small muted" style={{ margin: "4px 0 0" }}>
-        {h.note}
+        {h.note}{" "}
+        {sel ? (
+          <>
+            · <b style={{ color: "#f2c14e" }}>{tr(`nuit du ${sel.slice(8, 10)}/${sel.slice(5, 7)} surlignée`)}</b>{" "}
+            <button className="small" onClick={() => setState({ selNight: null })}>
+              {tr("ne plus surligner")}
+            </button>
+          </>
+        ) : (
+          tr("· clique sur une nuit pour la surligner ici et dans la corrélation.")
+        )}
       </p>
     </>
   );
@@ -184,6 +213,7 @@ export function Cn2RealPanel({
   const [alt, setAlt] = useState("4");
   const [view, setView] = useState<View>(defaultView);
   const [zoom, setZoom] = useState(1);
+  const [smooth, setSmooth] = useState(false);
   const { forecast, cn2 } = useRealForecast(place, view);
   const histMed = useHourlyMedians(place);
   const raw = useRawMeasurements(place);
@@ -195,7 +225,10 @@ export function Cn2RealPanel({
     () => (cn2.data ? cn2Ctx(cn2.data, forecast.data, alt, showObs ? obs : undefined, zoom, showObs ? raw : [], mesf) : null),
     [cn2.data, forecast.data, alt, obs, raw, showObs, zoom, mesf],
   );
-  const svg = useLangMemo(() => (ctx && cn2.data ? cn2RealSvg(ctx, Date.parse(cn2.data.run_time)) : ""), [ctx, cn2.data]);
+  const svg = useLangMemo(
+    () => (ctx && cn2.data ? cn2RealSvg(ctx, Date.parse(cn2.data.run_time), smooth) : ""),
+    [ctx, cn2.data, smooth],
+  );
   // zoomed: both vertical axes stay on the edges of the visible part (the drawing scrolls under them)
   const axes = useLangMemo(() => (ctx && ctx.n ? { left: cn2AxisLeft(ctx), right: cn2AxisRight(ctx) } : null), [ctx]);
   const [hover, setHover] = useState<number | null>(null);
@@ -259,6 +292,15 @@ export function Cn2RealPanel({
       <button onClick={() => setZoomC(0.5)}>−</button>
       <button onClick={() => setZoomC(2)}>+</button>
       <button onClick={() => setZoomC(0)}>{tr("tout voir")}</button>
+      <button
+        title={tr("Télécharger le panneau Cn² (PNG)")}
+        onClick={() => exportSvgIn(svgRef.current, `cn2_${fileSafe(place.nom)}_${(cn2.data?.run_time ?? "").slice(0, 13).replace(/[-T]/g, "")}Z.png`)}
+      >
+        ⤓ PNG
+      </button>
+      <Chip on={smooth} onToggle={() => setSmooth(!smooth)} title={tr("Fondu entre heures voisines, pour l'image seulement")}>
+        {tr("Interpolation temporelle")}
+      </Chip>
       {profile && <span className="small muted">{tr("survole le panneau : profil à l'heure choisie")}</span>}
     </div>
   );

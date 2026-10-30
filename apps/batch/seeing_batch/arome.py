@@ -31,6 +31,8 @@ logger = logging.getLogger(__name__)
 PACKAGES = ("SP2", "SP3", "HP1", "HP2", "IP1", "IP4")
 # Every AROME 0.025 cycle (00, 03, ..., 21 UTC) is published up to H+51 (group 49H51H).
 CYCLE_HOURS = Arome0025.freq_update
+# Only the main cycles are computed (00, 06, 12, 18 UTC), never the secondary ones (03, 09, 15, 21 UTC).
+MAIN_CYCLE_HOURS = 6
 
 
 def _date_str(run_time: datetime) -> str:
@@ -47,17 +49,20 @@ def cycle_complete(run_time: datetime, packages: Sequence[str] = PACKAGES) -> bo
 
 
 def latest_complete_cycle(packages: Sequence[str] = PACKAGES, max_back: int = Arome0025.past_runs_) -> datetime:
-    """Most recent cycle whose packages are all published. Starts from meteofetch's latest
-    available cycle for the slowest-checked package and steps back if another one is incomplete."""
+    """Most recent MAIN cycle (00, 06, 12, 18 UTC) whose packages are all published. Starts from
+    meteofetch's latest available cycle for the slowest-checked package, brought back to the main cycle at
+    or before it, and steps back 6 h at a time if a package is incomplete. Secondary cycles are never
+    returned."""
     latest = Arome0025.get_latest_forecast_time(paquet=packages[0])
     if latest is None:
         raise RuntimeError("No AROME 0.025 cycle available")
     candidate = pd.Timestamp(latest).to_pydatetime().astimezone(UTC)
-    for _ in range(max_back):
+    candidate -= timedelta(hours=candidate.hour % MAIN_CYCLE_HOURS)
+    for _ in range(max(1, max_back * CYCLE_HOURS // MAIN_CYCLE_HOURS)):
         if cycle_complete(candidate, packages):
             return candidate
-        logger.info("AROME cycle %s incomplete, trying the previous one", candidate.isoformat())
-        candidate -= timedelta(hours=CYCLE_HOURS)
+        logger.info("AROME cycle %s incomplete, trying the previous main one", candidate.isoformat())
+        candidate -= timedelta(hours=MAIN_CYCLE_HOURS)
     raise RuntimeError("No complete AROME 0.025 cycle found")
 
 

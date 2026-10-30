@@ -2,7 +2,7 @@
  * Per-place forecast. API sites show the real latest run (seeing, Cn², boundary layer); personal places
  * use the fictitious model with the K in use, plus mock measurements.
  */
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { corrChart } from "../charts/lieuCharts";
@@ -13,6 +13,7 @@ import { hourlyMedians, useHourlyMedians, useRawMeasurements, usePlaceLoading, u
 import { Cn2Legend, LegArome, LegBreak, LegDay, LegMed, LegMes, Seg, Spinner, Sw, SvgChart } from "../components/ui";
 import { kHidden, kTxt, useCurrentPlace, type Place } from "../data/places";
 import { tr } from "../i18n";
+import { exportSvgIn, fileSafe } from "../lib/export";
 import { fmt } from "../lib/util";
 import { lieuData } from "../mock/engine";
 import { useLangMemo, useUi } from "../store";
@@ -116,7 +117,8 @@ function RealHistory({ place, OB, head }: { place: Place; OB: boolean; head: Rea
 function RealCorr({ place }: { place: Place }) {
   const data = useSiteHistory(place);
   const corrf = useUi((s) => s.corrf);
-  const c = useLangMemo(() => (data && data.paires.length ? corrChart(data, corrf) : null), [data, corrf]);
+  const sel = useUi((s) => s.selNight);
+  const c = useLangMemo(() => (data && data.paires.length ? corrChart(data, corrf, sel) : null), [data, corrf, sel]);
   const loading = usePlaceLoading(place);
   if (!c && loading) return <Spinner />;
   if (!c) return <NoData text="Corrélation : choisis un lieu avec seeing monitor." />;
@@ -157,6 +159,7 @@ function KRead({ place }: { place: Place }) {
 }
 
 function RealSeeing({ place }: { place: Place }) {
+  const box = useRef<HTMLDivElement>(null);
   const role = useUi((s) => s.role);
   const showObs = useUi((s) => s.showObs);
   const { forecast } = useRealForecast(place);
@@ -173,7 +176,17 @@ function RealSeeing({ place }: { place: Place }) {
   );
   if (forecast.isLoading) return <Spinner />;
   if (forecast.isError || !forecast.data) return <NoData text="Pas de prévision enregistrée pour ce lieu." />;
-  return <SvgChart html={svg} viewBox="0 0 900 220" label="Seeing prévu" />;
+  const run = forecast.data.run_time.slice(0, 13).replace(/[-T]/g, "");
+  return (
+    <div ref={box}>
+      <SvgChart html={svg} viewBox="0 0 900 220" label="Seeing prévu" />
+      <div style={{ textAlign: "right" }}>
+        <button className="small" title={tr("Télécharger la courbe de prévision (PNG)")} onClick={() => exportSvgIn(box.current, `prevision_seeing_${fileSafe(place.nom)}_${run}Z.png`)}>
+          ⤓ PNG
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function MockSeeing({ place }: { place: Place }) {
