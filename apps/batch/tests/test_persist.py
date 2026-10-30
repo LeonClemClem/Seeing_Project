@@ -129,6 +129,20 @@ def test_run_batch_success_then_idempotent(db, monkeypatch, tmp_path):
     assert calls == [RUN]
 
 
+def test_run_batch_leaves_a_run_being_computed(db, monkeypatch, tmp_path):
+    monkeypatch.setattr("seeing_batch.cli.compute_from_extracted",
+                        lambda run, sites, fh: fake_forecasts(sites, run_time=run.run_time))
+    calls = []
+    kw = dict(grib_dir=tmp_path, find_cycle=lambda: RUN, fetch=_fake_fetch(calls), retention_days=10**5)
+    persist.start_run(db, RUN)  # another execution started it just now
+    assert run_batch(db, **kw) == 0 and calls == []
+    with db.begin() as s:  # ... or 2 h ago: dead execution (killed after 1 h), computed again
+        s.scalar(select(ModelRun)).started_at = datetime.now(UTC) - timedelta(hours=2)
+    assert run_batch(db, **kw) == 0 and calls == [RUN]
+    with db() as s:
+        assert s.scalar(select(ModelRun.status)) == RunStatus.success
+
+
 def test_run_batch_failure_marks_failed(db, tmp_path):
     def fetch(*a, **k):
         raise RuntimeError("download exploded")

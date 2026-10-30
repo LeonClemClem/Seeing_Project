@@ -53,6 +53,10 @@ def run_status(session: Session, run_time: datetime) -> RunStatus | None:
     return session.scalar(select(ModelRun.status).where(ModelRun.run_time == run_time))
 
 
+def run_started_at(session: Session, run_time: datetime) -> datetime | None:
+    return session.scalar(select(ModelRun.started_at).where(ModelRun.run_time == run_time))
+
+
 def start_run(session_factory: sessionmaker, run_time: datetime) -> int:
     """Upsert the model_runs row of `run_time` as `running`; returns its id."""
     with session_factory.begin() as session:
