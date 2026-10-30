@@ -222,7 +222,7 @@ export const hourKeyOf = (s: string) => {
 const C_RM = "#ff4d4d";
 
 /** Forecast vs measured for a place: hourly medians, nightly medians (moons) and raw points. viewBox 0 0 340 320. */
-export function corrChart(l: LieuData, corrf: UiState["corrf"], sel: string | null = null, rm?: ReadonlySet<string>) {
+export function corrChart(l: LieuData, corrf: UiState["corrf"], sel: string | null = null, rmHours?: ReadonlySet<string>) {
   const prevAt = (() => {
     const m = new Map<string, number>();
     l.episodes.forEach((e) => e.prevu.forEach((p) => p[1] != null && m.set(p[0], p[1])));
@@ -299,8 +299,8 @@ export function corrChart(l: LieuData, corrf: UiState["corrf"], sel: string | nu
       g += `<path d="M${cx + 2},${cy - 9} A9,9 0 1,0 ${cx + 2},${cy + 9} A12,12 0 0,1 ${cx + 2},${cy - 9} Z" fill="#f1efe8" stroke="#0a0f1d" stroke-width="1"/>`;
     });
   // hours left out of the calibration (filters, nights left out) in red, the highlighted night on top in yellow
-  if (rm?.size)
-    P.filter((p) => rm.has(hourKeyOf(p[0]))).forEach(
+  if (rmHours?.size)
+    P.filter((p) => rmHours.has(hourKeyOf(p[0]))).forEach(
       (p) => (g += `<circle cx="${X(p[1])}" cy="${Y(p[2])}" r="3.6" fill="${C_RM}" stroke="#fff" stroke-width="0.6"/>`),
     );
   if (sel && G[sel]) {
