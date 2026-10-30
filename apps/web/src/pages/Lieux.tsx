@@ -48,7 +48,7 @@ export default function Lieux() {
       <h1>{tr("Mes lieux")}</h1>
       <p className="lead">
         {tr(
-          "Tes lieux personnels : historique des prévisions et des mesures, corrélation et panneau Cn². Tu peux aussi consulter les sites publics et les lieux partagés par la communauté (lecture seule, K confidentiels).",
+          "Tes lieux personnels : historique des prévisions et des mesures, corrélation et panneau Cn². Tu peux aussi consulter les sites publics et les lieux partagés par la communauté (lecture seule).",
         )}{" "}
         <b>{tr("Données réelles")}</b> {tr("pour les sites publics (prévisions AROME V2bd du dernier run), contrairement au reste de la maquette.")}
       </p>
@@ -281,8 +281,9 @@ function PlaceDetail({ l }: { l: Place }) {
             {l.kind === "pub" ? tr(l.shared ? " (partagé par la communauté)" : " (site public)") : ""}
           </h2>
           <span className="small muted mono">
-            {tr(kTxt(l.K, hid, fmt))}
-            {first && lastE ? tr(` · mesures du ${ddmm(pd(first.a))} au ${ddmm(pd(lastE.b))}`) : ""}
+            {[tr(kTxt(l.K, hid, fmt)), first && lastE ? tr(`mesures du ${ddmm(pd(first.a))} au ${ddmm(pd(lastE.b))}`) : ""]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         </div>
         <div className="legend">

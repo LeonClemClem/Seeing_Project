@@ -133,12 +133,12 @@ export default function Header() {
         <span>
           {tr("Prochain run principal")} <b className="mono">{runMs ? pad2(new Date(runMs + 6 * 3600000).getUTCHours()) + "Z" : "–"}</b>
         </span>
-        <span>
-          {tr("K du lieu")}{" "}
-          <b className="mono">
-            {tr(hid ? "confidentiels" : `${fmt(K[0])} / ${fmt(K[1])} / ${fmt(K[2])} · ${kmode === "A" ? "calés" : "manuels"}`)}
-          </b>
-        </span>
+        {!hid && (
+          <span>
+            {tr("K du lieu")}{" "}
+            <b className="mono">{tr(`${fmt(K[0])} / ${fmt(K[1])} / ${fmt(K[2])} · ${kmode === "A" ? "calés" : "manuels"}`)}</b>
+          </span>
+        )}
         {realView ? (
           <span className="pill p-ok">{tr("Données réelles")} · AROME</span>
         ) : (

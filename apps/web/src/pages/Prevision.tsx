@@ -142,6 +142,7 @@ function KRead({ place }: { place: Place }) {
   const role = useUi((s) => s.role);
   const K = useUi((s) => s.K);
   const kmode = useUi((s) => s.kmode);
+  if (place.real && kHidden(place, role)) return null; // K of the public sites: not shown, not mentioned
   const txt = place.real
     ? `${kTxt(place.K, kHidden(place, role), fmt)} (${tr("calcul du run, données réelles")})`
     : `K_TKE = ${fmt(K[0])}  K_CIS = ${fmt(K[1])}  K_conv = 0.1 (${tr(kmode === "A" ? "calés" : "manuels")})`;

@@ -28,7 +28,7 @@ const NIGHT_H = [19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5],
   MAPH = [...NIGHT_H, ...NIGHT_H],
   inMean = (i: number) => MAPH[i] !== 19 && MAPH[i] !== 5;
 const LEADMAX = 51;
-const KGLOB = [2, 57, 0.1];
+const KGLOB = [1, 35, 0.1];
 const JS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
 const LUT = [...Array(256)].map((_, k) => turbo(k / 255));
 /** Colour of a seeing value: turbo on a fixed 0-10" range with a fixed square-root stretch, the same for
