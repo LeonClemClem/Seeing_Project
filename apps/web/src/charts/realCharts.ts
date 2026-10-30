@@ -113,7 +113,7 @@ export function prevRealSvg(
     const [li, lv] = sv.reduce((m, q) => (q[1] > m[1] ? q : m));
     g += `<text x="${X(li + 0.5)}" y="${Y(lv) - 9}" text-anchor="middle" font-size="13" font-weight="700" fill="${C_AR}" stroke="#0a0f1d" stroke-width="3.5" paint-order="stroke">Seeing AROME</text>`;
   }
-  g += `<line x1="${X(0)}" x2="${X(0)}" y1="${T}" y2="${T + ph}" stroke="#f2c14e" stroke-width="1.6" stroke-dasharray="5 3"/><text x="${X(0) + 4}" y="${T + ph - 6}" font-size="11" fill="#f2c14e">run ${runLabel(ms(fc.run_time))} · ${tr(kLabel)}</text>`;
+  g += `<line x1="${X(0)}" x2="${X(0)}" y1="${T}" y2="${T + ph}" stroke="#f2c14e" stroke-width="1.6" stroke-dasharray="5 3"/><text x="${X(0) + 4}" y="${T + ph - 6}" font-size="11" fill="#f2c14e">run ${runLabel(ms(fc.run_time))}${kLabel ? ` · ${tr(kLabel)}` : ""}</text>`;
   return g;
 }
 
