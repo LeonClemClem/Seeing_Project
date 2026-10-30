@@ -8,6 +8,7 @@ import type { Place } from "../data/places";
 import { tr } from "../i18n";
 import type { LieuData } from "../mock/engine";
 import { setState, useLangMemo, useUi, type UiState } from "../store";
+import { exportSvgIn, fileSafe } from "../lib/export";
 import { pad2 } from "../lib/util";
 import { Chip, Seg, Spinner, SvgChart } from "./ui";
 
@@ -263,6 +264,12 @@ export function Cn2RealPanel({
       <button onClick={() => setZoomC(0.5)}>−</button>
       <button onClick={() => setZoomC(2)}>+</button>
       <button onClick={() => setZoomC(0)}>{tr("tout voir")}</button>
+      <button
+        title={tr("Télécharger le panneau Cn² (PNG)")}
+        onClick={() => exportSvgIn(svgRef.current, `cn2_${fileSafe(place.nom)}_${(cn2.data?.run_time ?? "").slice(0, 13).replace(/[-T]/g, "")}Z.png`)}
+      >
+        ⤓ PNG
+      </button>
       <Chip on={smooth} onToggle={() => setSmooth(!smooth)} title={tr("Fondu entre heures voisines, pour l'image seulement")}>
         {tr("Interpolation temporelle")}
       </Chip>

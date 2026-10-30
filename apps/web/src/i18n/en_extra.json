@@ -140,5 +140,10 @@
 "Pas de nuages pour ce run : ils arrivent avec le prochain run AROME.": "No clouds for this run: they come with the next AROME run.",
 "Relief": "Relief",
 "Interpolation temporelle": "Time interpolation",
-"Fondu entre heures voisines, pour l'image seulement": "Blend between neighbouring hours, for the picture only"
+"Fondu entre heures voisines, pour l'image seulement": "Blend between neighbouring hours, for the picture only",
+"Télécharger la carte affichée (PNG)": "Download the map shown (PNG)",
+"Télécharger l'animation des heures de la nuit choisie (GIF)": "Download the animation of the hours of the chosen night (GIF)",
+"GIF…": "GIF…",
+"Télécharger le panneau Cn² (PNG)": "Download the Cn² panel (PNG)",
+"Télécharger la courbe de prévision (PNG)": "Download the forecast curve (PNG)"
 }
