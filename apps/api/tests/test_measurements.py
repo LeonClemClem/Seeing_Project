@@ -32,7 +32,7 @@ def client_for(email: str) -> TestClient:
     return c
 
 
-def test_upload_read_delete_measurements():
+def test_upload_read_measurements_never_deleted():
     ada = client_for("ada@example.org")
     slug = ada.post("/api/places", json={"name": "Jardin", "lat": 44.3, "lon": 5.3}).json()["slug"]
     pts = [["2026-10-13T21:00:00Z", 1.2], ["2026-10-13T21:05:00Z", 1.4], ["2026-10-14T22:00:00Z", 0.9], ["2026-10-13T21:10:00Z", 99]]
@@ -42,8 +42,9 @@ def test_upload_read_delete_measurements():
     ada.post(f"/api/sites/{slug}/measurements", json={"points": [["2026-10-13T21:00:00Z", 1.3]]})
     m = ada.get(f"/api/sites/{slug}/measurements").json()
     assert m["seeing_arcsec"] == [1.3, 1.4, 0.9] and m["times"][0] == "2026-10-13T21:00:00Z"
-    assert ada.request("DELETE", f"/api/sites/{slug}/measurements", params={"night": "2026-10-13"}, json={}).status_code == 204
-    assert ada.get(f"/api/sites/{slug}/measurements").json()["seeing_arcsec"] == [0.9]
+    # no route deletes measurements: a night is only left out of the calibration
+    assert ada.request("DELETE", f"/api/sites/{slug}/measurements", params={"night": "2026-10-13"}, json={}).status_code == 405
+    assert ada.get(f"/api/sites/{slug}/measurements").json()["seeing_arcsec"] == [1.3, 1.4, 0.9]
 
     bob = client_for("bob@example.org")
     assert bob.get(f"/api/sites/{slug}/measurements").status_code == 404

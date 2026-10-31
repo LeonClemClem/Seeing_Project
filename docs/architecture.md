@@ -89,7 +89,7 @@ Batch only:
 | `FORECAST_HOURS` | `51` | Last lead hour computed (0..51). |
 | `MAP_ENABLED` | `1` | `0` skips the global map (sites only). A map failure never fails the run. |
 | `MAP_STRIDE` | `2` | Map grid = every n-th AROME 0.025 point (2 -> 0.05 deg, ~200 000 columns, ~13 s per lead hour). |
-| `RETENTION_DAYS` | `14` (envs: `36500`) | Model runs older than this are deleted. 36500 = keep everything. |
+| `RETENTION_DAYS` | `36500` (envs: `36500`) | Model runs older than this are deleted. 36500 = keep everything. |
 | `LOG_LEVEL` | `INFO` | |
 
 API only:

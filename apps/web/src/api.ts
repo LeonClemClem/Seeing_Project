@@ -240,7 +240,10 @@ export const api = {
   sites: () => get<Site[]>("/api/sites"),
   createPlace: (b: PlaceIn) => post<Site>("/api/places", b),
   updatePlace: (slug: string, b: PlacePatch) => send<Site>("PATCH", `/api/places/${encodeURIComponent(slug)}`, b),
-  deletePlace: (slug: string) => send<void>("DELETE", `/api/places/${encodeURIComponent(slug)}`),
+  /** Archive a place (nothing is deleted: forecasts and measurements kept, restorable). */
+  archivePlace: (slug: string) => send<void>("DELETE", `/api/places/${encodeURIComponent(slug)}`),
+  archivedPlaces: () => get<Site[]>("/api/places/archived"),
+  restorePlace: (slug: string) => post<Site>(`/api/places/${encodeURIComponent(slug)}/restore`, {}),
   measurements: (slug: string) => get<Measurements>(`/api/sites/${encodeURIComponent(slug)}/measurements`),
   addMeasurements: (slug: string, points: [string, number][]) =>
     post<{ stored: number; rejected: number }>(`/api/sites/${encodeURIComponent(slug)}/measurements`, { points }),
@@ -251,8 +254,6 @@ export const api = {
     send<void>("PUT", `/api/sites/${encodeURIComponent(slug)}/k`, b),
   saveCalib: (slug: string, b: { pics: boolean; courtes: boolean; top: number; out: string[] }) =>
     send<void>("PUT", `/api/sites/${encodeURIComponent(slug)}/calib`, b),
-  deleteMeasurements: (slug: string, night?: string) =>
-    send<void>("DELETE", `/api/sites/${encodeURIComponent(slug)}/measurements${night ? `?night=${night}` : ""}`),
   point: (lat: number, lon: number) => get<PointForecast>(`/api/point?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`),
   fisheye: (lat: number, lon: number, alt?: number | null) =>
     get<Fisheye>(`/api/fisheye?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}${alt != null ? `&alt=${Math.round(alt)}` : ""}`),
