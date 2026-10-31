@@ -103,7 +103,7 @@ class SkillBin(BaseModel):
     r: float | None
     bias: float | None  # mean (forecast - measured), arcsec
     mae: float | None  # mean |forecast - measured|, arcsec
-    sd: float | None  # standard deviation of |forecast - measured| (band around mae)
+    sd: float | None  # standard deviation of forecast - measured (band around the bias)
     rmse: float | None
 
 
@@ -115,7 +115,7 @@ class SkillNight(BaseModel):
     n_nights: int
     bias: float | None
     mae: float | None
-    sd: float | None  # standard deviation of |forecast - measured| between the nights
+    sd: float | None  # standard deviation of forecast - measured between the nights (band around the bias)
 
 
 class SkillOut(BaseModel):
@@ -209,7 +209,7 @@ def get_skill(slug: str, session: SessionDep, user: CurrentUser) -> SkillOut:
         bins.append(SkillBin(
             age_from=b * SKILL_BIN_H, age_to=(b + 1) * SKILL_BIN_H, n_hours=len(g),
             n_nights=len({(x[2] - timedelta(hours=12)).date() for x in g}), r=_pearson(p, o),
-            bias=statistics.fmean(d), mae=statistics.fmean(abs(x) for x in d), sd=_sd([abs(x) for x in d]),
+            bias=statistics.fmean(d), mae=statistics.fmean(abs(x) for x in d), sd=_sd(d),
             rmse=math.sqrt(statistics.fmean(x * x for x in d)),
         ))
     by_age: dict[int, list[float]] = {}
@@ -220,7 +220,7 @@ def get_skill(slug: str, session: SessionDep, user: CurrentUser) -> SkillOut:
         age = round((midnight - run_time).total_seconds() / 3600)
         by_age.setdefault(age, []).append(statistics.median(x[0] for x in g) - statistics.median(x[1] for x in g))
     nights = [SkillNight(age=a, n_nights=len(d), bias=statistics.fmean(d), mae=statistics.fmean(abs(x) for x in d),
-                         sd=_sd([abs(x) for x in d]))
+                         sd=_sd(d))
               for a, d in sorted(by_age.items())]
     return SkillOut(bins=bins, nights=nights)
 

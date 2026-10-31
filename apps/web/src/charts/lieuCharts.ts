@@ -25,74 +25,65 @@ import {
   yaxis,
 } from "../lib/util";
 
-/** Error of the forecast with the age of the run (square panel under the correlation): mean |forecast - measured| for
- * each hour of age (orange, band of one standard deviation) and by night, medians of the night (white, age at 00h UTC,
- * bars of one standard deviation); the ages with few compared hours (or nights) are see-through. */
+/** Signed error of the forecast with the age of the run (square panel under the correlation): mean forecast - measured
+ * for each hour of age (orange) and by night, medians of the night (white, dashed, age at 00h UTC), each with a band of
+ * one standard deviation. Above 0, AROME forecasts a worse seeing than measured. The ages with few compared hours (or
+ * nights) are see-through. */
 export function skillSvg(bins: SkillBin[], nights: SkillNight[] = []) {
   const W = 200,
     H = 200,
-    L = 28,
+    L = 30,
     R = 8,
     T = 8,
     B = 30,
     pw = W - L - R,
     ph = H - T - B,
     amax = Math.max(48, ...bins.map((b) => b.age_to)),
+    hp = bins.filter((b) => b.bias != null),
+    nn = nights.filter((n) => n.bias != null),
     emax = Math.max(
       0.5,
-      Math.ceil(Math.max(...bins.map((b) => (b.mae ?? 0) + (b.sd ?? 0)), ...nights.map((n) => (n.mae ?? 0) + (n.sd ?? 0))) * 1.1 * 2) / 2,
+      Math.ceil(Math.max(...hp.map((b) => Math.abs(b.bias!) + (b.sd ?? 0)), ...nn.map((n) => Math.abs(n.bias!) + (n.sd ?? 0))) * 1.05 * 2) / 2,
     ),
     X = (a: number) => L + (a / amax) * pw,
-    Y = (v: number) => T + ph - (Math.min(v, emax) / emax) * ph,
-    pts = bins.filter((b) => b.mae != null);
+    Y = (v: number) => T + ph / 2 - (Math.max(-emax, Math.min(v, emax)) / emax) * (ph / 2),
+    sg = (v: number) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(v === 0 ? 0 : 1);
   let g = "";
-  [0, emax / 4, emax / 2, (3 * emax) / 4, emax].forEach(
+  [-emax, -emax / 2, 0, emax / 2, emax].forEach(
     (v) =>
-      (g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${C_LINE}" stroke-width="0.5"/><text x="${L - 3}" y="${Y(v) + 3}" text-anchor="end" font-size="9" fill="${C_TXT}">${v.toFixed(1)}"</text>`),
+      (g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${v === 0 ? C_TXT : C_LINE}" stroke-width="${v === 0 ? 0.9 : 0.5}"/><text x="${L - 3}" y="${Y(v) + 3}" text-anchor="end" font-size="9" fill="${C_TXT}">${sg(v)}"</text>`),
   );
   for (let a = 0; a <= amax; a += 12)
     g += `<line x1="${X(a)}" x2="${X(a)}" y1="${T}" y2="${T + ph}" stroke="${C_LINE}" stroke-width="0.5"/><text x="${X(a)}" y="${T + ph + 12}" text-anchor="middle" font-size="9" fill="${C_TXT}">${a}</text>`;
+  g += `<text x="${W - R - 2}" y="${T + 9}" text-anchor="end" font-size="7.5" fill="${C_TXT}">${tr("AROME trop pessimiste")}</text>`;
+  g += `<text x="${W - R - 2}" y="${T + ph - 3}" text-anchor="end" font-size="7.5" fill="${C_TXT}">${tr("AROME trop optimiste")}</text>`;
   g += `<text x="${L + pw / 2}" y="${H - 4}" text-anchor="middle" font-size="9.5" fill="${C_TXT}">${tr("âge du run (h)")}</text>`;
-  // band of one standard deviation around the hourly curve, broken like the curve
-  let band: SkillBin[] = [];
-  const flush = () => {
-    const q = band.filter((b) => b.sd != null);
-    if (q.length > 1) {
-      const up = q.map((b) => `${X(b.age_from + 0.5)},${Y(b.mae! + b.sd!)}`),
-        dn = q.map((b) => `${X(b.age_from + 0.5)},${Y(Math.max(0, b.mae! - b.sd!))}`).reverse();
-      g += `<polygon points="${[...up, ...dn].join(" ")}" fill="${C_AR}" fill-opacity=".18"/>`;
-    }
-    band = [];
+  // band of one standard deviation around a curve, broken where an age is missing
+  const band = (q: { x: number; v: number; sd: number | null }[], color: string, op: number) => {
+    const w = q.filter((p) => p.sd != null);
+    if (w.length < 2) return;
+    const up = w.map((p) => `${X(p.x)},${Y(p.v + p.sd!)}`),
+      dn = w.map((p) => `${X(p.x)},${Y(p.v - p.sd!)}`).reverse();
+    g += `<polygon points="${[...up, ...dn].join(" ")}" fill="${color}" fill-opacity="${op}"/>`;
   };
-  pts.forEach((b, i) => {
-    if (i && b.age_from !== pts[i - 1]!.age_from + 1) flush();
-    band.push(b);
-  });
-  flush();
-  // the curve is broken where hours of age are missing (no night hour at that age)
-  let seg: [number, number][] = [];
-  pts.forEach((b, i) => {
-    if (i && b.age_from !== pts[i - 1]!.age_from + 1) {
-      g += pl(seg, `stroke="${C_AR}" stroke-width="1.8"`);
-      seg = [];
-    }
-    seg.push([X(b.age_from + 0.5), Y(b.mae!)]);
-  });
-  g += pl(seg, `stroke="${C_AR}" stroke-width="1.8"`);
-  pts.forEach((b) => {
+  const runs = <U,>(a: U[], next: (p: U, q: U) => boolean) => {
+    const out: U[][] = [];
+    a.forEach((p, i) => (i && next(a[i - 1]!, p) ? out[out.length - 1]!.push(p) : out.push([p])));
+    return out;
+  };
+  const hr = runs(hp, (p, q) => q.age_from === p.age_from + 1).map((r) => r.map((b) => ({ x: b.age_from + 0.5, v: b.bias!, sd: b.sd })));
+  const nr = nn.map((n) => ({ x: n.age, v: n.bias!, sd: n.sd }));
+  hr.forEach((r) => band(r, C_AR, 0.2));
+  band(nr, "#f1efe8", 0.13);
+  hr.forEach((r) => (g += pl(r.map((p) => [X(p.x), Y(p.v)] as [number, number]), `stroke="${C_AR}" stroke-width="1.8"`)));
+  hp.forEach((b) => {
     const op = b.n_hours < 10 ? ' opacity=".35"' : "";
-    g += `<circle cx="${X(b.age_from + 0.5)}" cy="${Y(b.mae!)}" r="2.4" fill="${C_AR}"${op}><title>${b.age_from} h : ${b.mae!.toFixed(2)}'' (${b.n_hours} h)</title></circle>`;
+    g += `<circle cx="${X(b.age_from + 0.5)}" cy="${Y(b.bias!)}" r="2.4" fill="${C_AR}"${op}><title>${b.age_from} h : ${sg(b.bias!)}'' ± ${(b.sd ?? 0).toFixed(2)} (${b.n_hours} h)</title></circle>`;
   });
-  const nn = nights.filter((n) => n.mae != null);
-  g += pl(
-    nn.map((n) => [X(n.age), Y(n.mae!)] as [number, number]),
-    `stroke="#f1efe8" stroke-width="1.4" stroke-dasharray="4 3"`,
-  );
+  g += pl(nr.map((p) => [X(p.x), Y(p.v)] as [number, number]), `stroke="#f1efe8" stroke-width="1.4" stroke-dasharray="4 3"`);
   nn.forEach((n) => {
     const op = n.n_nights < 3 ? ' opacity=".35"' : "";
-    if (n.sd != null)
-      g += `<line x1="${X(n.age)}" x2="${X(n.age)}" y1="${Y(n.mae! + n.sd)}" y2="${Y(Math.max(0, n.mae! - n.sd))}" stroke="#f1efe8" stroke-width="1"${op}/>`;
-    g += `<rect x="${X(n.age) - 3}" y="${Y(n.mae!) - 3}" width="6" height="6" fill="#f1efe8" stroke="#0a0f1d" stroke-width="0.8"${op}><title>${tr("nuit")} ${n.age} h : ${n.mae!.toFixed(2)}'' (${n.n_nights} ${tr("nuits")})</title></rect>`;
+    g += `<rect x="${X(n.age) - 3}" y="${Y(n.bias!) - 3}" width="6" height="6" fill="#f1efe8" stroke="#0a0f1d" stroke-width="0.8"${op}><title>${tr("nuit")} ${n.age} h : ${sg(n.bias!)}'' ± ${(n.sd ?? 0).toFixed(2)} (${n.n_nights} ${tr("nuits")})</title></rect>`;
   });
   return g;
 }

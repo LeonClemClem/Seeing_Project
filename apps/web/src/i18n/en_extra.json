@@ -208,5 +208,9 @@
 "nuit": "night",
 "nuits": "nights",
 "± 1 écart type": "± 1 standard deviation",
-"des heures (au-dessus)": "of the hours (above)"
+"des heures (au-dessus)": "of the hours (above)",
+"Erreur selon l'âge du run (prévu − mesuré)": "Error with the age of the run (forecast − measured)",
+"AROME trop pessimiste": "AROME too pessimistic",
+"AROME trop optimiste": "AROME too optimistic",
+"taille par défaut": "default size"
 }
