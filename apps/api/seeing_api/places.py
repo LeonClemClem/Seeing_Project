@@ -15,7 +15,9 @@ from seeing_api.auth import require_json, require_role
 from seeing_api.schemas import SiteOut
 from seeing_db import Site, User, UserRole
 
-router = APIRouter(prefix="/api/places", dependencies=[Depends(require_json)])
+router = APIRouter(prefix="/api/places")
+# CSRF guard on every write (JSON bodies only); the reads are plain GETs
+JSON_ONLY = [Depends(require_json)]
 LoggedIn = Annotated[User, Depends(require_role())]
 
 MAX_PLACES = 5  # per account (the administrator is not limited)
@@ -56,7 +58,7 @@ def _check_limit(session, user: User) -> None:
         raise HTTPException(409, f"At most {MAX_PLACES} places per account")
 
 
-@router.post("", response_model=SiteOut, status_code=201)
+@router.post("", response_model=SiteOut, status_code=201, dependencies=JSON_ONLY)
 def create_place(body: PlaceIn, session: SessionDep, user: LoggedIn) -> SiteOut:
     _check_limit(session, user)
     k_tke, k_cis, k_conv = DEFAULT_K
@@ -70,7 +72,7 @@ def create_place(body: PlaceIn, session: SessionDep, user: LoggedIn) -> SiteOut:
     return site_out(site, user)
 
 
-@router.patch("/{slug}", response_model=SiteOut)
+@router.patch("/{slug}", response_model=SiteOut, dependencies=JSON_ONLY)
 def update_place(slug: str, body: PlacePatch, session: SessionDep, user: LoggedIn) -> SiteOut:
     site = own_place(session, slug, user)
     if body.name is not None:
@@ -85,7 +87,7 @@ def update_place(slug: str, body: PlacePatch, session: SessionDep, user: LoggedI
     return site_out(site, user)
 
 
-@router.delete("/{slug}", status_code=204)
+@router.delete("/{slug}", status_code=204, dependencies=JSON_ONLY)
 def archive_place(slug: str, session: SessionDep, user: LoggedIn) -> Response:
     """Archive the place: hidden everywhere and no longer computed, its forecasts and measurements kept."""
     own_place(session, slug, user).active = False
@@ -99,7 +101,7 @@ def archived_places(session: SessionDep, user: LoggedIn) -> list[SiteOut]:
     return [site_out(s, user) for s in sites]
 
 
-@router.post("/{slug}/restore", response_model=SiteOut)
+@router.post("/{slug}/restore", response_model=SiteOut, dependencies=JSON_ONLY)
 def restore_place(slug: str, session: SessionDep, user: LoggedIn) -> SiteOut:
     site = own_place(session, slug, user)
     if not site.active:
