@@ -145,6 +145,7 @@ function calCorr<C>(
   K: K3,
   see: (K: K3, c: C) => number,
   show: { horaire: boolean; nuit: boolean } = { horaire: true, nuit: true },
+  sel: string | null = null,
 ) {
   const pts = P.map((p) => [see(K, p.c), p.m] as const).filter(([x, y]) => isFinite(x) && x > 0 && y > 0),
     out = R.map((p) => [see(K, p.c), p.m] as const).filter(([x, y]) => isFinite(x) && x > 0 && y > 0);
@@ -184,6 +185,13 @@ function calCorr<C>(
       cy = Y(y);
     g += `<path d="M${cx + 2},${cy - 9} A9,9 0 1,0 ${cx + 2},${cy + 9} A12,12 0 0,1 ${cx + 2},${cy - 9} Z" fill="#f1efe8" stroke="#0a0f1d" stroke-width="1"/>`;
   });
+  // the selected night (top panel, or clicked in the history) on top in yellow, with a ring around its median
+  if (sel) {
+    const mine = [...P, ...R].filter((p) => p.key.startsWith(sel + "|")).map((p) => [see(K, p.c), p.m] as const).filter(([x, y]) => isFinite(x) && x > 0 && y > 0);
+    mine.forEach(([x, y]) => (g += `<circle cx="${X(x)}" cy="${Y(y)}" r="5" fill="#f2c14e" stroke="#000" stroke-width="1"/>`));
+    if (mine.length >= 2)
+      g += `<circle cx="${X(med(mine.map((q) => q[0])))}" cy="${Y(med(mine.map((q) => q[1])))}" r="11" fill="none" stroke="#f2c14e" stroke-width="2.2"/>`;
+  }
   g += `<text x="${L + pw / 2}" y="${H - 2}" text-anchor="middle" font-size="11" fill="${C_TXT}">${tr("prévu (K en service)")}</text><text x="10" y="${T + ph / 2}" text-anchor="middle" font-size="11" fill="${C_TXT}" transform="rotate(-90 10 ${T + ph / 2})">${tr("mesuré")}</text>`;
   const xs = pts.map((q) => q[0]),
     ys = pts.map((q) => q[1]),
@@ -264,17 +272,21 @@ export default function Calibrer() {
   };
   const outSet = useMemo(() => new Set(filters.out), [filters.out]);
   const selNight = useUi((s) => s.selNight);
-  /** Select the previous (-1) or next (+1) night of the list. */
-  const stepNight = (d: number) => {
-    const keys = [...nights.keys()].sort();
-    if (!keys.length) return;
-    const i = night ? keys.indexOf(night) : -1,
-      k = keys[Math.min(keys.length - 1, Math.max(0, i < 0 ? keys.length - 1 : i + d))]!;
+  /** Select a night in the top panel; it is highlighted in the history and the correlation too. */
+  const selectNight = (k: string) => {
     if (editable) setSelR(k);
     else {
       st.sel = k;
       refresh();
     }
+    setState({ selNight: k });
+  };
+  /** Select the previous (-1) or next (+1) night of the list. */
+  const stepNight = (d: number) => {
+    const keys = [...nights.keys()].sort();
+    if (!keys.length) return;
+    const i = night ? keys.indexOf(night) : -1;
+    selectNight(keys[Math.min(keys.length - 1, Math.max(0, i < 0 ? keys.length - 1 : i + d))]!);
   };
   const toggleOut = (n: string) =>
     setFilters({ ...filters, out: filters.out.includes(n) ? filters.out.filter((x) => x !== n) : [...filters.out, n].sort() });
@@ -346,6 +358,16 @@ export default function Calibrer() {
   const s = editable ? cstats(cal.P as CalPair<Terms>[], K, seeTerms) : cstats(cal.P as CalPair[], K);
   const selKey = editable ? selR : st.sel;
   const night = selKey && nights.has(selKey) ? selKey : editable ? (srvKeys[srvKeys.length - 1] ?? null) : null;
+  // a night clicked in the history becomes the night of the top panel
+  useEffect(() => {
+    if (!selNight || selNight === night || !nights.has(selNight)) return;
+    if (editable) setSelR(selNight);
+    else {
+      st.sel = selNight;
+      refresh();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selNight]);
   const realHist = useSiteHistory(place);
   const cch = useLangMemo(() => {
     if (!night) return "";
@@ -401,8 +423,8 @@ export default function Calibrer() {
     </div>
   ) : null;
   const calC = useLangMemo(
-    () => (editable && realModel ? calCorr(cal.P as CalPair<Terms>[], cal.R as CalPair<Terms>[], K, seeTerms, corrf) : null),
-    [editable, realModel, cal, K, corrf],
+    () => (editable && realModel ? calCorr(cal.P as CalPair<Terms>[], cal.R as CalPair<Terms>[], K, seeTerms, corrf, night) : null),
+    [editable, realModel, cal, K, corrf, night],
   );
   const corrR = useLangMemo(() => (realHist ? corrChart(realHist, corrf, selNight, cal.F.rm) : null), [realHist, corrf, selNight, cal]);
   useEffect(() => setSaved(""), [K]);
@@ -612,11 +634,7 @@ export default function Calibrer() {
                     key={k}
                     className={"chip" + (k === night ? " on" : "")}
                     tabIndex={0}
-                    onClick={() => {
-                      if (editable) return setSelR(k);
-                      st.sel = k;
-                      refresh();
-                    }}
+                    onClick={() => selectNight(k)}
                   >
                     <span style={outSet.has(k) ? { textDecoration: "line-through", color: "#ff8a7a" } : undefined}>
                       {tr(`Nuit du ${k.slice(8)}/${k.slice(5, 7)}`)} · {nights.get(k)!.length} pts
