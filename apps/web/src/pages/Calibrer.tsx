@@ -79,9 +79,8 @@ function addTo(st: NonNullable<typeof STORE>, txt: string, o: CsvOpts) {
   return true;
 }
 
-/** pred(K, i): model seeing at hour index i (0 = 12h UTC) for K, NaN when unknown; K0 = dashed curve.
- * Night only (17h30-06h UTC), as everywhere on the site. `stored`: the forecast recorded for the hours without
- * model terms (they cannot be rescaled to other K), as [hour index, seeing]. */
+/** pred(K, i): model seeing at hour index i (0 = 12h UTC) for K, NaN when the hour has no integrals at K = 1 (it
+ * cannot be calibrated: not drawn); K0 = dashed curve. Night only (17h30-06h UTC), as everywhere on the site. */
 function nightSvg(
   key: string,
   allPts: NightPt[],
@@ -89,7 +88,6 @@ function nightSvg(
   rm: Set<string>,
   pred: (K: K3, i: number) => number,
   K0: K3,
-  stored: [number, number][] = [],
   opt: { obs: boolean; mesf: { brut: boolean; horaire: boolean; courbe: boolean } } = {
     obs: true,
     mesf: { brut: true, horaire: true, courbe: true },
@@ -108,7 +106,7 @@ function nightSvg(
     B = 30,
     pw = W - L - R,
     ph = Hh - T - B;
-  const ymax = Math.max(3, Math.ceil(Math.max(...[...P0, ...P1].filter((v) => !isNaN(v)), ...H.map((p) => p.m), ...stored.map((q) => q[1])) * 1.2));
+  const ymax = Math.max(3, Math.ceil(Math.max(...[...P0, ...P1].filter((v) => !isNaN(v)), ...H.map((p) => p.m)) * 1.2));
   const X = (x: number) => L + (x * pw) / 24,
     Y = (v: number) => T + ph - (Math.min(v, ymax) / ymax) * ph;
   let g = `<rect x="${X(0)}" y="${T}" width="${X(5.5) - X(0)}" height="${ph}" fill="${C_DAY}"/><rect x="${X(18)}" y="${T}" width="${X(24) - X(18)}" height="${ph}" fill="${C_DAY}"/>`;
@@ -125,9 +123,6 @@ function nightSvg(
   const line = (P: number[]) => idx.filter((i) => !isNaN(P[i]!)).map((i) => [X(i), Y(P[i]!)] as [number, number]);
   g += pl(line(P0), `stroke="${C_AR}" stroke-width="1.5" stroke-dasharray="5 4"`);
   g += pl(line(P1), `stroke="${C_AR}" stroke-width="2.2"`);
-  // recorded forecast on the night hours without terms (thin, see-through)
-  const st = stored.filter(([i, v]) => isNx(i) && v > 0 && isNaN(P1[Math.round(i)] ?? NaN)).sort((a, b) => a[0] - b[0]);
-  if (st.length) g += pl(st.map(([i, v]) => [X(i), Y(v)] as [number, number]), `stroke="${C_AR}" stroke-width="1.6" opacity=".55"`);
   if (opt.obs && opt.mesf.brut) pts.forEach((p) => (g += `<circle cx="${X(p.x)}" cy="${Y(p.v)}" r="1.9" fill="${C_OBS}"/>`));
   if (opt.obs && opt.mesf.courbe && H.length > 1) g += pl(H.map((p) => [X(p.h), Y(p.m)] as [number, number]), `stroke="${C_OBSD}" stroke-width="1.6"`);
   if (opt.obs && opt.mesf.horaire)
@@ -377,20 +372,12 @@ export default function Calibrer() {
           return c ? seeTerms(k, c) : NaN;
         }
       : (k: K3, i: number) => seeC(k, comp(night)[i]!);
-    const noonMs = Date.parse(night + "T12:00:00Z"),
-      stored: [number, number][] = [];
-    realHist?.episodes.forEach((e) =>
-      e.prevu.forEach(([t, v]) => {
-        const x = (Date.parse(t.length <= 16 ? t + ":00Z" : t) - noonMs) / 3600000;
-        if (v != null && x >= 0 && x <= 24) stored.push([x, v]);
-      }),
-    );
-    return nightSvg(night, nights.get(night)!, K, cal.F.rm, pred, editable ? place.K : KDEF, stored, { obs: showObs, mesf });
-  }, [night, nightsKey, K, cal, realModel, editable, realHist, showObs, mesf]);
+    return nightSvg(night, nights.get(night)!, K, cal.F.rm, pred, editable ? place.K : KDEF, { obs: showObs, mesf });
+  }, [night, nightsKey, K, cal, realModel, editable, showObs, mesf]);
   const p2c = useLangMemo(() => (place.real ? "" : cn2Svg(K, KCAL, showObs, { mesf }, place.f)), [place, K, KCAL, showObs, mesf]);
   const corr = useLangMemo(() => corrMock(K, KCAL, place.f), [K, KCAL, place.f]);
-  // the history forecast at the K in service: every hour that has its model terms is recomputed with K (the others
-  // keep the recorded forecast)
+  // the history forecast at the K in service: every hour with its integrals at K = 1 is recomputed with K; the hours
+  // without them cannot be calibrated and are left out (no forecast drawn, no correlation point)
   const hist = useLangMemo(() => {
     if (!place.real) return lieuData(place.nom, place.f, K, KCAL);
     if (!realHist || !editable || !realModel) return realHist;
@@ -404,7 +391,7 @@ export default function Calibrer() {
       ...realHist,
       episodes: realHist.episodes.map((e) => ({
         ...e,
-        prevu: e.prevu.map(([t, v]): [string, number | null] => [t, at(t) ?? v]),
+        prevu: e.prevu.map(([t]): [string, number | null] => [t, at(t)]),
       })),
     };
   }, [place, K, KCAL, realHist, editable, realModel]);
@@ -426,7 +413,8 @@ export default function Calibrer() {
     () => (editable && realModel ? calCorr(cal.P as CalPair<Terms>[], cal.R as CalPair<Terms>[], K, seeTerms, corrf, night) : null),
     [editable, realModel, cal, K, corrf, night],
   );
-  const corrR = useLangMemo(() => (realHist ? corrChart(realHist, corrf, selNight, cal.F.rm) : null), [realHist, corrf, selNight, cal]);
+  // same forecast as the history: recomputed with the K in service, hours without integrals left out
+  const corrR = useLangMemo(() => (hist ? corrChart(hist, corrf, selNight, cal.F.rm) : null), [hist, corrf, selNight, cal]);
   useEffect(() => setSaved(""), [K]);
 
   const kb = (k: "L" | 0 | 1, f: number) => {
