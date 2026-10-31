@@ -256,17 +256,13 @@ export default function Calibrer() {
     enabled: editable && srvKeys.length > 0,
   });
   const realModel = useMemo(() => (tq.data ? termsModel(tq.data, place.K) : null), [tq.data, place.K]);
-  // the nights without any night hour with integrals at K = 1 cannot be calibrated: not shown anywhere in Calibrer
-  // (their measurements stay stored on the server)
+  // a night is shown in Calibrer only if at least one night hour (17h30-06h UTC) has both monitor measurements and an
+  // AROME forecast with its integrals at K = 1; the others cannot be compared (their measurements stay stored)
   const intNights = useMemo(() => {
-    if (!realModel) return srvNights;
     const out = new Map<string, NightPt[]>();
+    if (!realModel) return out;
     srvNights.forEach((pts, k) => {
-      for (let h = 0; h <= 24; h++)
-        if (isNx(h) && realModel.comp(k, h)) {
-          out.set(k, pts);
-          return;
-        }
+      if (chourly(pts).some((p) => isNx(p.h) && realModel.comp(k, p.h))) out.set(k, pts);
     });
     return out;
   }, [srvNights, realModel]);

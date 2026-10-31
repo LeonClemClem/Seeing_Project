@@ -74,7 +74,9 @@ export interface SkillBin {
 
 /** Night precision: median of a run's forecast hours of a night vs the measured median; age at 00h UTC. */
 export interface SkillNight {
+  /** class of age of the run at 00h UTC, `age` to `age_to` hours */
   age: number;
+  age_to: number;
   n_nights: number;
   bias: number | null;
   mae: number | null;
