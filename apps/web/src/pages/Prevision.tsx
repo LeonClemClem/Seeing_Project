@@ -154,19 +154,20 @@ function RunAgeSkill({ place }: { place: Place }) {
   if (!svg) return null;
   return (
     <div className="panel" style={{ width: "50%", minWidth: 220, marginTop: 12 }}>
-      <h2 style={{ fontSize: 14 }}>{tr("Erreur selon l'âge du run")}</h2>
+      <h2 style={{ fontSize: 14 }}>{tr("Erreur selon l'âge du run (prévu − mesuré)")}</h2>
       <div className="legend">
         <span>
           <Sw style={{ width: 16, borderTop: "2px solid #ff9f43" }} />
           {tr("horaire")}
         </span>
         <span>
-          <Sw style={{ width: 16, height: 8, background: "rgba(255,159,67,.25)" }} />
-          {tr("± 1 écart type")}
-        </span>
-        <span>
           <Sw style={{ width: 16, borderTop: "2px dashed #f1efe8" }} />
           {tr("par nuit (médianes)")}
+        </span>
+        <span>
+          <Sw style={{ width: 16, height: 8, background: "rgba(255,159,67,.25)" }} />
+          <Sw style={{ width: 16, height: 8, background: "rgba(241,239,232,.2)" }} />
+          {tr("± 1 écart type")}
         </span>
       </div>
       <SvgChart html={svg} viewBox="0 0 200 200" label="Erreur selon l'âge du run" style={{ width: "100%", display: "block" }} />
