@@ -139,8 +139,12 @@ function calCorr<C>(
   R: CalPair<C>[],
   K: K3,
   see: (K: K3, c: C) => number,
-  show: { horaire: boolean; nuit: boolean } = { horaire: true, nuit: true },
+  show: { horaire: boolean; nuit: boolean; brut?: boolean } = { horaire: true, nuit: true },
   sel: string | null = null,
+  /** raw measurements of the compared hours, [forecast interpolated at the measurement time, measured] */
+  raw: [number, number][] = [],
+  /** "above the model" filter: % asked and hours it left out (threshold line between them and the kept hours) */
+  top?: { pct: number; keys: ReadonlySet<string> },
 ) {
   const pts = P.map((p) => [see(K, p.c), p.m] as const).filter(([x, y]) => isFinite(x) && x > 0 && y > 0),
     out = R.map((p) => [see(K, p.c), p.m] as const).filter(([x, y]) => isFinite(x) && x > 0 && y > 0);
@@ -171,6 +175,7 @@ function calCorr<C>(
   for (let v = 0; v <= m; v += st)
     g += `<line x1="${L}" x2="${W - R0}" y1="${Y(v)}" y2="${Y(v)}" stroke="${C_LINE}" stroke-width="0.6"/><line y1="${T}" y2="${T + ph}" x1="${X(v)}" x2="${X(v)}" stroke="${C_LINE}" stroke-width="0.6"/><text x="${L - 5}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="${C_TXT}">${v}"</text><text x="${X(v)}" y="${T + ph + 14}" text-anchor="middle" font-size="11" fill="${C_TXT}">${v}"</text>`;
   g += `<line x1="${X(0)}" y1="${Y(0)}" x2="${X(m)}" y2="${Y(m)}" stroke="${C_TXT}" stroke-dasharray="4 3"/>`;
+  if (show.brut) raw.forEach(([x, y]) => (g += `<circle cx="${X(x)}" cy="${Y(y)}" r="1.6" fill="#2a78d6" opacity=".35"/>`));
   if (show.horaire) {
     out.forEach(([x, y]) => (g += `<circle cx="${X(x)}" cy="${Y(y)}" r="3.4" fill="${C_RM}" stroke="#fff" stroke-width="0.5" opacity=".85"/>`));
     pts.forEach(([x, y]) => (g += `<circle cx="${X(x)}" cy="${Y(y)}" r="3.6" fill="#2a78d6" stroke="#fff" stroke-width="0.6"/>`));
@@ -180,6 +185,17 @@ function calCorr<C>(
       cy = Y(y);
     g += `<path d="M${cx + 2},${cy - 9} A9,9 0 1,0 ${cx + 2},${cy + 9} A12,12 0 0,1 ${cx + 2},${cy - 9} Z" fill="#f1efe8" stroke="#0a0f1d" stroke-width="1"/>`;
   });
+  // "above the model" filter: dashed red line y = x + threshold, between the hours it left out and the kept ones
+  if (top && top.pct > 0 && top.keys.size) {
+    const res = (p: CalPair<C>) => p.m - see(K, p.c),
+      rmin = Math.min(...R.filter((p) => top.keys.has(p.key)).map(res).filter(isFinite)),
+      kmax = Math.max(...P.map(res).filter(isFinite), -1e9),
+      thr = kmax > -1e9 && kmax < rmin ? (rmin + kmax) / 2 : rmin,
+      x0 = Math.max(0, -thr),
+      x1 = Math.min(m, m - thr);
+    if (isFinite(thr) && x1 > x0)
+      g += `<line x1="${X(x0)}" y1="${Y(x0 + thr)}" x2="${X(x1)}" y2="${Y(x1 + thr)}" stroke="#ff6b6b" stroke-width="1.4" stroke-dasharray="6 4"/><text x="${X(x0) + 6}" y="${Y(x0 + thr) - 6}" font-size="11" font-weight="600" fill="#ff6b6b" stroke="#0a0f1d" stroke-width="3" paint-order="stroke">− ${top.pct} % ${tr("des heures (au-dessus)")}</text>`;
+  }
   // the selected night (top panel, or clicked in the history) on top in yellow, with a ring around its median
   if (sel) {
     const mine = [...P, ...R].filter((p) => p.key.startsWith(sel + "|")).map((p) => [see(K, p.c), p.m] as const).filter(([x, y]) => isFinite(x) && x > 0 && y > 0);
@@ -329,7 +345,7 @@ export default function Calibrer() {
       editable
         ? realModel
           ? calib(nights, filters, realModel)
-          : { P: [] as CalPair<Terms>[], K: place.K, mode: srvKeys.length ? "pas encore de prévision pour ces nuits" : "aucune mesure", F: { pics: 0, courtes: 0, top: 0, out: 0, rm: new Set<string>() }, R: [] as CalPair<Terms>[] }
+          : { P: [] as CalPair<Terms>[], K: place.K, mode: srvKeys.length ? "pas encore de prévision pour ces nuits" : "aucune mesure", F: { pics: 0, courtes: 0, top: 0, out: 0, rm: new Set<string>(), topRm: new Set<string>() }, R: [] as CalPair<Terms>[] }
         : calib(nights, filters),
     [nightsKey, filters, realModel, editable],
   );
@@ -411,8 +427,30 @@ export default function Calibrer() {
     </div>
   ) : null;
   const calC = useLangMemo(
-    () => (editable && realModel ? calCorr(cal.P as CalPair<Terms>[], cal.R as CalPair<Terms>[], K, seeTerms, corrf, night) : null),
-    [editable, realModel, cal, K, corrf, night],
+    () => {
+      if (!editable || !realModel) return null;
+      // raw measurements of the compared hours, against the forecast interpolated between the two hours around them
+      const compared = new Set([...cal.P, ...cal.R].map((p) => p.key)),
+        raw: [number, number][] = [];
+      if (corrf.brut)
+        nights.forEach((pts, key) =>
+          pts.forEach((p) => {
+            if (!isNx(p.x) || !compared.has(hourKey(key, Math.round(p.x)))) return;
+            const i = Math.floor(p.x),
+              ca = realModel.comp(key, i),
+              cb = realModel.comp(key, i + 1),
+              va = ca ? seeTerms(K, ca) : NaN,
+              vb = cb ? seeTerms(K, cb) : NaN,
+              v = p.x === i ? va : va + (vb - va) * (p.x - i);
+            if (isFinite(v) && v > 0 && p.v > 0) raw.push([v, p.v]);
+          }),
+        );
+      return calCorr(cal.P as CalPair<Terms>[], cal.R as CalPair<Terms>[], K, seeTerms, corrf, night, raw, {
+        pct: filters.top,
+        keys: cal.F.topRm,
+      });
+    },
+    [editable, realModel, cal, K, corrf, night, nightsKey, filters.top],
   );
   // same forecast as the history: recomputed with the K in service, hours without integrals left out
   const corrR = useLangMemo(() => (hist ? corrChart(hist, corrf, selNight, cal.F.rm) : null), [hist, corrf, selNight, cal]);
