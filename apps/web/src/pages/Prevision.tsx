@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { corrChart, skillSvg } from "../charts/lieuCharts";
+import { corrChart, SKILL_FEW_HOURS, SKILL_FEW_NIGHTS, skillSvg, type SkillMode } from "../charts/lieuCharts";
 import { cn2Svg, prevSvg } from "../charts/mockCharts";
 import { PVDEF, PVGRP, prevRealSvg, pvPanel } from "../charts/realCharts";
 import { Cn2RealPanel, DataChips, HistPanel } from "../components/panels";
@@ -139,8 +139,9 @@ function RealCorr({ place }: { place: Place }) {
   );
 }
 
-/** Square panel under the correlation (half its width, a quarter of its area): hourly error with the age of the run,
- * every run that forecast the hour recomputed with the place's current K (hours with integrals only). */
+/** Panel under the correlation: signed error (forecast - measured) with the age of the run, hourly and/or by night,
+ * every run that forecast the hour recomputed with the place's current K (hours with integrals only). Default width:
+ * the correlation panel's; the corner handle resizes it, the button restores the default. */
 function RunAgeSkill({ place }: { place: Place }) {
   const slug = place.slug ?? "";
   const q = useQuery({
@@ -150,34 +151,56 @@ function RunAgeSkill({ place }: { place: Place }) {
     retry: false,
     staleTime: 30 * 60 * 1000,
   });
-  const svg = useLangMemo(() => (q.data?.bins.length ? skillSvg(q.data.bins, q.data.nights) : ""), [q.data]);
-  // default size: the width of the correlation panel; the corner handle resizes it, the button restores the default
+  const [mode, setMode] = useState<SkillMode>("deux");
+  const svg = useLangMemo(() => (q.data?.bins.length ? skillSvg(q.data.bins, q.data.nights, mode) : ""), [q.data, mode]);
   const box = useRef<HTMLDivElement>(null);
   if (!svg) return null;
+  const hourly = mode !== "nuit",
+    nightly = mode !== "horaire";
   return (
     <div ref={box} className="panel" style={{ width: "100%", minWidth: 220, maxWidth: "100%", marginTop: 12, resize: "horizontal", overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
         <h2 style={{ fontSize: 14 }}>{tr("Erreur selon l'âge du run (prévu − mesuré)")}</h2>
         <button type="button" className="chip" onClick={() => box.current && (box.current.style.width = "100%")}>
           {tr("taille par défaut")}
         </button>
       </div>
+      <Seg<SkillMode>
+        value={mode}
+        onChange={setMode}
+        label={tr("Erreur affichée")}
+        style={{ margin: "0 0 6px" }}
+        options={[
+          ["horaire", tr("horaire")],
+          ["nuit", tr("nocturne")],
+          ["deux", tr("les deux")],
+        ]}
+      />
       <div className="legend">
+        {hourly && (
+          <span>
+            <Sw style={{ width: 16, borderTop: "2px solid #ff9f43" }} />
+            {tr("horaire : moyenne de chaque heure d'âge")}
+          </span>
+        )}
+        {nightly && (
+          <span>
+            <Sw style={{ width: 16, borderTop: "2px dashed #f1efe8" }} />
+            {tr("nocturne : médianes de la nuit, âge à 00h TU")}
+          </span>
+        )}
         <span>
-          <Sw style={{ width: 16, borderTop: "2px solid #ff9f43" }} />
-          {tr("horaire")}
-        </span>
-        <span>
-          <Sw style={{ width: 16, borderTop: "2px dashed #f1efe8" }} />
-          {tr("par nuit (médianes)")}
-        </span>
-        <span>
-          <Sw style={{ width: 16, height: 8, background: "rgba(255,159,67,.25)" }} />
-          <Sw style={{ width: 16, height: 8, background: "rgba(241,239,232,.2)" }} />
+          {hourly && <Sw style={{ width: 16, height: 8, background: "rgba(255,159,67,.25)" }} />}
+          {nightly && <Sw style={{ width: 16, height: 8, background: "rgba(241,239,232,.2)" }} />}
           {tr("± 1 écart type")}
         </span>
       </div>
       <SvgChart html={svg} viewBox="0 0 200 200" label="Erreur selon l'âge du run" style={{ width: "100%", display: "block" }} />
+      <p className="small muted" style={{ margin: "4px 0 0" }}>
+        {tr(
+          `Points pâles : moins de ${SKILL_FEW_HOURS} heures (horaire) ou ${SKILL_FEW_NIGHTS} nuits (nocturne) comparées. Heures de nuit avec intégrales, recalculées avec les K actuels du lieu.`,
+        )}
+      </p>
     </div>
   );
 }

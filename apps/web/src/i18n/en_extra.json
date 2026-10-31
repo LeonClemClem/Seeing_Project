@@ -212,5 +212,14 @@
 "Erreur selon l'âge du run (prévu − mesuré)": "Error with the age of the run (forecast − measured)",
 "AROME trop pessimiste": "AROME too pessimistic",
 "AROME trop optimiste": "AROME too optimistic",
-"taille par défaut": "default size"
+"taille par défaut": "default size",
+"prévu − mesuré (″)": "forecast − measured (″)",
+"Pas encore de comparaison.": "No comparison yet.",
+"par nuit": "by night",
+"nocturne": "by night",
+"les deux": "both",
+"Erreur affichée": "Error shown",
+"horaire : moyenne de chaque heure d'âge": "hourly: mean of each hour of age",
+"nocturne : médianes de la nuit, âge à 00h TU": "by night: medians of the night, age at 00h UTC",
+"Points pâles : moins de 10 heures (horaire) ou 3 nuits (nocturne) comparées. Heures de nuit avec intégrales, recalculées avec les K actuels du lieu.": "Pale points: fewer than 10 hours (hourly) or 3 nights (by night) compared. Night hours with integrals, recomputed with the place's current K."
 }

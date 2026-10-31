@@ -156,7 +156,8 @@ export function liveHistory(fc: Forecast, meas: [number, number][], after: numbe
 /** History forecast and pairs on the server data (`/verif`): one forecast per hour with its integrals at K = 1,
  * recomputed with the site's current K, and the measured hourly median (+/- 30 min), the same for every panel. The
  * hours without integrals cannot be compared: no forecast, no pair; the nights without any of them are not shown at
- * all (their measurements stay stored). One period per night kept. */
+ * all, nor those without a night hour with both forecast and measurement (their measurements stay stored).
+ * One period per night kept. */
 function alignVerif(l: LieuData, v: { valid_times: string[]; seeing_arcsec: (number | null)[]; measured_arcsec: (number | null)[] }): LieuData {
   const f = new Map<string, number>(),
     m = new Map<string, number>();
@@ -180,7 +181,8 @@ function alignVerif(l: LieuData, v: { valid_times: string[]; seeing_arcsec: (num
     [...by.entries()]
       .sort((x, y) => (x[0] < y[0] ? -1 : 1))
       .forEach(([, x]) => {
-        if (!x.prevu.length || !(x.mediane.length || x.brut.length)) return;
+        // kept only with at least one night hour that has both the forecast and a measurement
+        if (!x.prevu.some(([t]) => m.has(t) && isNightDate(new Date(t + ":00Z")))) return;
         const ts = [...x.prevu, ...x.mediane, ...x.brut].map((p) => p[0].slice(0, 16)).sort();
         episodes.push({ ...x, prevu: x.prevu.sort((p, q) => (p[0] < q[0] ? -1 : 1)), a: ts[0]! > e.a ? ts[0]! : e.a, b: ts[ts.length - 1]! < e.b ? ts[ts.length - 1]! : e.b });
       });
