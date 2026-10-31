@@ -90,6 +90,10 @@ function nightSvg(
   pred: (K: K3, i: number) => number,
   K0: K3,
   stored: [number, number][] = [],
+  opt: { obs: boolean; mesf: { brut: boolean; horaire: boolean; courbe: boolean } } = {
+    obs: true,
+    mesf: { brut: true, horaire: true, courbe: true },
+  },
 ) {
   const pts = allPts.filter((p) => isNx(p.x));
   const idx = [...Array(25).keys()],
@@ -124,8 +128,10 @@ function nightSvg(
   // recorded forecast on the night hours without terms (thin, see-through)
   const st = stored.filter(([i, v]) => isNx(i) && v > 0 && isNaN(P1[Math.round(i)] ?? NaN)).sort((a, b) => a[0] - b[0]);
   if (st.length) g += pl(st.map(([i, v]) => [X(i), Y(v)] as [number, number]), `stroke="${C_AR}" stroke-width="1.6" opacity=".55"`);
-  pts.forEach((p) => (g += `<circle cx="${X(p.x)}" cy="${Y(p.v)}" r="1.9" fill="${C_OBS}"/>`));
-  H.forEach((p) => (g += `<rect x="${X(p.h) - 3.5}" y="${Y(p.m) - 3.5}" width="7" height="7" fill="${rm.has(hourKey(key, p.h)) ? C_RM : C_OBSD}"/>`));
+  if (opt.obs && opt.mesf.brut) pts.forEach((p) => (g += `<circle cx="${X(p.x)}" cy="${Y(p.v)}" r="1.9" fill="${C_OBS}"/>`));
+  if (opt.obs && opt.mesf.courbe && H.length > 1) g += pl(H.map((p) => [X(p.h), Y(p.m)] as [number, number]), `stroke="${C_OBSD}" stroke-width="1.6"`);
+  if (opt.obs && opt.mesf.horaire)
+    H.forEach((p) => (g += `<rect x="${X(p.h) - 3.5}" y="${Y(p.m) - 3.5}" width="7" height="7" fill="${rm.has(hourKey(key, p.h)) ? C_RM : C_OBSD}"/>`));
   g += `<text x="${W - R}" y="${Hh - 2}" text-anchor="end" font-size="11" fill="${C_TXT}">${tr("heure TU")}</text>`;
   return g;
 }
@@ -133,7 +139,13 @@ function nightSvg(
 /** Correlation of the calibration: every compared night hour, forecast with the K in service (x) vs measured (y);
  * the hours kept in the fit in blue (with the night medians), the hours left out in red. Statistics on the kept
  * hours only, so they follow the filters and the nights left out. */
-function calCorr<C>(P: CalPair<C>[], R: CalPair<C>[], K: K3, see: (K: K3, c: C) => number) {
+function calCorr<C>(
+  P: CalPair<C>[],
+  R: CalPair<C>[],
+  K: K3,
+  see: (K: K3, c: C) => number,
+  show: { horaire: boolean; nuit: boolean } = { horaire: true, nuit: true },
+) {
   const pts = P.map((p) => [see(K, p.c), p.m] as const).filter(([x, y]) => isFinite(x) && x > 0 && y > 0),
     out = R.map((p) => [see(K, p.c), p.m] as const).filter(([x, y]) => isFinite(x) && x > 0 && y > 0);
   if (!pts.length && !out.length) return null;
@@ -163,9 +175,11 @@ function calCorr<C>(P: CalPair<C>[], R: CalPair<C>[], K: K3, see: (K: K3, c: C) 
   for (let v = 0; v <= m; v += st)
     g += `<line x1="${L}" x2="${W - R0}" y1="${Y(v)}" y2="${Y(v)}" stroke="${C_LINE}" stroke-width="0.6"/><line y1="${T}" y2="${T + ph}" x1="${X(v)}" x2="${X(v)}" stroke="${C_LINE}" stroke-width="0.6"/><text x="${L - 5}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="${C_TXT}">${v}"</text><text x="${X(v)}" y="${T + ph + 14}" text-anchor="middle" font-size="11" fill="${C_TXT}">${v}"</text>`;
   g += `<line x1="${X(0)}" y1="${Y(0)}" x2="${X(m)}" y2="${Y(m)}" stroke="${C_TXT}" stroke-dasharray="4 3"/>`;
-  out.forEach(([x, y]) => (g += `<circle cx="${X(x)}" cy="${Y(y)}" r="3.4" fill="${C_RM}" stroke="#fff" stroke-width="0.5" opacity=".85"/>`));
-  pts.forEach(([x, y]) => (g += `<circle cx="${X(x)}" cy="${Y(y)}" r="3.6" fill="#2a78d6" stroke="#fff" stroke-width="0.6"/>`));
-  moons.forEach(([x, y]) => {
+  if (show.horaire) {
+    out.forEach(([x, y]) => (g += `<circle cx="${X(x)}" cy="${Y(y)}" r="3.4" fill="${C_RM}" stroke="#fff" stroke-width="0.5" opacity=".85"/>`));
+    pts.forEach(([x, y]) => (g += `<circle cx="${X(x)}" cy="${Y(y)}" r="3.6" fill="#2a78d6" stroke="#fff" stroke-width="0.6"/>`));
+  }
+  if (show.nuit) moons.forEach(([x, y]) => {
     const cx = X(x),
       cy = Y(y);
     g += `<path d="M${cx + 2},${cy - 9} A9,9 0 1,0 ${cx + 2},${cy + 9} A12,12 0 0,1 ${cx + 2},${cy - 9} Z" fill="#f1efe8" stroke="#0a0f1d" stroke-width="1"/>`;
@@ -349,15 +363,33 @@ export default function Calibrer() {
         if (v != null && x >= 0 && x <= 24) stored.push([x, v]);
       }),
     );
-    return nightSvg(night, nights.get(night)!, K, cal.F.rm, pred, editable ? place.K : KDEF, stored);
-  }, [night, nightsKey, K, cal, realModel, editable, realHist]);
+    return nightSvg(night, nights.get(night)!, K, cal.F.rm, pred, editable ? place.K : KDEF, stored, { obs: showObs, mesf });
+  }, [night, nightsKey, K, cal, realModel, editable, realHist, showObs, mesf]);
   const p2c = useLangMemo(() => (place.real ? "" : cn2Svg(K, KCAL, showObs, { mesf }, place.f)), [place, K, KCAL, showObs, mesf]);
   const corr = useLangMemo(() => corrMock(K, KCAL, place.f), [K, KCAL, place.f]);
-  const hist = useLangMemo(() => (place.real ? realHist : lieuData(place.nom, place.f, K, KCAL)), [place, K, KCAL, realHist]);
+  // the history forecast at the K in service: every hour that has its model terms is recomputed with K (the others
+  // keep the recorded forecast)
+  const hist = useLangMemo(() => {
+    if (!place.real) return lieuData(place.nom, place.f, K, KCAL);
+    if (!realHist || !editable || !realModel) return realHist;
+    const at = (t: string) => {
+      const ms = Date.parse(t.length <= 16 ? t + ":00Z" : t),
+        n = new Date(ms - 12 * 3600000).toISOString().slice(0, 10),
+        c = realModel.comp(n, Math.round((ms - Date.parse(n + "T12:00:00Z")) / 3600000));
+      return c ? seeTerms(K, c) : null;
+    };
+    return {
+      ...realHist,
+      episodes: realHist.episodes.map((e) => ({
+        ...e,
+        prevu: e.prevu.map(([t, v]): [string, number | null] => [t, at(t) ?? v]),
+      })),
+    };
+  }, [place, K, KCAL, realHist, editable, realModel]);
   const corrf = useUi((s) => s.corrf);
   const calC = useLangMemo(
-    () => (editable && realModel ? calCorr(cal.P as CalPair<Terms>[], cal.R as CalPair<Terms>[], K, seeTerms) : null),
-    [editable, realModel, cal, K],
+    () => (editable && realModel ? calCorr(cal.P as CalPair<Terms>[], cal.R as CalPair<Terms>[], K, seeTerms, corrf) : null),
+    [editable, realModel, cal, K, corrf],
   );
   const corrR = useLangMemo(() => (realHist ? corrChart(realHist, corrf, selNight, cal.F.rm) : null), [realHist, corrf, selNight, cal]);
   useEffect(() => setSaved(""), [K]);
@@ -418,6 +450,53 @@ export default function Calibrer() {
         <div className="stack">
           <div id="copts">
             <DataChips id="copts" />
+            {/* calibration filters: in the same sticky bar, on their own line */}
+            {!lock && (!place.real || editable) && <div style={{ flexBasis: "100%" }}>
+            <div
+              id="calfilt"
+              style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", borderTop: "1px solid var(--line)", paddingTop: 6, marginTop: 6 }}
+            >
+              <span className="small muted">{tr("Filtres du calage :")}</span>
+              {(
+                [
+                  ["pics", "pics peu fournis", "heures dont la médiane repose sur beaucoup moins de mesures que d'habitude"],
+                  ["courtes", "nuits < 3 h successives", "nuits sans au moins 3 heures comparées successives"],
+                ] as const
+              ).map(([k, lab, title]) => (
+                <span
+                  key={k}
+                  className={"chip" + (filters[k] ? " on" : "")}
+                  role="switch"
+                  aria-checked={filters[k]}
+                  tabIndex={0}
+                  title={tr(title)}
+                  onClick={() => setFilters({ ...filters, [k]: !filters[k] })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setFilters({ ...filters, [k]: !filters[k] });
+                    }
+                  }}
+                >
+                  {tr(lab)}
+                </span>
+              ))}
+              <span className="small muted" style={{ marginLeft: 4 }}>
+                {tr("heures au-dessus du modèle :")}
+              </span>
+              <Seg
+                value={filters.top}
+                onChange={(top) => setFilters({ ...filters, top })}
+                options={[
+                  [0, "0"],
+                  [1, "1 %"],
+                  [5, "5 %"],
+                  [10, "10 %"],
+                ]}
+              />
+              <span className="small muted">{tr(fnote)}</span>
+            </div>
+            </div>}
           </div>
           {(!place.real || editable) && (
             <div className="panel">
@@ -591,7 +670,7 @@ export default function Calibrer() {
           <div className="panel">
             <h2>{tr("Historique (prévisions avec les K en service et mesures, nuit)")}</h2>
             {hist ? (
-              <HistPanel data={hist} OB={showObs || place.real} inset={false} rm={cal.F.rm} />
+              <HistPanel data={hist} OB={showObs} inset={false} rm={cal.F.rm} />
             ) : (
               <SvgChart
                 html={`<text x="550" y="120" text-anchor="middle" font-size="13" fill="${C_TXT}">${tr("Historique : choisis un lieu avec seeing monitor.")}</text>`}
@@ -604,7 +683,12 @@ export default function Calibrer() {
             <h2>{tr("Cn² (altitude × temps)")}</h2>
             <Cn2Legend obs={showObs} />
             {place.real ? (
-              <Cn2RealPanel place={place} profile={false} rm={cal.F.rm} />
+              <Cn2RealPanel
+                place={place}
+                profile={false}
+                rm={cal.F.rm}
+                kRatio={editable ? [K[0] / place.K[0], K[1] / place.K[1]] : undefined}
+              />
             ) : (
               <SvgChart html={p2c} viewBox="0 0 900 270" label="Panneau Cn2 de calibration" />
             )}
@@ -675,54 +759,6 @@ export default function Calibrer() {
             saved={saved}
             setSaved={setSaved}
             krow={krow}
-            filtersUi={
-              <>
-                <div
-                  id="calfilt"
-                  style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", borderTop: "1px solid var(--line)", paddingTop: 6, marginTop: 6 }}
-                >
-                  <span className="small muted">{tr("Filtres du calage :")}</span>
-                  {(
-                    [
-                      ["pics", "pics peu fournis", "heures dont la médiane repose sur beaucoup moins de mesures que d'habitude"],
-                      ["courtes", "nuits < 3 h successives", "nuits sans au moins 3 heures comparées successives"],
-                    ] as const
-                  ).map(([k, lab, title]) => (
-                    <span
-                      key={k}
-                      className={"chip" + (filters[k] ? " on" : "")}
-                      role="switch"
-                      aria-checked={filters[k]}
-                      tabIndex={0}
-                      title={tr(title)}
-                      onClick={() => setFilters({ ...filters, [k]: !filters[k] })}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          setFilters({ ...filters, [k]: !filters[k] });
-                        }
-                      }}
-                    >
-                      {tr(lab)}
-                    </span>
-                  ))}
-                  <span className="small muted" style={{ marginLeft: 4 }}>
-                    {tr("heures au-dessus du modèle :")}
-                  </span>
-                  <Seg
-                    value={filters.top}
-                    onChange={(top) => setFilters({ ...filters, top })}
-                    options={[
-                      [0, "0"],
-                      [1, "1 %"],
-                      [5, "5 %"],
-                      [10, "10 %"],
-                    ]}
-                  />
-                  <span className="small muted">{tr(fnote)}</span>
-                </div>
-              </>
-            }
           />
         </div>
       </div>
@@ -739,8 +775,6 @@ function KPanel(p: {
   saved: string;
   setSaved: (s: string) => void;
   krow: (lab: string, k: "L" | 0 | 1) => JSX.Element;
-  /** calibration filters and nights left out: in this panel, which stays in view while scrolling */
-  filtersUi: JSX.Element;
 }) {
   const K = useUi((s) => s.K);
   const { r, b, q } = p.stats;
@@ -797,7 +831,6 @@ function KPanel(p: {
               <span className="okmsg">{p.saved}</span>
             </div>
           </div>
-          {p.filtersUi}
         </>
       )}
       <div className="res" style={{ borderTop: "1px solid var(--line)", marginTop: 10, paddingTop: 10 }}>
