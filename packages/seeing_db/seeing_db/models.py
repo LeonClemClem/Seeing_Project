@@ -40,7 +40,7 @@ class Site(Base):
     lon: Mapped[float] = mapped_column(Float)
     altitude_m: Mapped[float | None] = mapped_column(Float)
     # Empirical coefficients of the three Cn2 models (convective, TKE, wind shear).
-    k_tke_conv: Mapped[float] = mapped_column(Float, default=0.3)
+    k_tke_conv: Mapped[float] = mapped_column(Float, default=0.1)  # K_conv = 0.1 everywhere
     #: Calibration settings of the place {pics, courtes, top, out: [nights left out]} (Calibrer), NULL = defaults.
     calib: Mapped[dict | None] = mapped_column(JSONB)
     k_tke: Mapped[float] = mapped_column(Float, default=3.0)
