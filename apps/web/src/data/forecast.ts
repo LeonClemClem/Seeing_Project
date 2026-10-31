@@ -153,8 +153,34 @@ export function liveHistory(fc: Forecast, meas: [number, number][], after: numbe
   return { episodes, paires };
 }
 
+/** History forecast and pairs on the server data (`/verif`): one forecast per hour with its integrals at K = 1,
+ * recomputed with the site's current K, and the measured hourly median (+/- 30 min), the same for every panel. The
+ * hours without integrals cannot be compared: no forecast, no pair. */
+function alignVerif(l: LieuData, v: { valid_times: string[]; seeing_arcsec: (number | null)[]; measured_arcsec: (number | null)[] }): LieuData {
+  const f = new Map<string, number>(),
+    m = new Map<string, number>();
+  v.valid_times.forEach((t, i) => {
+    const k = t.slice(0, 16),
+      s = v.seeing_arcsec[i],
+      o = v.measured_arcsec[i];
+    if (s != null && s > 0) f.set(k, s);
+    if (o != null) m.set(k, o);
+  });
+  const episodes = l.episodes.map((e) => ({ ...e, prevu: [...f.entries()].filter(([t]) => t >= e.a && t <= e.b).map(([t, s]): TVn => [t, +s.toFixed(2)]) }));
+  const paires: LieuData["paires"] = [];
+  episodes.forEach((e) =>
+    e.prevu.forEach(([t, s]) => {
+      const o = m.get(t);
+      if (o != null) paires.push([t, s, +o.toFixed(2), isNightDate(new Date(t + ":00Z"))]);
+    }),
+  );
+  return { ...l, episodes, paires };
+}
+type TVn = [string, number | null];
+
 /** History of a real site: the research periods (research/envoi_site.py), then the periods built on the
- * server data (past forecasts and collected measurements). undefined while loading or when there is none. */
+ * server data (past forecasts and collected measurements); forecast and pairs from `/verif` (current K, hours with
+ * integrals only). undefined while loading or when there is none. */
 export function useSiteHistory(place: Place): LieuData | undefined {
   const res = useResearchHistory(place);
   const slug = place.slug ?? "";
@@ -166,14 +192,22 @@ export function useSiteHistory(place: Place): LieuData | undefined {
     staleTime: 10 * 60 * 1000,
   });
   const meas = useServerMeasurements(place);
+  const vq = useQuery({
+    queryKey: ["verif", slug],
+    queryFn: () => api.verif(slug),
+    enabled: place.real && !!slug,
+    retry: false,
+    staleTime: 10 * 60 * 1000,
+  });
   return useMemo(() => {
+    if (vq.isLoading) return undefined;
     const after = Math.max(-Infinity, ...(res?.episodes ?? []).map((e) => Date.parse(e.b + ":00Z")));
     const live = fq.data && meas?.length ? liveHistory(fq.data, meas, after) : null;
     if (!res && !live?.episodes.length) return undefined;
     const base: LieuData = res ?? { nom: place.nom, modele: "V2bd", K: [...place.K], episodes: [], paires: [] };
-    if (!live) return base;
-    return { ...base, episodes: [...base.episodes, ...live.episodes], paires: [...base.paires, ...live.paires] };
-  }, [res, fq.data, meas, place.nom, place.K]);
+    const all = live ? { ...base, episodes: [...base.episodes, ...live.episodes], paires: [...base.paires, ...live.paires] } : base;
+    return vq.data ? alignVerif(all, vq.data) : all;
+  }, [res, fq.data, meas, place.nom, place.K, vq.data, vq.isLoading]);
 }
 
 /** Research history of a real site (sent by research/envoi_site.py), as the charts expect it.

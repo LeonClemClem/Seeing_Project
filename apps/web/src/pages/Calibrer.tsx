@@ -393,6 +393,7 @@ export default function Calibrer() {
         ...e,
         prevu: e.prevu.map(([t]): [string, number | null] => [t, at(t)]),
       })),
+      paires: realHist.paires.map(([t, , o, n]): [string, number | null, number | null, boolean] => [t, at(t), o, n]),
     };
   }, [place, K, KCAL, realHist, editable, realModel]);
   const corrf = useUi((s) => s.corrf);

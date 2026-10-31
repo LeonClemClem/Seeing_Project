@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { corrChart } from "../charts/lieuCharts";
+import { corrChart, skillSvg } from "../charts/lieuCharts";
 import { cn2Svg, prevSvg } from "../charts/mockCharts";
 import { PVDEF, PVGRP, prevRealSvg, pvPanel } from "../charts/realCharts";
 import { Cn2RealPanel, DataChips, HistPanel } from "../components/panels";
@@ -83,9 +83,12 @@ export default function Prevision() {
           {place.real ? <RealHistory place={place} OB={OB} head={histHead} /> : <MockHistory place={place} OB={OB} head={histHead} />}
         </div>
         <div className="grid2" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1.5fr)", alignItems: "start" }}>
-          <div className="panel">
-            <h2>{tr("Corrélation prévu / mesuré (nuit)")}</h2>
-            {place.real ? <RealCorr place={place} /> : <MockCorr place={place} />}
+          <div>
+            <div className="panel">
+              <h2>{tr("Corrélation prévu / mesuré (nuit)")}</h2>
+              {place.real ? <RealCorr place={place} /> : <MockCorr place={place} />}
+            </div>
+            {place.real && <RunAgeSkill place={place} />}
           </div>
           <div className="panel">
             <h2>{tr("Variables du modèle (passées et prévues)")}</h2>
@@ -133,6 +136,41 @@ function RealCorr({ place }: { place: Place }) {
       </p>
       <SvgChart html={c.svg} viewBox="0 0 340 320" label="Corrélation du lieu" style={{ maxWidth: 520 }} />
     </>
+  );
+}
+
+/** Square panel under the correlation (half its width, a quarter of its area): hourly error with the age of the run,
+ * every run that forecast the hour recomputed with the place's current K (hours with integrals only). */
+function RunAgeSkill({ place }: { place: Place }) {
+  const slug = place.slug ?? "";
+  const q = useQuery({
+    queryKey: ["skill", slug],
+    queryFn: () => api.skill(slug),
+    enabled: place.real && !!slug,
+    retry: false,
+    staleTime: 30 * 60 * 1000,
+  });
+  const svg = useLangMemo(() => (q.data?.bins.length ? skillSvg(q.data.bins, q.data.nights) : ""), [q.data]);
+  if (!svg) return null;
+  return (
+    <div className="panel" style={{ width: "50%", minWidth: 220, marginTop: 12 }}>
+      <h2 style={{ fontSize: 14 }}>{tr("Erreur selon l'âge du run")}</h2>
+      <div className="legend">
+        <span>
+          <Sw style={{ width: 16, borderTop: "2px solid #ff9f43" }} />
+          {tr("horaire")}
+        </span>
+        <span>
+          <Sw style={{ width: 16, height: 8, background: "rgba(255,159,67,.25)" }} />
+          {tr("± 1 écart type")}
+        </span>
+        <span>
+          <Sw style={{ width: 16, borderTop: "2px dashed #f1efe8" }} />
+          {tr("par nuit (médianes)")}
+        </span>
+      </div>
+      <SvgChart html={svg} viewBox="0 0 200 200" label="Erreur selon l'âge du run" style={{ width: "100%", display: "block" }} />
+    </div>
   );
 }
 
