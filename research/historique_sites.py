@@ -67,9 +67,9 @@ SITES = {
     # OHP 1.1/27.7/0.344, Villeneuve 4.52/143/0.002.
     "Drôme":       {"cache_tag": "Dr_me",       "K_script": (8, 40, 0.1), "K_new": (3.94, 49.7, 0.1)},  # V2bd cale nuit 18/10 : TOUTES les mesures, SANS AUCUN filtre, capture ROSA du 16/10 incluse
     "Copernic":    {"cache_tag": "Copernic",    "K_script": (3, 30, 0.3), "K_new": (11.2, 112, 0.1)},  # V2bd cale nuit 18/10 : TOUTES les mesures, SANS AUCUN filtre, capture ROSA du 16/10 incluse
-    "Saint-Veran": {"cache_tag": "Saint_Veran", "K_script": (6, 12, 0.1), "K_new": (5.17, 41.1, 0.086)},  # V2bd cale nuit 18/10 : TOUTES les mesures, SANS AUCUN filtre, capture ROSA du 16/10 incluse
-    "OHP":         {"cache_tag": "OHP",         "K_script": (8, 40, 0.1), "K_new": (0.767, 48.4, 0.01)},  # V2bd cale nuit 18/10 : TOUTES les mesures, SANS AUCUN filtre, capture ROSA du 16/10 incluse ; K_conv = 0.01 impose par l'utilisateur
-    "Seeing monitor 5": {"cache_tag": "Villeneuve",  "K_script": (8, 40, 0.1), "K_new": (5.08, 80.5, 0.002)},  # V2bd 17/10 (utilisateur) : cale SANS les nuits du 08 et 13/10 (les 2 plus au-dessus de la droite), sans autre filtre
+    "Saint-Veran": {"cache_tag": "Saint_Veran", "K_script": (6, 12, 0.1), "K_new": (5.17, 41.1, 0.1)},  # 31/10 : K_conv 0.1 partout (avant 0.086) ; V2bd cale nuit 18/10 : TOUTES les mesures, SANS AUCUN filtre, capture ROSA du 16/10 incluse
+    "OHP":         {"cache_tag": "OHP",         "K_script": (8, 40, 0.1), "K_new": (0.767, 48.4, 0.1)},  # V2bd cale nuit 18/10 : TOUTES les mesures, SANS AUCUN filtre, capture ROSA du 16/10 incluse  ; 31/10 : K_conv = 0.1 partout (utilisateur), avant 0.01
+    "Seeing monitor 5": {"cache_tag": "Villeneuve",  "K_script": (8, 40, 0.1), "K_new": (5.08, 80.5, 0.1)},  # 31/10 : K_conv 0.1 partout (avant 0.002) ; V2bd 17/10 (utilisateur) : cale SANS les nuits du 08 et 13/10 (les 2 plus au-dessus de la droite), sans autre filtre
     # 12/10 : Pic du Midi ajoute (mesures : fichier transmis par l'utilisateur, 17/10/2025 -> 02/10/2026, TU).
     # K par defaut du script V2 en attendant un calage ; maille AROME a 2195 m pour un sommet a 2877 m (682 m d'ecart).
     "Pic du Midi": {"cache_tag": "Pic_du_Midi", "K_script": (8, 40, 0.1), "K_new": (1.8, 22.6, 0.1)},  # V2bd cale nuit 18/10 : TOUTES les mesures, SANS AUCUN filtre, capture ROSA du 16/10 incluse
