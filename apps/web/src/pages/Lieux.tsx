@@ -22,7 +22,9 @@ type Sel = { t: "lx"; id: string };
 
 export default function Lieux() {
   const { pub, sh, mine } = usePlaces();
-  const { remove } = usePlaceActions();
+  const { archive, restore } = usePlaceActions();
+  // archived places (nothing is deleted): listed under the table, restorable
+  const archived = useQuery({ queryKey: ["archived"], queryFn: () => api.archivedPlaces(), retry: false });
   const current = useUi((s) => s.place);
   const mesf = useUi((s) => s.mesf);
   const nav = useNavigate();
@@ -107,11 +109,12 @@ export default function Lieux() {
                       <button
                         className="small"
                         style={{ marginLeft: 8 }}
-                        aria-label={tr("Supprimer ce lieu")}
-                        title={tr("Supprimer ce lieu")}
+                        aria-label={tr("Archiver ce lieu")}
+                        title={tr("Archiver ce lieu")}
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (window.confirm(tr(`Supprimer « ${p.nom} » et ses prévisions ?`))) remove.mutate(p.slug!);
+                          if (window.confirm(tr(`Archiver « ${p.nom} » ? Il disparaît de tes lieux, mais rien n'est effacé : tu pourras le restaurer.`)))
+                            archive.mutate(p.slug!);
                         }}
                       >
                         ✕
@@ -129,6 +132,20 @@ export default function Lieux() {
           </button>{" "}
           <span className="small muted">{tr(`${mine.length} lieux sur ${MAX_PLACES}`)}</span>
         </div>
+        {!!archived.data?.length && (
+          <div className="small" style={{ marginTop: 10 }}>
+            <span className="muted">{tr("Lieux archivés :")}</span>{" "}
+            {archived.data.map((a) => (
+              <span key={a.slug} style={{ marginRight: 12 }}>
+                {a.name}{" "}
+                <button className="small" disabled={restore.isPending} onClick={() => restore.mutate(a.slug)}>
+                  {tr("Restaurer")}
+                </button>
+              </span>
+            ))}
+            {restore.error && <span className="p-warn"> {restore.error.message}</span>}
+          </div>
+        )}
       </div>
 
       <details

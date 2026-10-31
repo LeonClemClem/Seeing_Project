@@ -14,7 +14,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from seeing_api.api import TEAM_SITE, SessionDep, utc
@@ -261,21 +261,6 @@ def get_measurements(
         q = q.where(Measurement.time < end)
     rows = session.execute(q.order_by(Measurement.time)).all()
     return MeasurementsOut(times=[utc(r.time) for r in rows], seeing_arcsec=[r.seeing_arcsec for r in rows])
-
-
-@router.delete("/{slug}/measurements", status_code=204, dependencies=[Depends(require_json)])
-def delete_measurements(
-    slug: str, session: SessionDep, user: LoggedIn, night: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}-\d{2}$")] = None,
-) -> Response:
-    """Delete every measurement of the site, or those of one night (12h UTC of `night` to 12h the next day)."""
-    site = editable_site(session, slug, user)
-    q = delete(Measurement).where(Measurement.site_id == site.id)
-    if night:
-        t0 = datetime.fromisoformat(night).replace(hour=12, tzinfo=UTC)
-        q = q.where(Measurement.time >= t0, Measurement.time < t0 + timedelta(days=1))
-    session.execute(q)
-    session.commit()
-    return Response(status_code=204)
 
 
 @router.put("/{slug}/k", status_code=204, dependencies=[Depends(require_json)])

@@ -30,7 +30,7 @@ def client_for(email: str) -> TestClient:
     return c
 
 
-def test_create_list_update_delete_place():
+def test_create_list_update_archive_restore_place():
     ada = client_for("ada@example.org")
     r = ada.post("/api/places", json={"name": " Jardin ", "lat": 44.30, "lon": 5.30})
     assert r.status_code == 201
@@ -45,8 +45,12 @@ def test_create_list_update_delete_place():
     assert ada.patch(f"/api/places/{p['slug']}", json={"k_cis": 151}).status_code == 422
 
     assert ada.delete(f"/api/places/{p['slug']}").status_code == 415  # CSRF guard: JSON only
-    assert ada.request("DELETE", f"/api/places/{p['slug']}", json={}).status_code == 204
+    assert ada.request("DELETE", f"/api/places/{p['slug']}", json={}).status_code == 204  # archived, not deleted
     assert p["slug"] not in {s["slug"] for s in ada.get("/api/sites").json()}
+    assert [s["slug"] for s in ada.get("/api/places/archived").json()] == [p["slug"]]
+    assert ada.post(f"/api/places/{p['slug']}/restore", json={}).status_code == 200
+    assert p["slug"] in {s["slug"] for s in ada.get("/api/sites").json()}
+    assert ada.get("/api/places/archived").json() == []
 
 
 def test_domain_is_checked():
@@ -78,15 +82,21 @@ def test_place_limit_and_admin():
     for i in range(5):
         assert ada.post("/api/places", json={"name": f"L{i}", "lat": 45.0, "lon": 6.0 + i / 10}).status_code == 201
     assert ada.post("/api/places", json={"name": "L5", "lat": 45.0, "lon": 6.6}).status_code == 409
+    # an archived place does not count; restoring it needs a free slot again
+    first = ada.get("/api/sites").json()
+    slug0 = next(s["slug"] for s in first if s.get("owned"))
+    assert ada.request("DELETE", f"/api/places/{slug0}", json={}).status_code == 204
+    assert ada.post("/api/places", json={"name": "L5", "lat": 45.0, "lon": 6.6}).status_code == 201
+    assert ada.post(f"/api/places/{slug0}/restore", json={}).status_code == 409
     with get_session_factory()() as s:
         s.scalar(select(User)).role = UserRole.admin
         s.commit()
-    assert ada.post("/api/places", json={"name": "L5", "lat": 45.0, "lon": 6.6}).status_code == 201
+    assert ada.post("/api/places", json={"name": "L6", "lat": 45.0, "lon": 6.7}).status_code == 201
     sites = {s["slug"]: s for s in ada.get("/api/sites").json()}
     assert sites["saint-veran"]["k"] == [5.17, 41.1, 0.086]  # the administrator sees the curated K
 
 
-def test_deleting_a_place_deletes_its_forecasts():
+def test_archiving_a_place_keeps_its_forecasts():
     from datetime import UTC, datetime
 
     ada = client_for("ada@example.org")
@@ -100,4 +110,5 @@ def test_deleting_a_place_deletes_its_forecasts():
         s.commit()
     assert ada.request("DELETE", f"/api/places/{p['slug']}", json={}).status_code == 204
     with get_session_factory()() as s:
-        assert s.scalar(select(Forecast)) is None
+        assert s.scalar(select(Forecast)) is not None
+        assert s.scalar(select(Site).where(Site.slug == p["slug"])).active is False

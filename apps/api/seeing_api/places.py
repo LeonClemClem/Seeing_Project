@@ -1,6 +1,7 @@
 """Personal places: `sites` rows owned by an account (`owner_id`), computed by the batch like the
 curated sites. Private by default; a shared place is shown to the community without its name and
-with a position blurred by 5-11 km."""
+with a position blurred by 5-11 km. Nothing is ever deleted: removing a place archives it (`active` false,
+no more forecasts, hidden everywhere) with its forecasts and measurements, and it can be restored."""
 
 import secrets
 from typing import Annotated
@@ -14,7 +15,9 @@ from seeing_api.auth import require_json, require_role
 from seeing_api.schemas import SiteOut
 from seeing_db import Site, User, UserRole
 
-router = APIRouter(prefix="/api/places", dependencies=[Depends(require_json)])
+router = APIRouter(prefix="/api/places")
+# CSRF guard on every write (JSON bodies only); the reads are plain GETs
+JSON_ONLY = [Depends(require_json)]
 LoggedIn = Annotated[User, Depends(require_role())]
 
 MAX_PLACES = 5  # per account (the administrator is not limited)
@@ -48,11 +51,16 @@ def own_place(session, slug: str, user: User) -> Site:
     return site
 
 
-@router.post("", response_model=SiteOut, status_code=201)
-def create_place(body: PlaceIn, session: SessionDep, user: LoggedIn) -> SiteOut:
-    n = session.scalar(select(func.count()).select_from(Site).where(Site.owner_id == user.id))
+def _check_limit(session, user: User) -> None:
+    """At most MAX_PLACES places in use per account (the archived ones do not count; the administrator is not limited)."""
+    n = session.scalar(select(func.count()).select_from(Site).where(Site.owner_id == user.id, Site.active.is_(True)))
     if user.role != UserRole.admin and n >= MAX_PLACES:
         raise HTTPException(409, f"At most {MAX_PLACES} places per account")
+
+
+@router.post("", response_model=SiteOut, status_code=201, dependencies=JSON_ONLY)
+def create_place(body: PlaceIn, session: SessionDep, user: LoggedIn) -> SiteOut:
+    _check_limit(session, user)
     k_tke, k_cis, k_conv = DEFAULT_K
     site = Site(
         slug=f"p{user.id}-{secrets.token_hex(4)}", name=body.name.strip(), lat=body.lat, lon=body.lon,
@@ -64,7 +72,7 @@ def create_place(body: PlaceIn, session: SessionDep, user: LoggedIn) -> SiteOut:
     return site_out(site, user)
 
 
-@router.patch("/{slug}", response_model=SiteOut)
+@router.patch("/{slug}", response_model=SiteOut, dependencies=JSON_ONLY)
 def update_place(slug: str, body: PlacePatch, session: SessionDep, user: LoggedIn) -> SiteOut:
     site = own_place(session, slug, user)
     if body.name is not None:
@@ -79,8 +87,25 @@ def update_place(slug: str, body: PlacePatch, session: SessionDep, user: LoggedI
     return site_out(site, user)
 
 
-@router.delete("/{slug}", status_code=204)
-def delete_place(slug: str, session: SessionDep, user: LoggedIn) -> Response:
-    session.delete(own_place(session, slug, user))  # forecasts and Cn2 profiles: ON DELETE CASCADE
+@router.delete("/{slug}", status_code=204, dependencies=JSON_ONLY)
+def archive_place(slug: str, session: SessionDep, user: LoggedIn) -> Response:
+    """Archive the place: hidden everywhere and no longer computed, its forecasts and measurements kept."""
+    own_place(session, slug, user).active = False
     session.commit()
     return Response(status_code=204)
+
+
+@router.get("/archived", response_model=list[SiteOut])
+def archived_places(session: SessionDep, user: LoggedIn) -> list[SiteOut]:
+    sites = session.scalars(select(Site).where(Site.owner_id == user.id, Site.active.is_(False)).order_by(Site.name))
+    return [site_out(s, user) for s in sites]
+
+
+@router.post("/{slug}/restore", response_model=SiteOut, dependencies=JSON_ONLY)
+def restore_place(slug: str, session: SessionDep, user: LoggedIn) -> SiteOut:
+    site = own_place(session, slug, user)
+    if not site.active:
+        _check_limit(session, user)
+        site.active = True
+        session.commit()
+    return site_out(site, user)

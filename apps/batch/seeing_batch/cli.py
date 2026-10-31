@@ -57,7 +57,7 @@ def run_batch(
 
     grib_dir = grib_dir or Path(os.environ.get("GRIB_DIR", "/tmp/arome"))
     forecast_hours = forecast_hours if forecast_hours is not None else int(os.environ.get("FORECAST_HOURS", "51"))
-    retention_days = retention_days if retention_days is not None else int(os.environ.get("RETENTION_DAYS", "14"))
+    retention_days = retention_days if retention_days is not None else int(os.environ.get("RETENTION_DAYS", "36500"))  # default: keep every run
     if map_enabled is None:
         map_enabled = os.environ.get("MAP_ENABLED", "1") == "1"
     find_cycle = find_cycle or arome.latest_complete_cycle

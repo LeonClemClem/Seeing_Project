@@ -88,14 +88,15 @@ export function usePlaces(): { pub: Place[]; sh: Place[]; hid: Place[]; mine: Pl
 
 export const MAX_PLACES = 5;
 
-/** Create / update / delete the account's places; every change reloads the site list. */
+/** Create / update / archive / restore the account's places (never deleted); every change reloads the lists. */
 export function usePlaceActions() {
   const qc = useQueryClient();
-  const refresh = () => qc.invalidateQueries({ queryKey: queryKeys.sites });
+  const refresh = () => Promise.all([qc.invalidateQueries({ queryKey: queryKeys.sites }), qc.invalidateQueries({ queryKey: ["archived"] })]);
   return {
     create: useMutation({ mutationFn: (b: PlaceIn) => api.createPlace(b), onSuccess: refresh }),
     update: useMutation({ mutationFn: ({ slug, ...b }: PlacePatch & { slug: string }) => api.updatePlace(slug, b), onSuccess: refresh }),
-    remove: useMutation({ mutationFn: (slug: string) => api.deletePlace(slug), onSuccess: refresh }),
+    archive: useMutation({ mutationFn: (slug: string) => api.archivePlace(slug), onSuccess: refresh }),
+    restore: useMutation({ mutationFn: (slug: string) => api.restorePlace(slug), onSuccess: refresh }),
   };
 }
 
