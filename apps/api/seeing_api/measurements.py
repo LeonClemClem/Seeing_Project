@@ -124,8 +124,28 @@ class SkillOut(BaseModel):
 
 
 SKILL_BIN_H = 1  # hourly error: one class per hour of age
-MEAS_WINDOW = 5  # rolling centred median of the measurements, as everywhere (never hourly aggregates)
-MEAS_MAX_GAP = timedelta(minutes=15)  # measurement nearest the hour, at most this far
+MEAS_HALF = timedelta(minutes=30)  # measured value of an hour: median of the measurements within +/- 30 min
+
+
+def _measured(session, site_id: int, t0: datetime, t1: datetime):
+    """Measured value of each hour from t0 to t1: median of the measurements within +/- 30 min of the hour, as the
+    hourly medians of Calibrer and of the history (same value on every panel)."""
+    ms = session.execute(
+        select(Measurement.time, Measurement.seeing_arcsec)
+        .where(Measurement.site_id == site_id, Measurement.time >= t0 - MEAS_HALF, Measurement.time <= t1 + MEAS_HALF)
+        .order_by(Measurement.time)
+    ).all()
+    times = [utc(r.time) for r in ms]
+    vals = [r.seeing_arcsec for r in ms]
+    cache: dict[datetime, float | None] = {}
+
+    def at(t: datetime) -> float | None:
+        if t not in cache:
+            w = vals[bisect.bisect_left(times, t - MEAS_HALF):bisect.bisect_right(times, t + MEAS_HALF)]
+            cache[t] = statistics.median(w) if w else None
+        return cache[t]
+
+    return at
 
 
 def _is_night(t: datetime) -> bool:
@@ -167,26 +187,7 @@ def get_skill(slug: str, session: SessionDep, user: CurrentUser) -> SkillOut:
     fc = [r for r in fc if _is_night(utc(r.valid_time))]
     if not fc:
         return SkillOut(bins=[])
-    t0, t1 = min(r.valid_time for r in fc), max(r.valid_time for r in fc)
-    ms = session.execute(
-        select(Measurement.time, Measurement.seeing_arcsec)
-        .where(Measurement.site_id == site.id, Measurement.time >= t0 - timedelta(hours=1), Measurement.time <= t1 + timedelta(hours=1))
-        .order_by(Measurement.time)
-    ).all()
-    times = [utc(r.time) for r in ms]
-    vals = [r.seeing_arcsec for r in ms]
-    half = MEAS_WINDOW // 2
-    smooth = [statistics.median(vals[max(0, i - half):i + half + 1]) for i in range(len(vals))]
-    measured: dict[datetime, float] = {}
-
-    def measured_at(t: datetime) -> float | None:
-        if t not in measured:
-            i = bisect.bisect_left(times, t)
-            near = [j for j in (i - 1, i) if 0 <= j < len(times)]
-            j = min(near, key=lambda j: abs(times[j] - t), default=None)
-            measured[t] = smooth[j] if j is not None and abs(times[j] - t) <= MEAS_MAX_GAP else math.nan
-        v = measured[t]
-        return None if math.isnan(v) else v
+    measured_at = _measured(session, site.id, utc(min(r.valid_time for r in fc)), utc(max(r.valid_time for r in fc)))
 
     groups: dict[int, list[tuple[float, float, datetime]]] = {}
     per_night: dict[tuple[datetime, object], list[tuple[float, float]]] = {}
@@ -297,14 +298,15 @@ def put_calib(slug: str, body: CalibSettings, session: SessionDep, user: LoggedI
     return Response(status_code=204)
 
 
-@router.get("/{slug}/terms", response_model=TermsOut)
-def get_terms(
-    slug: str, session: SessionDep, user: LoggedIn,
-    start: Annotated[datetime, Query(alias="from")], end: Annotated[datetime, Query(alias="to")],
-) -> TermsOut:
-    site = editable_site(session, slug, user)
-    if end - start > timedelta(days=400):
-        raise HTTPException(422, "At most 400 days at once")
+def _hour_terms(session, site_id: int, start: datetime | None = None, end: datetime | None = None):
+    """Integrals at K = 1 of each valid hour, from one run: main runs first, then the shortest lead; a secondary run
+    (research history) only for the hours no main run covers. The same selection for Calibrer and the history."""
+    where = [Forecast.site_id == site_id, ModelRun.status == RunStatus.success, Forecast.i_tke.is_not(None),
+             Forecast.i_conv.is_not(None), Forecast.i_cis.is_not(None)]
+    if start is not None:
+        where.append(Forecast.valid_time >= start)
+    if end is not None:
+        where.append(Forecast.valid_time < end)
     ranked = (
         select(
             Forecast.valid_time, Forecast.lead_hour, Forecast.i_tke, Forecast.i_conv, Forecast.i_cis,
@@ -316,13 +318,49 @@ def get_terms(
             ).label("rk"),
         )
         .join(ModelRun, ModelRun.id == Forecast.run_id)
-        .where(
-            Forecast.site_id == site.id, ModelRun.status == RunStatus.success, Forecast.i_tke.is_not(None),
-            Forecast.valid_time >= start, Forecast.valid_time < end,
-        )
+        .where(*where)
         .subquery()
     )
-    rows = session.execute(select(ranked).where(ranked.c.rk == 1).order_by(ranked.c.valid_time)).all()
+    return session.execute(select(ranked).where(ranked.c.rk == 1).order_by(ranked.c.valid_time)).all()
+
+
+class VerifOut(BaseModel):
+    """Forecast of each hour that has its integrals at K = 1, recomputed with the site's current K (the run chosen as
+    for Calibrer), and the measured value of the hour (median +/- 30 min) where there are measurements."""
+
+    valid_times: list[datetime]
+    seeing_arcsec: list[float | None]
+    measured_arcsec: list[float | None]
+
+
+@router.get("/{slug}/verif", response_model=VerifOut)
+def get_verif(slug: str, session: SessionDep, user: CurrentUser) -> VerifOut:
+    """History and correlation of the Prévision tab: one forecast per hour, at the current K, hours without integrals
+    left out. The K stay on the server."""
+    if user is None:
+        site = public_site(session, slug)
+        if site is None:
+            raise HTTPException(401, "Not logged in")
+    else:
+        site = readable_site(session, slug, user)
+    rows = _hour_terms(session, site.id)
+    if not rows:
+        return VerifOut(valid_times=[], seeing_arcsec=[], measured_arcsec=[])
+    at = _measured(session, site.id, utc(rows[0].valid_time), utc(rows[-1].valid_time))
+    see = [seeing_of(site.k_tke * r.i_tke + site.k_tke_conv * r.i_conv + site.k_cis * r.i_cis)[0] for r in rows]
+    return VerifOut(valid_times=[utc(r.valid_time) for r in rows], seeing_arcsec=[round(v, 3) if v else None for v in see],
+                    measured_arcsec=[at(utc(r.valid_time)) for r in rows])
+
+
+@router.get("/{slug}/terms", response_model=TermsOut)
+def get_terms(
+    slug: str, session: SessionDep, user: LoggedIn,
+    start: Annotated[datetime, Query(alias="from")], end: Annotated[datetime, Query(alias="to")],
+) -> TermsOut:
+    site = editable_site(session, slug, user)
+    if end - start > timedelta(days=400):
+        raise HTTPException(422, "At most 400 days at once")
+    rows = _hour_terms(session, site.id, start, end)
     return TermsOut(
         valid_times=[utc(r.valid_time) for r in rows], lead_hours=[r.lead_hour for r in rows],
         i_tke=[r.i_tke for r in rows], i_conv=[r.i_conv for r in rows], i_cis=[r.i_cis for r in rows],

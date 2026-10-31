@@ -144,6 +144,29 @@ def test_skill_by_age_of_the_run():
     assert [(n["age"], n["n_nights"]) for n in r.json()["nights"]] == [(6, 1), (18, 1)]
 
 
+def test_verif_one_forecast_per_hour_at_the_current_k():
+    ada = client_for("ada@example.org")
+    slug = ada.post("/api/places", json={"name": "Jardin", "lat": 44.3, "lon": 5.3}).json()["slug"]
+    with get_session_factory()() as s:
+        site = s.scalar(select(Site).where(Site.slug == slug))
+        for k, run_time in enumerate((T0, T0 + timedelta(hours=6))):
+            run = ModelRun(run_time=run_time, status=RunStatus.success)
+            s.add(run)
+            s.flush()
+            for lead in range(0, 12):
+                ok = lead != 3  # 09Z without integrals in the 06Z run: taken from the 00Z run, which has them
+                s.add(Forecast(run_id=run.id, site_id=site.id, valid_time=run_time + timedelta(hours=lead), lead_hour=lead,
+                               seeing_arcsec=9.0, i_tke=1e-13 if ok or k == 0 else None, i_conv=0.0, i_cis=1e-15))
+        for m in (-20, 0, 25, 40):  # 40 min after 06Z: outside the hour
+            s.add(Measurement(site_id=site.id, time=T0 + timedelta(hours=6, minutes=m), seeing_arcsec=1.0 + m / 100))
+        s.commit()
+    r = ada.get(f"/api/sites/{slug}/verif").json()
+    assert len(r["valid_times"]) == 18
+    assert all(v is not None and v != 9.0 for v in r["seeing_arcsec"])  # recomputed with the K, not the stored value
+    i6 = r["valid_times"].index("2026-10-13T06:00:00Z")
+    assert r["measured_arcsec"][i6] == 1.0 and r["measured_arcsec"][0] is None
+
+
 def test_terms_take_a_secondary_run_only_where_no_main_run_covers():
     ada = client_for("ada@example.org")
     slug = ada.post("/api/places", json={"name": "Jardin", "lat": 44.3, "lon": 5.3}).json()["slug"]

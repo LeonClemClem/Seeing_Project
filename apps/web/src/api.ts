@@ -256,6 +256,11 @@ export const api = {
     get<Fisheye>(`/api/fisheye?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}${alt != null ? `&alt=${Math.round(alt)}` : ""}`),
   /** Research history of a monitored site (periods, hourly pairs); K and integrals only for calibrators. */
   history: (slug: string) => get<SiteHistory>(`/api/sites/${encodeURIComponent(slug)}/history`),
+  /** One forecast per hour with integrals, at the site's current K, and the measured hourly median. */
+  verif: (slug: string) =>
+    get<{ valid_times: string[]; seeing_arcsec: (number | null)[]; measured_arcsec: (number | null)[] }>(
+      `/api/sites/${encodeURIComponent(slug)}/verif`,
+    ),
   skill: (slug: string) => get<{ bins: SkillBin[]; nights: SkillNight[] }>(`/api/sites/${encodeURIComponent(slug)}/skill`),
   terms: (slug: string, from: string, to: string) =>
     get<Terms>(`/api/sites/${encodeURIComponent(slug)}/terms?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
