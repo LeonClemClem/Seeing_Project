@@ -78,6 +78,26 @@ def test_calibration_settings_saved_with_the_place():
     assert ada.put(f"/api/sites/{slug}/calib", json={**body, "out": ["28/10/2026"]}).status_code == 422
 
 
+def test_save_k_owner_admin_only():
+    from seeing_db import UserRole
+
+    ada = client_for("ada@example.org")
+    slug = ada.post("/api/places", json={"name": "Jardin", "lat": 44.3, "lon": 5.3}).json()["slug"]
+    k = {"k_tke": 1.0, "k_cis": 30.0, "k_conv": 0.1}
+    assert ada.put(f"/api/sites/{slug}/k", json=k).status_code == 204
+    assert ada.put("/api/sites/ohp/k", json=k).status_code == 404  # a public site: not hers
+    assert ada.put(f"/api/sites/{slug}/k", json={**k, "k_cis": 500}).status_code == 422
+    with get_session_factory()() as s:
+        site = s.scalar(select(Site).where(Site.slug == slug))
+        assert (site.k_tke, site.k_cis, site.k_tke_conv) == (1.0, 30.0, 0.1)
+        s.scalar(select(User).where(User.email == "ada@example.org")).role = UserRole.admin
+        s.commit()
+    assert ada.put("/api/sites/ohp/k", json=k).status_code == 204  # the administrator saves any site's K
+    with get_session_factory()() as s:
+        ohp = s.scalar(select(Site).where(Site.slug == "ohp"))
+        assert (ohp.k_tke, ohp.k_cis) == (1.0, 30.0)
+
+
 def test_terms_use_the_latest_run_before_each_hour():
     ada = client_for("ada@example.org")
     slug = ada.post("/api/places", json={"name": "Jardin", "lat": 44.3, "lon": 5.3}).json()["slug"]

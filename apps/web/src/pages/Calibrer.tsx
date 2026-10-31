@@ -5,7 +5,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 
-import { api } from "../api";
+import { api, queryKeys } from "../api";
 
 import { corrChart } from "../charts/lieuCharts";
 import { cn2Svg, corrMock } from "../charts/mockCharts";
@@ -15,7 +15,7 @@ import { useUser } from "../data/auth";
 import { useSiteHistory } from "../data/forecast";
 import { useNavigate } from "react-router-dom";
 
-import { kHidden, selectPlace, TEAM_SITE, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
+import { kHidden, selectPlace, TEAM_SITE, useCurrentPlace, usePlaces, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { parseCsv, type CsvOpts, type DateFmt, type NightPt } from "../lib/csv";
 import { C_AR, C_DAY, C_LINE, C_OBS, C_OBSD, C_TXT, dnText, fmt, pl, yaxis } from "../lib/util";
@@ -355,6 +355,19 @@ export default function Calibrer() {
   const corr = useLangMemo(() => corrMock(K, KCAL, place.f), [K, KCAL, place.f]);
   const hist = useLangMemo(() => (place.real ? realHist : lieuData(place.nom, place.f, K, KCAL)), [place, K, KCAL, realHist]);
   const corrf = useUi((s) => s.corrf);
+  // Cn² notice: the panel previews the K being set; the site's forecasts use the saved K, from the next run
+  const kDiff = place.real && editable && (Math.abs(K[0] - place.K[0]) > 1e-6 || Math.abs(K[1] - place.K[1]) > 1e-6);
+  const kBanner = kDiff ? (
+    <div className="kbanner warn" role="status">
+      <b>{tr("⚠ Aperçu avec les K réglés")}</b> (K_TKE {fmt(K[0])} · K_CIS {fmt(K[1])}).{" "}
+      {tr("Le Cn² et les prévisions du site ne les prendront en compte qu'au prochain run AROME, après « Enregistrer pour ce lieu ».")}
+    </div>
+  ) : saved && place.real && editable ? (
+    <div className="kbanner ok" role="status">
+      <b>{tr("✓ K enregistrés")}</b>{" "}
+      {tr("Le Cn² et les prévisions du site les prendront en compte à partir du prochain run AROME (toutes les 6 h).")}
+    </div>
+  ) : null;
   const calC = useLangMemo(
     () => (editable && realModel ? calCorr(cal.P as CalPair<Terms>[], cal.R as CalPair<Terms>[], K, seeTerms) : null),
     [editable, realModel, cal, K],
@@ -602,6 +615,7 @@ export default function Calibrer() {
           </div>
           <div className="panel">
             <h2>{tr("Cn² (altitude × temps)")}</h2>
+            {kBanner}
             <Cn2Legend obs={showObs} />
             {place.real ? (
               <Cn2RealPanel place={place} profile={false} rm={cal.F.rm} />
@@ -744,13 +758,18 @@ function KPanel(p: {
 }) {
   const K = useUi((s) => s.K);
   const { r, b, q } = p.stats;
-  const { update } = usePlaceActions();
+  const qc = useQueryClient();
+  // saved with the site on the server (owner, administrator for every site, team for its site), used by the batch
+  // from the next run; the example places only keep them in the page
   const save = () => {
     const done = tr(`Enregistré : K_TKE = ${fmt(K[0])}, K_CIS = ${fmt(K[1])}, K_conv = 0.1.`);
-    if (p.place.kind !== "mine" || !p.place.real || !p.place.slug) return p.setSaved(done);
-    update.mutate(
-      { slug: p.place.slug, k_tke: K[0], k_cis: K[1], k_conv: 0.1 },
-      { onSuccess: () => p.setSaved(done + tr(" Utilisés dès le prochain run.")), onError: (e) => p.setSaved(e.message) },
+    if (!p.place.real || !p.place.slug) return p.setSaved(done);
+    api.saveK(p.place.slug, { k_tke: K[0], k_cis: K[1], k_conv: 0.1 }).then(
+      () => {
+        p.setSaved(done + tr(" Utilisés dès le prochain run."));
+        return qc.invalidateQueries({ queryKey: queryKeys.sites });
+      },
+      (e: Error) => p.setSaved(e.message),
     );
   };
   return (
