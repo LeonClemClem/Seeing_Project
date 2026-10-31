@@ -106,8 +106,19 @@ class SkillBin(BaseModel):
     rmse: float | None
 
 
+class SkillNight(BaseModel):
+    """Night precision: for each run and night, median of its forecast hours against the median of the measured ones
+    (as the night points of the correlation); `age` = age of the run at 00h UTC, the middle of the night."""
+
+    age: int
+    n_nights: int
+    bias: float | None
+    mae: float | None
+
+
 class SkillOut(BaseModel):
     bins: list[SkillBin]
+    nights: list[SkillNight] = Field(default_factory=list)
 
 
 SKILL_BIN_H = 1  # hourly error: one class per hour of age
@@ -142,7 +153,7 @@ def get_skill(slug: str, session: SessionDep, user: CurrentUser) -> SkillOut:
     else:
         site = readable_site(session, slug, user)
     fc = session.execute(
-        select(Forecast.valid_time, Forecast.lead_hour, Forecast.i_tke, Forecast.i_conv, Forecast.i_cis)
+        select(Forecast.valid_time, Forecast.lead_hour, Forecast.i_tke, Forecast.i_conv, Forecast.i_cis, ModelRun.run_time)
         .join(ModelRun, ModelRun.id == Forecast.run_id)
         .where(Forecast.site_id == site.id, ModelRun.status == RunStatus.success, Forecast.i_tke.is_not(None),
                Forecast.i_conv.is_not(None), Forecast.i_cis.is_not(None), Forecast.lead_hour >= 0)
@@ -172,6 +183,7 @@ def get_skill(slug: str, session: SessionDep, user: CurrentUser) -> SkillOut:
         return None if math.isnan(v) else v
 
     groups: dict[int, list[tuple[float, float, datetime]]] = {}
+    per_night: dict[tuple[datetime, object], list[tuple[float, float]]] = {}
     for r in fc:
         t = utc(r.valid_time)
         m = measured_at(t)
@@ -181,6 +193,7 @@ def get_skill(slug: str, session: SessionDep, user: CurrentUser) -> SkillOut:
         if seeing is None:
             continue
         groups.setdefault(r.lead_hour // SKILL_BIN_H, []).append((seeing, m, t))
+        per_night.setdefault((utc(r.run_time), (t - timedelta(hours=12)).date()), []).append((seeing, m))
     bins = []
     for b in sorted(groups):
         g = groups[b]
@@ -191,7 +204,16 @@ def get_skill(slug: str, session: SessionDep, user: CurrentUser) -> SkillOut:
             n_nights=len({(x[2] - timedelta(hours=12)).date() for x in g}), r=_pearson(p, o),
             bias=statistics.fmean(d), mae=statistics.fmean(abs(x) for x in d), rmse=math.sqrt(statistics.fmean(x * x for x in d)),
         ))
-    return SkillOut(bins=bins)
+    by_age: dict[int, list[float]] = {}
+    for (run_time, night), g in per_night.items():
+        if len(g) < 2:  # as the night points of the correlation
+            continue
+        midnight = datetime.combine(night + timedelta(days=1), datetime.min.time(), tzinfo=UTC)
+        age = round((midnight - run_time).total_seconds() / 3600)
+        by_age.setdefault(age, []).append(statistics.median(x[0] for x in g) - statistics.median(x[1] for x in g))
+    nights = [SkillNight(age=a, n_nights=len(d), bias=statistics.fmean(d), mae=statistics.fmean(abs(x) for x in d))
+              for a, d in sorted(by_age.items())]
+    return SkillOut(bins=bins, nights=nights)
 
 
 @router.post("/{slug}/measurements", dependencies=[Depends(require_json)])

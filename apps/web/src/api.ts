@@ -70,6 +70,14 @@ export interface SkillBin {
   rmse: number | null;
 }
 
+/** Night precision: median of a run's forecast hours of a night vs the measured median; age at 00h UTC. */
+export interface SkillNight {
+  age: number;
+  n_nights: number;
+  bias: number | null;
+  mae: number | null;
+}
+
 /** V2bd terms at K = 1 of each valid hour (latest run issued before it). */
 export interface Terms {
   valid_times: string[];
@@ -245,7 +253,7 @@ export const api = {
     get<Fisheye>(`/api/fisheye?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}${alt != null ? `&alt=${Math.round(alt)}` : ""}`),
   /** Research history of a monitored site (periods, hourly pairs); K and integrals only for calibrators. */
   history: (slug: string) => get<SiteHistory>(`/api/sites/${encodeURIComponent(slug)}/history`),
-  skill: (slug: string) => get<{ bins: SkillBin[] }>(`/api/sites/${encodeURIComponent(slug)}/skill`),
+  skill: (slug: string) => get<{ bins: SkillBin[]; nights: SkillNight[] }>(`/api/sites/${encodeURIComponent(slug)}/skill`),
   terms: (slug: string, from: string, to: string) =>
     get<Terms>(`/api/sites/${encodeURIComponent(slug)}/terms?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   latestRun: () => get<Run>("/api/runs/latest"),

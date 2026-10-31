@@ -83,9 +83,12 @@ export default function Prevision() {
           {place.real ? <RealHistory place={place} OB={OB} head={histHead} /> : <MockHistory place={place} OB={OB} head={histHead} />}
         </div>
         <div className="grid2" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1.5fr)", alignItems: "start" }}>
-          <div className="panel">
-            <h2>{tr("Corrélation prévu / mesuré (nuit)")}</h2>
-            {place.real ? <RealCorr place={place} /> : <MockCorr place={place} />}
+          <div>
+            <div className="panel">
+              <h2>{tr("Corrélation prévu / mesuré (nuit)")}</h2>
+              {place.real ? <RealCorr place={place} /> : <MockCorr place={place} />}
+            </div>
+            {place.real && <RunAgeSkill place={place} />}
           </div>
           <div className="panel">
             <h2>{tr("Variables du modèle (passées et prévues)")}</h2>
@@ -131,16 +134,13 @@ function RealCorr({ place }: { place: Place }) {
       <p className="small muted mono" style={{ margin: "0 0 2px" }}>
         {c.ct}
       </p>
-      <div style={{ position: "relative", maxWidth: 520 }}>
-        <SvgChart html={c.svg} viewBox="0 0 340 320" label="Corrélation du lieu" style={{ width: "100%", display: "block" }} />
-        <RunAgeSkill place={place} />
-      </div>
+      <SvgChart html={c.svg} viewBox="0 0 340 320" label="Corrélation du lieu" style={{ maxWidth: 520 }} />
     </>
   );
 }
 
-/** Inset in the bottom-right corner of the correlation: hourly error with the age of the run, every run that forecast
- * the hour recomputed with the place's current K (hours with integrals only). */
+/** Square panel under the correlation (half its width, a quarter of its area): hourly error with the age of the run,
+ * every run that forecast the hour recomputed with the place's current K (hours with integrals only). */
 function RunAgeSkill({ place }: { place: Place }) {
   const slug = place.slug ?? "";
   const q = useQuery({
@@ -150,11 +150,22 @@ function RunAgeSkill({ place }: { place: Place }) {
     retry: false,
     staleTime: 30 * 60 * 1000,
   });
-  const svg = useLangMemo(() => (q.data?.bins.length ? skillSvg(q.data.bins) : ""), [q.data]);
+  const svg = useLangMemo(() => (q.data?.bins.length ? skillSvg(q.data.bins, q.data.nights) : ""), [q.data]);
   if (!svg) return null;
   return (
-    <div style={{ position: "absolute", right: "2%", bottom: "11%", width: "46%" }}>
-      <SvgChart html={svg} viewBox="0 0 160 96" label="Erreur horaire selon l'âge du run" style={{ width: "100%", display: "block" }} />
+    <div className="panel" style={{ width: "50%", minWidth: 220, marginTop: 12 }}>
+      <h2 style={{ fontSize: 14 }}>{tr("Erreur selon l'âge du run")}</h2>
+      <div className="legend">
+        <span>
+          <Sw style={{ width: 16, borderTop: "2px solid #ff9f43" }} />
+          {tr("horaire")}
+        </span>
+        <span>
+          <Sw style={{ width: 16, borderTop: "2px dashed #f1efe8" }} />
+          {tr("par nuit (médianes)")}
+        </span>
+      </div>
+      <SvgChart html={svg} viewBox="0 0 200 200" label="Erreur selon l'âge du run" style={{ width: "100%", display: "block" }} />
     </div>
   );
 }

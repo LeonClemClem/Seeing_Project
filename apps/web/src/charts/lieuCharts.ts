@@ -1,6 +1,6 @@
 /** Per-place charts (mockup's lxHist / lxCorr / histSvg / lxMaille) over LieuData. */
 import { tr } from "../i18n";
-import type { Cells, SkillBin } from "../api";
+import type { Cells, SkillBin, SkillNight } from "../api";
 import type { LieuData, LieuEpisode, TV } from "../mock/engine";
 import type { UiState } from "../store";
 import {
@@ -25,42 +25,53 @@ import {
   yaxis,
 } from "../lib/util";
 
-/** Hourly error of the forecast with the age of the run: one curve, mean |forecast - measured| for each hour of
- * age (small inset of the correlation); the hours of age with few compared hours are see-through. */
-export function skillSvg(bins: SkillBin[]) {
-  const W = 160,
-    H = 96,
-    L = 22,
-    R = 6,
-    T = 14,
-    B = 16,
+/** Error of the forecast with the age of the run (square panel under the correlation): mean |forecast - measured| for
+ * each hour of age (orange) and by night, medians of the night (white, age at 00h UTC); the ages with few compared
+ * hours (or nights) are see-through. */
+export function skillSvg(bins: SkillBin[], nights: SkillNight[] = []) {
+  const W = 200,
+    H = 200,
+    L = 28,
+    R = 8,
+    T = 8,
+    B = 30,
     pw = W - L - R,
     ph = H - T - B,
     amax = Math.max(48, ...bins.map((b) => b.age_to)),
-    emax = Math.max(0.5, Math.ceil(Math.max(...bins.map((b) => b.mae ?? 0)) * 1.2 * 2) / 2),
+    emax = Math.max(0.5, Math.ceil(Math.max(...bins.map((b) => b.mae ?? 0), ...nights.map((n) => n.mae ?? 0)) * 1.2 * 2) / 2),
     X = (a: number) => L + (a / amax) * pw,
     Y = (v: number) => T + ph - (Math.min(v, emax) / emax) * ph,
     pts = bins.filter((b) => b.mae != null);
-  let g = `<rect x="0.5" y="0.5" width="${W - 1}" height="${H - 1}" rx="6" fill="#0a0f1d" fill-opacity=".88" stroke="${C_LINE}"/>`;
-  g += `<text x="6" y="10" font-size="8.5" fill="${C_TXT}">${tr("erreur horaire ('') selon l'âge du run (h)")}</text>`;
-  [0, emax / 2, emax].forEach(
+  let g = "";
+  [0, emax / 4, emax / 2, (3 * emax) / 4, emax].forEach(
     (v) =>
-      (g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${C_LINE}" stroke-width="0.5"/><text x="${L - 3}" y="${Y(v) + 3}" text-anchor="end" font-size="8" fill="${C_TXT}">${v.toFixed(1)}</text>`),
+      (g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${C_LINE}" stroke-width="0.5"/><text x="${L - 3}" y="${Y(v) + 3}" text-anchor="end" font-size="9" fill="${C_TXT}">${v.toFixed(1)}"</text>`),
   );
-  for (let a = 0; a <= amax; a += 12) g += `<text x="${X(a)}" y="${H - 5}" text-anchor="middle" font-size="8" fill="${C_TXT}">${a}</text>`;
+  for (let a = 0; a <= amax; a += 12)
+    g += `<line x1="${X(a)}" x2="${X(a)}" y1="${T}" y2="${T + ph}" stroke="${C_LINE}" stroke-width="0.5"/><text x="${X(a)}" y="${T + ph + 12}" text-anchor="middle" font-size="9" fill="${C_TXT}">${a}</text>`;
+  g += `<text x="${L + pw / 2}" y="${H - 4}" text-anchor="middle" font-size="9.5" fill="${C_TXT}">${tr("âge du run (h)")}</text>`;
   // the curve is broken where hours of age are missing (no night hour at that age)
   let seg: [number, number][] = [];
   pts.forEach((b, i) => {
     if (i && b.age_from !== pts[i - 1]!.age_from + 1) {
-      g += pl(seg, `stroke="${C_AR}" stroke-width="1.6"`);
+      g += pl(seg, `stroke="${C_AR}" stroke-width="1.8"`);
       seg = [];
     }
     seg.push([X(b.age_from + 0.5), Y(b.mae!)]);
   });
-  g += pl(seg, `stroke="${C_AR}" stroke-width="1.6"`);
+  g += pl(seg, `stroke="${C_AR}" stroke-width="1.8"`);
   pts.forEach((b) => {
     const op = b.n_hours < 10 ? ' opacity=".35"' : "";
-    g += `<circle cx="${X(b.age_from + 0.5)}" cy="${Y(b.mae!)}" r="1.8" fill="${C_AR}"${op}><title>${b.age_from} h : ${b.mae!.toFixed(2)}'' (${b.n_hours} h)</title></circle>`;
+    g += `<circle cx="${X(b.age_from + 0.5)}" cy="${Y(b.mae!)}" r="2.4" fill="${C_AR}"${op}><title>${b.age_from} h : ${b.mae!.toFixed(2)}'' (${b.n_hours} h)</title></circle>`;
+  });
+  const nn = nights.filter((n) => n.mae != null);
+  g += pl(
+    nn.map((n) => [X(n.age), Y(n.mae!)] as [number, number]),
+    `stroke="#f1efe8" stroke-width="1.4" stroke-dasharray="4 3"`,
+  );
+  nn.forEach((n) => {
+    const op = n.n_nights < 3 ? ' opacity=".35"' : "";
+    g += `<rect x="${X(n.age) - 3}" y="${Y(n.mae!) - 3}" width="6" height="6" fill="#f1efe8" stroke="#0a0f1d" stroke-width="0.8"${op}><title>${tr("nuit")} ${n.age} h : ${n.mae!.toFixed(2)}'' (${n.n_nights} ${tr("nuits")})</title></rect>`;
   });
   return g;
 }

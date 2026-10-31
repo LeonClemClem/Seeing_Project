@@ -140,6 +140,8 @@ def test_skill_by_age_of_the_run():
     bins = r.json()["bins"]
     assert [(b["age_from"], b["n_hours"], b["n_nights"]) for b in bins] == [(a, 1, 1) for a in (2, 3, 4, 5, 14, 15, 16, 17)]
     assert all(b["mae"] >= 0 and b["rmse"] >= b["mae"] for b in bins)
+    # by night: the 18Z run is 6 h old at midnight, the 06Z run 18 h
+    assert [(n["age"], n["n_nights"]) for n in r.json()["nights"]] == [(6, 1), (18, 1)]
 
 
 def test_terms_take_a_secondary_run_only_where_no_main_run_covers():
