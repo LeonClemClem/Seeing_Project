@@ -151,10 +151,17 @@ function RunAgeSkill({ place }: { place: Place }) {
     staleTime: 30 * 60 * 1000,
   });
   const svg = useLangMemo(() => (q.data?.bins.length ? skillSvg(q.data.bins, q.data.nights) : ""), [q.data]);
+  // default size: the width of the correlation panel; the corner handle resizes it, the button restores the default
+  const box = useRef<HTMLDivElement>(null);
   if (!svg) return null;
   return (
-    <div className="panel" style={{ width: "50%", minWidth: 220, marginTop: 12 }}>
-      <h2 style={{ fontSize: 14 }}>{tr("Erreur selon l'âge du run (prévu − mesuré)")}</h2>
+    <div ref={box} className="panel" style={{ width: "100%", minWidth: 220, maxWidth: "100%", marginTop: 12, resize: "horizontal", overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+        <h2 style={{ fontSize: 14 }}>{tr("Erreur selon l'âge du run (prévu − mesuré)")}</h2>
+        <button type="button" className="chip" onClick={() => box.current && (box.current.style.width = "100%")}>
+          {tr("taille par défaut")}
+        </button>
+      </div>
       <div className="legend">
         <span>
           <Sw style={{ width: 16, borderTop: "2px solid #ff9f43" }} />
