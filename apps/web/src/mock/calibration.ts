@@ -101,6 +101,8 @@ export interface CalRemoved {
   /** nights left out by hand that had compared hours */
   out: number;
   rm: Set<string>; // hourKey of every night hour left out of the fit
+  /** hourKey of the hours left out by the "above the model" filter (drawn with their threshold line) */
+  topRm: Set<string>;
 }
 
 export function calib<C = Comp>(
@@ -109,7 +111,7 @@ export function calib<C = Comp>(
   model: CalModel<C> = MOCK_MODEL as unknown as CalModel<C>,
 ): { P: CalPair<C>[]; K: K3; mode: string; F: CalRemoved; R: CalPair<C>[] } {
   const all: CalPair<C>[] = [];
-  const F: CalRemoved = { pics: 0, courtes: 0, top: 0, out: 0, rm: new Set() };
+  const F: CalRemoved = { pics: 0, courtes: 0, top: 0, out: 0, rm: new Set(), topRm: new Set() };
   const outs = new Set(f.out ?? []);
   const R: CalPair<C>[] = []; // pairs left out of the fit (filters, nights left out)
   const seeC = model.see;
@@ -150,7 +152,10 @@ export function calib<C = Comp>(
         .map((p) => p.key),
     );
     F.top = drop.size;
-    drop.forEach((k) => F.rm.add(k));
+    drop.forEach((k) => {
+      F.rm.add(k);
+      F.topRm.add(k);
+    });
     R.push(...P.filter((p) => drop.has(p.key)));
     ({ P, K, mode } = fit(P.filter((p) => !drop.has(p.key)), model));
   }
