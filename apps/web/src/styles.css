@@ -103,3 +103,6 @@ a{color:#9cc7ff}
 @media (prefers-reduced-motion:reduce){.spinner{animation-duration:2.4s}}
 details>summary{list-style-position:inside}
 button:disabled{opacity:.5;cursor:not-allowed}
+.kbanner{border-radius:8px;padding:8px 12px;margin:4px 0 8px;font-size:13px;line-height:1.4}
+.kbanner.warn{background:rgba(242,193,78,.14);border:1px solid #f2c14e;color:#ffe3a3}
+.kbanner.ok{background:rgba(79,209,139,.12);border:1px solid #4fd18b;color:#c6f3d9}

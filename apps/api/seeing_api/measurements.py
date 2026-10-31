@@ -61,6 +61,14 @@ class CalibSettings(BaseModel):
     out: list[Annotated[str, Field(pattern=r"^\d{4}-\d{2}-\d{2}$")]] = Field(default_factory=list, max_length=2000)
 
 
+class KIn(BaseModel):
+    """K of a site, used by the batch from its next run (Calibrer, "Enregistrer pour ce lieu")."""
+
+    k_tke: float = Field(gt=0, le=150)
+    k_cis: float = Field(gt=0, le=150)
+    k_conv: float = Field(ge=0, le=150)
+
+
 class MeasurementsIn(BaseModel):
     # [[ISO 8601 UTC time, seeing arcsec], ...]
     points: list[tuple[datetime, float]] = Field(min_length=1, max_length=MAX_POINTS)
@@ -127,6 +135,15 @@ def delete_measurements(
         t0 = datetime.fromisoformat(night).replace(hour=12, tzinfo=UTC)
         q = q.where(Measurement.time >= t0, Measurement.time < t0 + timedelta(days=1))
     session.execute(q)
+    session.commit()
+    return Response(status_code=204)
+
+
+@router.put("/{slug}/k", status_code=204, dependencies=[Depends(require_json)])
+def put_k(slug: str, body: KIn, session: SessionDep, user: LoggedIn) -> Response:
+    """Save the K of a site: its owner, the administrator for every site, the team for its site."""
+    site = editable_site(session, slug, user)
+    site.k_tke, site.k_cis, site.k_tke_conv = body.k_tke, body.k_cis, body.k_conv
     session.commit()
     return Response(status_code=204)
 

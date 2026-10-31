@@ -221,6 +221,9 @@ export const api = {
     post<{ stored: number; rejected: number }>(`/api/sites/${encodeURIComponent(slug)}/measurements`, { points }),
   /** Calibration settings saved with the place: filters and nights left out. */
   calib: (slug: string) => get<{ pics: boolean; courtes: boolean; top: number; out: string[] }>(`/api/sites/${encodeURIComponent(slug)}/calib`),
+  /** Save the K of a site (owner, administrator, team for its site): used from the next run. */
+  saveK: (slug: string, b: { k_tke: number; k_cis: number; k_conv: number }) =>
+    send<void>("PUT", `/api/sites/${encodeURIComponent(slug)}/k`, b),
   saveCalib: (slug: string, b: { pics: boolean; courtes: boolean; top: number; out: string[] }) =>
     send<void>("PUT", `/api/sites/${encodeURIComponent(slug)}/calib`, b),
   deleteMeasurements: (slug: string, night?: string) =>
