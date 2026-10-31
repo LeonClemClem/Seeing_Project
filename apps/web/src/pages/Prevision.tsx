@@ -161,6 +161,10 @@ function RunAgeSkill({ place }: { place: Place }) {
           {tr("horaire")}
         </span>
         <span>
+          <Sw style={{ width: 16, height: 8, background: "rgba(255,159,67,.25)" }} />
+          {tr("± 1 écart type")}
+        </span>
+        <span>
           <Sw style={{ width: 16, borderTop: "2px dashed #f1efe8" }} />
           {tr("par nuit (médianes)")}
         </span>

@@ -67,6 +67,8 @@ export interface SkillBin {
   r: number | null;
   bias: number | null;
   mae: number | null;
+  /** standard deviation of |forecast - measured| */
+  sd: number | null;
   rmse: number | null;
 }
 
@@ -76,6 +78,7 @@ export interface SkillNight {
   n_nights: number;
   bias: number | null;
   mae: number | null;
+  sd: number | null;
 }
 
 /** V2bd terms at K = 1 of each valid hour (latest run issued before it). */

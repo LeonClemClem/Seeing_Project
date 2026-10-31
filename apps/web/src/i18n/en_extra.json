@@ -206,5 +206,6 @@
 "horaire": "hourly",
 "par nuit (médianes)": "by night (medians)",
 "nuit": "night",
-"nuits": "nights"
+"nuits": "nights",
+"± 1 écart type": "± 1 standard deviation"
 }

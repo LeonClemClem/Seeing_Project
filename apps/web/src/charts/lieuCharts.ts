@@ -26,8 +26,8 @@ import {
 } from "../lib/util";
 
 /** Error of the forecast with the age of the run (square panel under the correlation): mean |forecast - measured| for
- * each hour of age (orange) and by night, medians of the night (white, age at 00h UTC); the ages with few compared
- * hours (or nights) are see-through. */
+ * each hour of age (orange, band of one standard deviation) and by night, medians of the night (white, age at 00h UTC,
+ * bars of one standard deviation); the ages with few compared hours (or nights) are see-through. */
 export function skillSvg(bins: SkillBin[], nights: SkillNight[] = []) {
   const W = 200,
     H = 200,
@@ -38,7 +38,10 @@ export function skillSvg(bins: SkillBin[], nights: SkillNight[] = []) {
     pw = W - L - R,
     ph = H - T - B,
     amax = Math.max(48, ...bins.map((b) => b.age_to)),
-    emax = Math.max(0.5, Math.ceil(Math.max(...bins.map((b) => b.mae ?? 0), ...nights.map((n) => n.mae ?? 0)) * 1.2 * 2) / 2),
+    emax = Math.max(
+      0.5,
+      Math.ceil(Math.max(...bins.map((b) => (b.mae ?? 0) + (b.sd ?? 0)), ...nights.map((n) => (n.mae ?? 0) + (n.sd ?? 0))) * 1.1 * 2) / 2,
+    ),
     X = (a: number) => L + (a / amax) * pw,
     Y = (v: number) => T + ph - (Math.min(v, emax) / emax) * ph,
     pts = bins.filter((b) => b.mae != null);
@@ -50,6 +53,22 @@ export function skillSvg(bins: SkillBin[], nights: SkillNight[] = []) {
   for (let a = 0; a <= amax; a += 12)
     g += `<line x1="${X(a)}" x2="${X(a)}" y1="${T}" y2="${T + ph}" stroke="${C_LINE}" stroke-width="0.5"/><text x="${X(a)}" y="${T + ph + 12}" text-anchor="middle" font-size="9" fill="${C_TXT}">${a}</text>`;
   g += `<text x="${L + pw / 2}" y="${H - 4}" text-anchor="middle" font-size="9.5" fill="${C_TXT}">${tr("âge du run (h)")}</text>`;
+  // band of one standard deviation around the hourly curve, broken like the curve
+  let band: SkillBin[] = [];
+  const flush = () => {
+    const q = band.filter((b) => b.sd != null);
+    if (q.length > 1) {
+      const up = q.map((b) => `${X(b.age_from + 0.5)},${Y(b.mae! + b.sd!)}`),
+        dn = q.map((b) => `${X(b.age_from + 0.5)},${Y(Math.max(0, b.mae! - b.sd!))}`).reverse();
+      g += `<polygon points="${[...up, ...dn].join(" ")}" fill="${C_AR}" fill-opacity=".18"/>`;
+    }
+    band = [];
+  };
+  pts.forEach((b, i) => {
+    if (i && b.age_from !== pts[i - 1]!.age_from + 1) flush();
+    band.push(b);
+  });
+  flush();
   // the curve is broken where hours of age are missing (no night hour at that age)
   let seg: [number, number][] = [];
   pts.forEach((b, i) => {
@@ -71,6 +90,8 @@ export function skillSvg(bins: SkillBin[], nights: SkillNight[] = []) {
   );
   nn.forEach((n) => {
     const op = n.n_nights < 3 ? ' opacity=".35"' : "";
+    if (n.sd != null)
+      g += `<line x1="${X(n.age)}" x2="${X(n.age)}" y1="${Y(n.mae! + n.sd)}" y2="${Y(Math.max(0, n.mae! - n.sd))}" stroke="#f1efe8" stroke-width="1"${op}/>`;
     g += `<rect x="${X(n.age) - 3}" y="${Y(n.mae!) - 3}" width="6" height="6" fill="#f1efe8" stroke="#0a0f1d" stroke-width="0.8"${op}><title>${tr("nuit")} ${n.age} h : ${n.mae!.toFixed(2)}'' (${n.n_nights} ${tr("nuits")})</title></rect>`;
   });
   return g;

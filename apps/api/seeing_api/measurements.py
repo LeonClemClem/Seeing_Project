@@ -103,6 +103,7 @@ class SkillBin(BaseModel):
     r: float | None
     bias: float | None  # mean (forecast - measured), arcsec
     mae: float | None  # mean |forecast - measured|, arcsec
+    sd: float | None  # standard deviation of |forecast - measured| (band around mae)
     rmse: float | None
 
 
@@ -114,6 +115,7 @@ class SkillNight(BaseModel):
     n_nights: int
     bias: float | None
     mae: float | None
+    sd: float | None  # standard deviation of |forecast - measured| between the nights
 
 
 class SkillOut(BaseModel):
@@ -130,6 +132,10 @@ def _is_night(t: datetime) -> bool:
     """Night hours, 17h30-06h UTC, as on every chart of the site."""
     m = t.hour * 60 + t.minute
     return m >= 17 * 60 + 30 or m < 6 * 60
+
+
+def _sd(x: list[float]) -> float | None:
+    return statistics.stdev(x) if len(x) >= 2 else None
 
 
 def _pearson(x: list[float], y: list[float]) -> float | None:
@@ -202,7 +208,8 @@ def get_skill(slug: str, session: SessionDep, user: CurrentUser) -> SkillOut:
         bins.append(SkillBin(
             age_from=b * SKILL_BIN_H, age_to=(b + 1) * SKILL_BIN_H, n_hours=len(g),
             n_nights=len({(x[2] - timedelta(hours=12)).date() for x in g}), r=_pearson(p, o),
-            bias=statistics.fmean(d), mae=statistics.fmean(abs(x) for x in d), rmse=math.sqrt(statistics.fmean(x * x for x in d)),
+            bias=statistics.fmean(d), mae=statistics.fmean(abs(x) for x in d), sd=_sd([abs(x) for x in d]),
+            rmse=math.sqrt(statistics.fmean(x * x for x in d)),
         ))
     by_age: dict[int, list[float]] = {}
     for (run_time, night), g in per_night.items():
@@ -211,7 +218,8 @@ def get_skill(slug: str, session: SessionDep, user: CurrentUser) -> SkillOut:
         midnight = datetime.combine(night + timedelta(days=1), datetime.min.time(), tzinfo=UTC)
         age = round((midnight - run_time).total_seconds() / 3600)
         by_age.setdefault(age, []).append(statistics.median(x[0] for x in g) - statistics.median(x[1] for x in g))
-    nights = [SkillNight(age=a, n_nights=len(d), bias=statistics.fmean(d), mae=statistics.fmean(abs(x) for x in d))
+    nights = [SkillNight(age=a, n_nights=len(d), bias=statistics.fmean(d), mae=statistics.fmean(abs(x) for x in d),
+                         sd=_sd([abs(x) for x in d]))
               for a, d in sorted(by_age.items())]
     return SkillOut(bins=bins, nights=nights)
 
