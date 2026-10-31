@@ -431,12 +431,14 @@ function WindRoses({ place, data }: { place: Place; data: LieuData }) {
       </div>
       {fq.isLoading ? (
         <Spinner />
-      ) : !hours.length ? (
-        <p className="muted" style={{ textAlign: "center", padding: "30px 0" }}>
-          {tr("Pas encore d'heure de nuit avec mesure et vent AROME pour ce lieu : les données s'accumulent à chaque nuit.")}
-        </p>
       ) : (
         <>
+          {/* the three roses are always drawn, empty until the nights with measurement and wind add up */}
+          {!hours.length && (
+            <p className="muted small" style={{ textAlign: "center", margin: "0 0 6px" }}>
+              {tr("Pas encore d'heure de nuit avec mesure et vent AROME pour ce lieu : les données s'accumulent à chaque nuit.")}
+            </p>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 16 }}>
             {levels.map((lv, k) => {
               const pts: RosePt[] = hours
@@ -460,13 +462,7 @@ function WindRoses({ place, data }: { place: Place; data: LieuData }) {
                   <p className="small mono" style={{ margin: "4px 0 0", textAlign: "center", color: "#e6ebf6" }}>
                     {best ? `${tr("meilleur secteur :")} ${tr(best.sect)} (${best.med.toFixed(colour === "err" ? 0 : 2)}${unit}, ${best.n} h)` : tr("pas de secteur avec 5 h")}
                   </p>
-                  {pts.length ? (
-                    <SvgChart html={windRoseSvg(pts, lo, hi)} viewBox="0 0 300 300" label={`Rose des vents ${levelLabel(lv)}`} />
-                  ) : (
-                    <p className="muted small" style={{ textAlign: "center", padding: "60px 0" }}>
-                      {tr("Pas de vent AROME à ce niveau.")}
-                    </p>
-                  )}
+                  <SvgChart html={windRoseSvg(pts, lo, hi)} viewBox="0 0 300 300" label={`Rose des vents ${levelLabel(lv)}`} />
                 </div>
               );
             })}
