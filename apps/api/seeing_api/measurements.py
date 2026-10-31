@@ -6,6 +6,9 @@ account, for the public sites (their monitors are public). Calibration itself ru
 a small grid search).
 """
 
+import bisect
+import math
+import statistics
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
@@ -16,6 +19,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from seeing_api.api import TEAM_SITE, SessionDep, utc
 from seeing_api.auth import CurrentUser, require_json, require_role
+from seeing_api.history import seeing_of
 from seeing_db import Forecast, Measurement, ModelRun, RunStatus, Site, User, UserRole
 
 router = APIRouter(prefix="/api/sites")
@@ -87,6 +91,107 @@ class TermsOut(BaseModel):
     i_tke: list[float | None]
     i_conv: list[float | None]
     i_cis: list[float | None]
+
+
+class SkillBin(BaseModel):
+    """Forecasts issued `age_from` to `age_to` hours before the hour they forecast (lead), against the measurements."""
+
+    age_from: int
+    age_to: int
+    n_hours: int
+    n_nights: int
+    r: float | None
+    bias: float | None  # mean (forecast - measured), arcsec
+    mae: float | None  # mean |forecast - measured|, arcsec
+    rmse: float | None
+
+
+class SkillOut(BaseModel):
+    bins: list[SkillBin]
+
+
+SKILL_BIN_H = 1  # hourly error: one class per hour of age
+MEAS_WINDOW = 5  # rolling centred median of the measurements, as everywhere (never hourly aggregates)
+MEAS_MAX_GAP = timedelta(minutes=15)  # measurement nearest the hour, at most this far
+
+
+def _is_night(t: datetime) -> bool:
+    """Night hours, 17h30-06h UTC, as on every chart of the site."""
+    m = t.hour * 60 + t.minute
+    return m >= 17 * 60 + 30 or m < 6 * 60
+
+
+def _pearson(x: list[float], y: list[float]) -> float | None:
+    if len(x) < 3:
+        return None
+    mx, my = statistics.fmean(x), statistics.fmean(y)
+    sxy = sum((a - mx) * (b - my) for a, b in zip(x, y))
+    sxx, syy = sum((a - mx) ** 2 for a in x), sum((b - my) ** 2 for b in y)
+    return sxy / math.sqrt(sxx * syy) if sxx > 0 and syy > 0 else None
+
+
+@router.get("/{slug}/skill", response_model=SkillOut)
+def get_skill(slug: str, session: SessionDep, user: CurrentUser) -> SkillOut:
+    """Precision of the AROME forecast with the age of the run (lead), night hours only. Every run that has the
+    integrals at K = 1 of the hour (main or research secondary run) is recomputed with the site's current K, so that
+    every age is compared with the same K; the hours without integrals are left out."""
+    if user is None:
+        site = public_site(session, slug)
+        if site is None:
+            raise HTTPException(401, "Not logged in")
+    else:
+        site = readable_site(session, slug, user)
+    fc = session.execute(
+        select(Forecast.valid_time, Forecast.lead_hour, Forecast.i_tke, Forecast.i_conv, Forecast.i_cis)
+        .join(ModelRun, ModelRun.id == Forecast.run_id)
+        .where(Forecast.site_id == site.id, ModelRun.status == RunStatus.success, Forecast.i_tke.is_not(None),
+               Forecast.i_conv.is_not(None), Forecast.i_cis.is_not(None), Forecast.lead_hour >= 0)
+    ).all()
+    fc = [r for r in fc if _is_night(utc(r.valid_time))]
+    if not fc:
+        return SkillOut(bins=[])
+    t0, t1 = min(r.valid_time for r in fc), max(r.valid_time for r in fc)
+    ms = session.execute(
+        select(Measurement.time, Measurement.seeing_arcsec)
+        .where(Measurement.site_id == site.id, Measurement.time >= t0 - timedelta(hours=1), Measurement.time <= t1 + timedelta(hours=1))
+        .order_by(Measurement.time)
+    ).all()
+    times = [utc(r.time) for r in ms]
+    vals = [r.seeing_arcsec for r in ms]
+    half = MEAS_WINDOW // 2
+    smooth = [statistics.median(vals[max(0, i - half):i + half + 1]) for i in range(len(vals))]
+    measured: dict[datetime, float] = {}
+
+    def measured_at(t: datetime) -> float | None:
+        if t not in measured:
+            i = bisect.bisect_left(times, t)
+            near = [j for j in (i - 1, i) if 0 <= j < len(times)]
+            j = min(near, key=lambda j: abs(times[j] - t), default=None)
+            measured[t] = smooth[j] if j is not None and abs(times[j] - t) <= MEAS_MAX_GAP else math.nan
+        v = measured[t]
+        return None if math.isnan(v) else v
+
+    groups: dict[int, list[tuple[float, float, datetime]]] = {}
+    for r in fc:
+        t = utc(r.valid_time)
+        m = measured_at(t)
+        if m is None:
+            continue
+        seeing, _ = seeing_of(site.k_tke * r.i_tke + site.k_tke_conv * r.i_conv + site.k_cis * r.i_cis)
+        if seeing is None:
+            continue
+        groups.setdefault(r.lead_hour // SKILL_BIN_H, []).append((seeing, m, t))
+    bins = []
+    for b in sorted(groups):
+        g = groups[b]
+        p, o = [x[0] for x in g], [x[1] for x in g]
+        d = [a - c for a, c in zip(p, o)]
+        bins.append(SkillBin(
+            age_from=b * SKILL_BIN_H, age_to=(b + 1) * SKILL_BIN_H, n_hours=len(g),
+            n_nights=len({(x[2] - timedelta(hours=12)).date() for x in g}), r=_pearson(p, o),
+            bias=statistics.fmean(d), mae=statistics.fmean(abs(x) for x in d), rmse=math.sqrt(statistics.fmean(x * x for x in d)),
+        ))
+    return SkillOut(bins=bins)
 
 
 @router.post("/{slug}/measurements", dependencies=[Depends(require_json)])

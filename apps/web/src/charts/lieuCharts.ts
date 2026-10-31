@@ -1,6 +1,6 @@
 /** Per-place charts (mockup's lxHist / lxCorr / histSvg / lxMaille) over LieuData. */
 import { tr } from "../i18n";
-import type { Cells } from "../api";
+import type { Cells, SkillBin } from "../api";
 import type { LieuData, LieuEpisode, TV } from "../mock/engine";
 import type { UiState } from "../store";
 import {
@@ -24,6 +24,46 @@ import {
   turbo,
   yaxis,
 } from "../lib/util";
+
+/** Hourly error of the forecast with the age of the run: one curve, mean |forecast - measured| for each hour of
+ * age (small inset of the correlation); the hours of age with few compared hours are see-through. */
+export function skillSvg(bins: SkillBin[]) {
+  const W = 160,
+    H = 96,
+    L = 22,
+    R = 6,
+    T = 14,
+    B = 16,
+    pw = W - L - R,
+    ph = H - T - B,
+    amax = Math.max(48, ...bins.map((b) => b.age_to)),
+    emax = Math.max(0.5, Math.ceil(Math.max(...bins.map((b) => b.mae ?? 0)) * 1.2 * 2) / 2),
+    X = (a: number) => L + (a / amax) * pw,
+    Y = (v: number) => T + ph - (Math.min(v, emax) / emax) * ph,
+    pts = bins.filter((b) => b.mae != null);
+  let g = `<rect x="0.5" y="0.5" width="${W - 1}" height="${H - 1}" rx="6" fill="#0a0f1d" fill-opacity=".88" stroke="${C_LINE}"/>`;
+  g += `<text x="6" y="10" font-size="8.5" fill="${C_TXT}">${tr("erreur horaire ('') selon l'âge du run (h)")}</text>`;
+  [0, emax / 2, emax].forEach(
+    (v) =>
+      (g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${C_LINE}" stroke-width="0.5"/><text x="${L - 3}" y="${Y(v) + 3}" text-anchor="end" font-size="8" fill="${C_TXT}">${v.toFixed(1)}</text>`),
+  );
+  for (let a = 0; a <= amax; a += 12) g += `<text x="${X(a)}" y="${H - 5}" text-anchor="middle" font-size="8" fill="${C_TXT}">${a}</text>`;
+  // the curve is broken where hours of age are missing (no night hour at that age)
+  let seg: [number, number][] = [];
+  pts.forEach((b, i) => {
+    if (i && b.age_from !== pts[i - 1]!.age_from + 1) {
+      g += pl(seg, `stroke="${C_AR}" stroke-width="1.6"`);
+      seg = [];
+    }
+    seg.push([X(b.age_from + 0.5), Y(b.mae!)]);
+  });
+  g += pl(seg, `stroke="${C_AR}" stroke-width="1.6"`);
+  pts.forEach((b) => {
+    const op = b.n_hours < 10 ? ' opacity=".35"' : "";
+    g += `<circle cx="${X(b.age_from + 0.5)}" cy="${Y(b.mae!)}" r="1.8" fill="${C_AR}"${op}><title>${b.age_from} h : ${b.mae!.toFixed(2)}'' (${b.n_hours} h)</title></circle>`;
+  });
+  return g;
+}
 
 /** Night only (the mockup removed daytime seeing): keep the night part of each episode on a compressed axis. */
 function nightParts(eps: LieuEpisode[]): LieuEpisode[] {

@@ -7,7 +7,7 @@ from sqlalchemy import delete, select
 
 from seeing_api.db import get_session_factory
 from seeing_api.main import create_app
-from seeing_db import Forecast, ModelRun, RunStatus, Site, User
+from seeing_db import Forecast, Measurement, ModelRun, RunStatus, Site, User
 
 PASSWORD = "Correct horse battery 7"
 T0 = datetime(2026, 10, 13, 0, tzinfo=UTC)
@@ -115,6 +115,31 @@ def test_terms_use_the_latest_run_before_each_hour():
     assert len(r["valid_times"]) == 18
     assert r["i_tke"][:6] == [0.0] * 6 and r["i_tke"][6:] == [1.0] * 12  # from 06Z on: the 06Z run
     assert r["lead_hours"][6] == 0
+
+
+def test_skill_by_age_of_the_run():
+    ada = client_for("ada@example.org")
+    slug = ada.post("/api/places", json={"name": "Jardin", "lat": 44.3, "lon": 5.3}).json()["slug"]
+    with get_session_factory()() as s:
+        site = s.scalar(select(Site).where(Site.slug == slug))
+        # two runs forecast the night of 13/10 (20h-23h UTC): the 18Z run (lead 2-5 h) and the 06Z run (lead 14-17 h);
+        # a run without integrals is left out
+        for run_time, ok in ((T0 + timedelta(hours=18), True), (T0 + timedelta(hours=6), True), (T0 + timedelta(hours=12), False)):
+            run = ModelRun(run_time=run_time, status=RunStatus.success)
+            s.add(run)
+            s.flush()
+            for hh in range(20, 24):
+                vt = T0 + timedelta(hours=hh)
+                s.add(Forecast(run_id=run.id, site_id=site.id, valid_time=vt, lead_hour=int((vt - run_time).total_seconds() // 3600),
+                               seeing_arcsec=1.0, i_tke=1e-13 if ok else None, i_conv=0.0, i_cis=1e-15 if ok else None))
+        for k in range(4 * 60):
+            s.add(Measurement(site_id=site.id, time=T0 + timedelta(hours=20, minutes=k), seeing_arcsec=1.0 + (k % 7) * 0.1))
+        s.commit()
+    r = ada.get(f"/api/sites/{slug}/skill")
+    assert r.status_code == 200
+    bins = r.json()["bins"]
+    assert [(b["age_from"], b["n_hours"], b["n_nights"]) for b in bins] == [(a, 1, 1) for a in (2, 3, 4, 5, 14, 15, 16, 17)]
+    assert all(b["mae"] >= 0 and b["rmse"] >= b["mae"] for b in bins)
 
 
 def test_terms_take_a_secondary_run_only_where_no_main_run_covers():

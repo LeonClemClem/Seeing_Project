@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { corrChart } from "../charts/lieuCharts";
+import { corrChart, skillSvg } from "../charts/lieuCharts";
 import { cn2Svg, prevSvg } from "../charts/mockCharts";
 import { PVDEF, PVGRP, prevRealSvg, pvPanel } from "../charts/realCharts";
 import { Cn2RealPanel, DataChips, HistPanel } from "../components/panels";
@@ -131,8 +131,31 @@ function RealCorr({ place }: { place: Place }) {
       <p className="small muted mono" style={{ margin: "0 0 2px" }}>
         {c.ct}
       </p>
-      <SvgChart html={c.svg} viewBox="0 0 340 320" label="Corrélation du lieu" style={{ maxWidth: 520 }} />
+      <div style={{ position: "relative", maxWidth: 520 }}>
+        <SvgChart html={c.svg} viewBox="0 0 340 320" label="Corrélation du lieu" style={{ width: "100%", display: "block" }} />
+        <RunAgeSkill place={place} />
+      </div>
     </>
+  );
+}
+
+/** Inset in the bottom-right corner of the correlation: hourly error with the age of the run, every run that forecast
+ * the hour recomputed with the place's current K (hours with integrals only). */
+function RunAgeSkill({ place }: { place: Place }) {
+  const slug = place.slug ?? "";
+  const q = useQuery({
+    queryKey: ["skill", slug],
+    queryFn: () => api.skill(slug),
+    enabled: place.real && !!slug,
+    retry: false,
+    staleTime: 30 * 60 * 1000,
+  });
+  const svg = useLangMemo(() => (q.data?.bins.length ? skillSvg(q.data.bins) : ""), [q.data]);
+  if (!svg) return null;
+  return (
+    <div style={{ position: "absolute", right: "2%", bottom: "11%", width: "46%" }}>
+      <SvgChart html={svg} viewBox="0 0 160 96" label="Erreur horaire selon l'âge du run" style={{ width: "100%", display: "block" }} />
+    </div>
   );
 }
 

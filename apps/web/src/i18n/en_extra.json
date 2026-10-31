@@ -200,5 +200,6 @@
 "⚠ Aperçu avec les K réglés": "⚠ Preview with the K being set",
 "Le Cn² et les prévisions du site ne les prendront en compte qu'au prochain run AROME, après « Enregistrer pour ce lieu ».": "The site's Cn² and forecasts will only use them from the next AROME run, after \"Save for this place\".",
 "✓ K enregistrés": "✓ K saved",
-"Le Cn² et les prévisions du site les prendront en compte à partir du prochain run AROME (toutes les 6 h).": "The site's Cn² and forecasts will use them from the next AROME run (every 6 h)."
+"Le Cn² et les prévisions du site les prendront en compte à partir du prochain run AROME (toutes les 6 h).": "The site's Cn² and forecasts will use them from the next AROME run (every 6 h).",
+"erreur horaire ('') selon l'âge du run (h)": "hourly error ('') with the age of the run (h)"
 }

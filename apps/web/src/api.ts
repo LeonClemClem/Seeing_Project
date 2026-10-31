@@ -58,6 +58,18 @@ export interface Measurements {
   times: string[];
   seeing_arcsec: number[];
 }
+/** Precision of the AROME forecast with the age of the run (lead), night hours, at the site's current K. */
+export interface SkillBin {
+  age_from: number;
+  age_to: number;
+  n_hours: number;
+  n_nights: number;
+  r: number | null;
+  bias: number | null;
+  mae: number | null;
+  rmse: number | null;
+}
+
 /** V2bd terms at K = 1 of each valid hour (latest run issued before it). */
 export interface Terms {
   valid_times: string[];
@@ -233,6 +245,7 @@ export const api = {
     get<Fisheye>(`/api/fisheye?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}${alt != null ? `&alt=${Math.round(alt)}` : ""}`),
   /** Research history of a monitored site (periods, hourly pairs); K and integrals only for calibrators. */
   history: (slug: string) => get<SiteHistory>(`/api/sites/${encodeURIComponent(slug)}/history`),
+  skill: (slug: string) => get<{ bins: SkillBin[] }>(`/api/sites/${encodeURIComponent(slug)}/skill`),
   terms: (slug: string, from: string, to: string) =>
     get<Terms>(`/api/sites/${encodeURIComponent(slug)}/terms?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   latestRun: () => get<Run>("/api/runs/latest"),
