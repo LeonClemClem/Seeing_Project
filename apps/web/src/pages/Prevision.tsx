@@ -17,7 +17,7 @@ import { kHidden, kTxt, useCurrentPlace, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { exportSvgIn, fileSafe } from "../lib/export";
 import { parseCoord } from "../lib/geo";
-import { fmt } from "../lib/util";
+import { C_AR, fmt } from "../lib/util";
 import { lieuData } from "../mock/engine";
 import { useLangMemo, useUi } from "../store";
 
@@ -179,7 +179,7 @@ function RunAgeSkill({ place }: { place: Place }) {
       <div className="legend">
         {hourly && (
           <span>
-            <Sw style={{ width: 16, borderTop: "2px solid #ff9f43" }} />
+            <Sw style={{ width: 16, borderTop: `2px solid ${C_AR}` }} />
             {tr("horaire : moyenne de chaque heure d'âge")}
           </span>
         )}
@@ -190,8 +190,8 @@ function RunAgeSkill({ place }: { place: Place }) {
           </span>
         )}
         <span>
-          {hourly && <Sw style={{ width: 16, height: 8, background: "rgba(255,159,67,.25)" }} />}
-          {nightly && <Sw style={{ width: 16, height: 8, background: "rgba(241,239,232,.2)" }} />}
+          {hourly && <Sw style={{ width: 16, height: 8, background: C_AR, opacity: 0.3 }} />}
+          {nightly && <Sw style={{ width: 16, height: 8, background: "#f1efe8", opacity: 0.2 }} />}
           {tr("± 1 écart type")}
         </span>
       </div>

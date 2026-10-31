@@ -32,7 +32,7 @@ export const SKILL_FEW_HOURS = 10,
   SKILL_FEW_NIGHTS = 3;
 
 /** Signed error of the forecast with the age of the run (panel under the correlation): mean forecast - measured for
- * each hour of age (orange) and, by night, median forecast of the night - median measured (white, dashed, age of the
+ * each hour of age (AROME colour) and, by night, median forecast of the night - median measured (white, dashed, age of the
  * run at 00h UTC), each with a band of one standard deviation. Above 0, AROME forecasts a worse seeing than measured.
  * The ages with few compared hours (or nights) are see-through. `mode` picks the curves; the scale follows them. */
 export function skillSvg(bins: SkillBin[], nights: SkillNight[] = [], mode: SkillMode = "deux") {
