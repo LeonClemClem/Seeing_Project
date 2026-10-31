@@ -256,6 +256,20 @@ export default function Calibrer() {
     enabled: editable && srvKeys.length > 0,
   });
   const realModel = useMemo(() => (tq.data ? termsModel(tq.data, place.K) : null), [tq.data, place.K]);
+  // the nights without any night hour with integrals at K = 1 cannot be calibrated: not shown anywhere in Calibrer
+  // (their measurements stay stored on the server)
+  const intNights = useMemo(() => {
+    if (!realModel) return srvNights;
+    const out = new Map<string, NightPt[]>();
+    srvNights.forEach((pts, k) => {
+      for (let h = 0; h <= 24; h++)
+        if (isNx(h) && realModel.comp(k, h)) {
+          out.set(k, pts);
+          return;
+        }
+    });
+    return out;
+  }, [srvNights, realModel]);
   const [selR, setSelR] = useState<string | null>(null);
   const reloadMeasurements = () => qc.invalidateQueries({ queryKey: ["measurements", slug] });
 
@@ -338,7 +352,7 @@ export default function Calibrer() {
     refresh();
   };
 
-  const nights = editable ? srvNights : st.nights;
+  const nights = editable ? intNights : st.nights;
   const nightsKey = (editable ? "srv" : "") + [...nights.entries()].map(([k, v]) => k + v.length).join();
   const cal = useLangMemo(
     () =>
@@ -368,7 +382,8 @@ export default function Calibrer() {
     .join(" · ");
   const s = editable ? cstats(cal.P as CalPair<Terms>[], K, seeTerms) : cstats(cal.P as CalPair[], K);
   const selKey = editable ? selR : st.sel;
-  const night = selKey && nights.has(selKey) ? selKey : editable ? (srvKeys[srvKeys.length - 1] ?? null) : null;
+  const lastNight = [...nights.keys()].sort().pop() ?? null;
+  const night = selKey && nights.has(selKey) ? selKey : editable ? lastNight : null;
   // a night clicked in the history becomes the night of the top panel
   useEffect(() => {
     if (!selNight || selNight === night || !nights.has(selNight)) return;
