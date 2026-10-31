@@ -2,7 +2,7 @@ import { useIsFetching, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import { api, queryKeys, type Forecast } from "../api";
-import { isNightDate } from "../lib/util";
+import { isNightDate, pd } from "../lib/util";
 import type { LieuData, LieuEpisode } from "../mock/engine";
 import type { K3 } from "../store";
 import type { Place } from "./places";
@@ -155,7 +155,8 @@ export function liveHistory(fc: Forecast, meas: [number, number][], after: numbe
 
 /** History forecast and pairs on the server data (`/verif`): one forecast per hour with its integrals at K = 1,
  * recomputed with the site's current K, and the measured hourly median (+/- 30 min), the same for every panel. The
- * hours without integrals cannot be compared: no forecast, no pair. */
+ * hours without integrals cannot be compared: no forecast, no pair; the nights without any of them are not shown at
+ * all (their measurements stay stored). One period per night kept. */
 function alignVerif(l: LieuData, v: { valid_times: string[]; seeing_arcsec: (number | null)[]; measured_arcsec: (number | null)[] }): LieuData {
   const f = new Map<string, number>(),
     m = new Map<string, number>();
@@ -166,7 +167,24 @@ function alignVerif(l: LieuData, v: { valid_times: string[]; seeing_arcsec: (num
     if (s != null && s > 0) f.set(k, s);
     if (o != null) m.set(k, o);
   });
-  const episodes = l.episodes.map((e) => ({ ...e, prevu: [...f.entries()].filter(([t]) => t >= e.a && t <= e.b).map(([t, s]): TVn => [t, +s.toFixed(2)]) }));
+  // night of a time: date of the evening (12h UTC to 12h UTC)
+  const nk = (t: string) => new Date(pd(t.slice(0, 16)).getTime() - 12 * 3600000).toISOString().slice(0, 10);
+  const withF = new Set([...f.keys()].map(nk));
+  const episodes: LieuEpisode[] = [];
+  l.episodes.forEach((e) => {
+    const by = new Map<string, LieuEpisode>();
+    const of = (k: string) => by.get(k) ?? by.set(k, { a: e.a, b: e.b, prevu: [], mediane: [], brut: [] }).get(k)!;
+    f.forEach((s, t) => t >= e.a && t <= e.b && of(nk(t)).prevu.push([t, +s.toFixed(2)]));
+    e.mediane.forEach((p) => withF.has(nk(p[0])) && of(nk(p[0])).mediane.push(p));
+    e.brut.forEach((p) => withF.has(nk(p[0])) && of(nk(p[0])).brut.push(p));
+    [...by.entries()]
+      .sort((x, y) => (x[0] < y[0] ? -1 : 1))
+      .forEach(([, x]) => {
+        if (!x.prevu.length || !(x.mediane.length || x.brut.length)) return;
+        const ts = [...x.prevu, ...x.mediane, ...x.brut].map((p) => p[0].slice(0, 16)).sort();
+        episodes.push({ ...x, prevu: x.prevu.sort((p, q) => (p[0] < q[0] ? -1 : 1)), a: ts[0]! > e.a ? ts[0]! : e.a, b: ts[ts.length - 1]! < e.b ? ts[ts.length - 1]! : e.b });
+      });
+  });
   const paires: LieuData["paires"] = [];
   episodes.forEach((e) =>
     e.prevu.forEach(([t, s]) => {
@@ -176,7 +194,6 @@ function alignVerif(l: LieuData, v: { valid_times: string[]; seeing_arcsec: (num
   );
   return { ...l, episodes, paires };
 }
-type TVn = [string, number | null];
 
 /** History of a real site: the research periods (research/envoi_site.py), then the periods built on the
  * server data (past forecasts and collected measurements); forecast and pairs from `/verif` (current K, hours with
