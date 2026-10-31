@@ -205,6 +205,7 @@ export function Cn2RealPanel({
   style,
   defaultView = "week",
   rm,
+  kRatio,
 }: {
   place: Place;
   profile?: boolean;
@@ -212,6 +213,9 @@ export function Cn2RealPanel({
   defaultView?: View;
   /** hours left out of the calibration, hourKey "night|h" (Calibrer): veiled in red over their full height */
   rm?: ReadonlySet<string>;
+  /** Calibrer: [K_TKE, K_CIS] in service / K of the stored runs; Cn² below the boundary layer and above it rescaled,
+   * and the seeing curve recomputed from the rescaled profile */
+  kRatio?: [number, number];
 }) {
   const [alt, setAlt] = useState("4");
   const [view, setView] = useState<View>(defaultView);
@@ -224,9 +228,44 @@ export function Cn2RealPanel({
   const mesf = useUi((s) => s.mesf);
   // hourly medians: research history first, then those of the raw points (daily monitor collection)
   const obs = useMemo(() => new Map([...hourlyMedians(raw), ...histMed]), [raw, histMed]);
+  // K in service (Calibrer): TKE zone (up to the boundary-layer top) x kt, shear zone above x kc; seeing x (J'/J)^0.6
+  const scaled = useMemo(() => {
+    if (!kRatio || !cn2.data || (kRatio[0] === 1 && kRatio[1] === 1)) return { cn: cn2.data, fc: forecast.data };
+    const [kt, kc] = kRatio,
+      hcAt = new Map((forecast.data?.points ?? []).map((p) => [Date.parse(p.valid_time), p.h_coulim_m])),
+      H = cn2.data.heights_m,
+      ratio = new Map<number, number>();
+    const rows = cn2.data.cn2.map((row, i) => {
+      const t = Date.parse(cn2.data!.valid_times[i]!),
+        hc = hcAt.get(t) ?? 0,
+        out = row.map((v, k) => (v == null ? v : v * (H[k]! <= (hc ?? 0) ? kt : kc)));
+      let j0 = 0,
+        j1 = 0;
+      for (let k = 1; k < H.length; k++) {
+        const a = row[k - 1],
+          b = row[k],
+          a2 = out[k - 1],
+          b2 = out[k];
+        if (a != null && b != null && a2 != null && b2 != null) {
+          j0 += ((a + b) / 2) * (H[k]! - H[k - 1]!);
+          j1 += ((a2 + b2) / 2) * (H[k]! - H[k - 1]!);
+        }
+      }
+      if (j0 > 0) ratio.set(t, j1 / j0);
+      return out;
+    });
+    const fc = forecast.data && {
+      ...forecast.data,
+      points: forecast.data.points.map((p) => {
+        const r = ratio.get(Date.parse(p.valid_time));
+        return r != null && p.seeing_arcsec != null ? { ...p, seeing_arcsec: p.seeing_arcsec * Math.pow(r, 0.6) } : p;
+      }),
+    };
+    return { cn: { ...cn2.data, cn2: rows }, fc };
+  }, [cn2.data, forecast.data, kRatio]);
   const ctx = useMemo(
-    () => (cn2.data ? cn2Ctx(cn2.data, forecast.data, alt, showObs ? obs : undefined, zoom, showObs ? raw : [], mesf) : null),
-    [cn2.data, forecast.data, alt, obs, raw, showObs, zoom, mesf],
+    () => (scaled.cn ? cn2Ctx(scaled.cn, scaled.fc, alt, showObs ? obs : undefined, zoom, showObs ? raw : [], mesf) : null),
+    [scaled, alt, obs, raw, showObs, zoom, mesf],
   );
   const svg = useLangMemo(
     () => (ctx && cn2.data ? cn2RealSvg(ctx, Date.parse(cn2.data.run_time), smooth, rm) : ""),
