@@ -109,9 +109,11 @@ class SkillBin(BaseModel):
 
 class SkillNight(BaseModel):
     """Night precision: for each run and night, median of its forecast hours against the median of the measured ones
-    (as the night points of the correlation); `age` = age of the run at 00h UTC, the middle of the night."""
+    (as the night points of the correlation), grouped by the age of the run at 00h UTC (the middle of the night) in
+    classes of SKILL_NIGHT_BIN_H hours, `age` to `age_to`: several nights per class, hence a band."""
 
     age: int
+    age_to: int
     n_nights: int
     bias: float | None
     mae: float | None
@@ -124,6 +126,7 @@ class SkillOut(BaseModel):
 
 
 SKILL_BIN_H = 1  # hourly error: one class per hour of age
+SKILL_NIGHT_BIN_H = 6  # night error: classes of 6 h of age (runs every 6 h)
 MEAS_HALF = timedelta(minutes=30)  # measured value of an hour: median of the measurements within +/- 30 min
 
 
@@ -218,8 +221,8 @@ def get_skill(slug: str, session: SessionDep, user: CurrentUser) -> SkillOut:
             continue
         midnight = datetime.combine(night + timedelta(days=1), datetime.min.time(), tzinfo=UTC)
         age = round((midnight - run_time).total_seconds() / 3600)
-        by_age.setdefault(age, []).append(statistics.median(x[0] for x in g) - statistics.median(x[1] for x in g))
-    nights = [SkillNight(age=a, n_nights=len(d), bias=statistics.fmean(d), mae=statistics.fmean(abs(x) for x in d),
+        by_age.setdefault(age // SKILL_NIGHT_BIN_H * SKILL_NIGHT_BIN_H, []).append(statistics.median(x[0] for x in g) - statistics.median(x[1] for x in g))
+    nights = [SkillNight(age=a, age_to=a + SKILL_NIGHT_BIN_H, n_nights=len(d), bias=statistics.fmean(d), mae=statistics.fmean(abs(x) for x in d),
                          sd=_sd(d))
               for a, d in sorted(by_age.items())]
     return SkillOut(bins=bins, nights=nights)

@@ -220,6 +220,6 @@
 "les deux": "both",
 "Erreur affichée": "Error shown",
 "horaire : moyenne de chaque heure d'âge": "hourly: mean of each hour of age",
-"nocturne : médianes de la nuit, âge à 00h TU": "by night: medians of the night, age at 00h UTC",
-"Points pâles : moins de 10 heures (horaire) ou 3 nuits (nocturne) comparées. Heures de nuit avec intégrales, recalculées avec les K actuels du lieu.": "Pale points: fewer than 10 hours (hourly) or 3 nights (by night) compared. Night hours with integrals, recomputed with the place's current K."
+"Points pâles : moins de 10 heures (horaire) ou 3 nuits (nocturne) comparées. Heures de nuit avec intégrales, recalculées avec les K actuels du lieu.": "Pale points: fewer than 10 hours (hourly) or 3 nights (by night) compared. Night hours with integrals, recomputed with the place's current K.",
+"nocturne : médianes de la nuit, par classes de 6 h d'âge (à 00h TU)": "by night: medians of the night, in 6 h classes of age (at 00h UTC)"
 }

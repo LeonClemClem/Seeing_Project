@@ -186,7 +186,7 @@ function RunAgeSkill({ place }: { place: Place }) {
         {nightly && (
           <span>
             <Sw style={{ width: 16, borderTop: "2px dashed #f1efe8" }} />
-            {tr("nocturne : médianes de la nuit, âge à 00h TU")}
+            {tr("nocturne : médianes de la nuit, par classes de 6 h d'âge (à 00h TU)")}
           </span>
         )}
         <span>

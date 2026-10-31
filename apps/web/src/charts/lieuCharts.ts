@@ -32,8 +32,8 @@ export const SKILL_FEW_HOURS = 10,
   SKILL_FEW_NIGHTS = 3;
 
 /** Signed error of the forecast with the age of the run (panel under the correlation): mean forecast - measured for
- * each hour of age (AROME colour) and, by night, median forecast of the night - median measured (white, dashed, age of the
- * run at 00h UTC), each with a band of one standard deviation. Above 0, AROME forecasts a worse seeing than measured.
+ * each hour of age (AROME colour) and, by night, median forecast of the night - median measured (white, dashed, by class
+ * of 6 h of the age of the run at 00h UTC), each with a band of one standard deviation. Above 0, AROME forecasts a worse seeing than measured.
  * The ages with few compared hours (or nights) are see-through. `mode` picks the curves; the scale follows them. */
 export function skillSvg(bins: SkillBin[], nights: SkillNight[] = [], mode: SkillMode = "deux") {
   const W = 200,
@@ -44,7 +44,7 @@ export function skillSvg(bins: SkillBin[], nights: SkillNight[] = [], mode: Skil
     B = 30,
     pw = W - L - R,
     ph = H - T - B,
-    amax = Math.max(48, ...bins.map((b) => b.age_to), ...nights.map((n) => n.age)),
+    amax = Math.max(48, ...bins.map((b) => b.age_to), ...nights.map((n) => n.age_to)),
     hp = mode === "nuit" ? [] : bins.filter((b) => b.bias != null),
     nn = mode === "horaire" ? [] : nights.filter((n) => n.bias != null),
     emax = Math.max(
@@ -82,18 +82,22 @@ export function skillSvg(bins: SkillBin[], nights: SkillNight[] = [], mode: Skil
   const runs: SkillBin[][] = [];
   hp.forEach((b, i) => (i && b.age_from === hp[i - 1]!.age_from + 1 ? runs[runs.length - 1]!.push(b) : runs.push([b])));
   const hr = runs.map((r) => r.map((b) => ({ x: b.age_from + 0.5, v: b.bias!, sd: b.sd })));
-  const nr = nn.map((n) => ({ x: n.age, v: n.bias!, sd: n.sd }));
+  // the night curve and its band are broken where a class of age has no night
+  const nruns: SkillNight[][] = [];
+  nn.forEach((n, i) => (i && n.age === nn[i - 1]!.age_to ? nruns[nruns.length - 1]!.push(n) : nruns.push([n])));
+  const nr = nruns.map((r) => r.map((n) => ({ x: (n.age + n.age_to) / 2, v: n.bias!, sd: n.sd })));
   hr.forEach((r) => band(r, C_AR, 0.2));
-  band(nr, "#f1efe8", 0.13);
+  nr.forEach((r) => band(r, "#f1efe8", 0.13));
   hr.forEach((r) => (g += pl(r.map((p) => [X(p.x), Y(p.v)] as [number, number]), `stroke="${C_AR}" stroke-width="1.8"`)));
   hp.forEach((b) => {
     const op = b.n_hours < SKILL_FEW_HOURS ? ' opacity=".35"' : "";
     g += `<circle cx="${X(b.age_from + 0.5)}" cy="${Y(b.bias!)}" r="2.4" fill="${C_AR}"${op}><title>${tr("horaire")} · ${b.age_from} h : ${sg(b.bias!)}″ ± ${(b.sd ?? 0).toFixed(2)}″ (${b.n_hours} h)</title></circle>`;
   });
-  g += pl(nr.map((p) => [X(p.x), Y(p.v)] as [number, number]), `stroke="#f1efe8" stroke-width="1.4" stroke-dasharray="4 3"`);
+  nr.forEach((r) => (g += pl(r.map((p) => [X(p.x), Y(p.v)] as [number, number]), `stroke="#f1efe8" stroke-width="1.4" stroke-dasharray="4 3"`)));
   nn.forEach((n) => {
     const op = n.n_nights < SKILL_FEW_NIGHTS ? ' opacity=".35"' : "";
-    g += `<rect x="${X(n.age) - 3}" y="${Y(n.bias!) - 3}" width="6" height="6" fill="#f1efe8" stroke="#0a0f1d" stroke-width="0.8"${op}><title>${tr("par nuit")} · ${n.age} h : ${sg(n.bias!)}″ ± ${(n.sd ?? 0).toFixed(2)}″ (${n.n_nights} ${tr("nuits")})</title></rect>`;
+    const cx = X((n.age + n.age_to) / 2);
+    g += `<rect x="${cx - 3}" y="${Y(n.bias!) - 3}" width="6" height="6" fill="#f1efe8" stroke="#0a0f1d" stroke-width="0.8"${op}><title>${tr("par nuit")} · ${n.age}–${n.age_to} h : ${sg(n.bias!)}″ ± ${(n.sd ?? 0).toFixed(2)}″ (${n.n_nights} ${tr("nuits")})</title></rect>`;
   });
   return g;
 }
