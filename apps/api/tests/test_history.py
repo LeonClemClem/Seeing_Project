@@ -63,7 +63,7 @@ def test_forecast_import_keeps_batch_rows():
     fc = adm.get("/api/sites/ohp/forecast", params={"run": "2026-10-14T00:00Z"}).json()
     assert [p["lead_hour"] for p in fc["points"]] == [0, 1] and fc["points"][1]["seeing_arcsec"] > 0
     terms = adm.get("/api/sites/ohp/terms", params={"from": "2026-10-14T00:00:00Z", "to": "2026-10-15T00:00:00Z"}).json()
-    assert terms["i_tke"] == [0.0, 1e-13]
+    assert terms["i_tke"] == [1e-13]  # lead 0 left out (no TKE at lead 0: its i_tke is 0)
     late = {"run_time": "2026-10-20T00:00:00Z", "hours": [[0, 100.0, 0.0, 0.0, 1e-14]]}
     assert adm.post("/api/admin/sites/ohp/forecasts", json={"runs": [late]}).json()["too_recent_runs"] == 1  # newer than every stored run: skipped
 
