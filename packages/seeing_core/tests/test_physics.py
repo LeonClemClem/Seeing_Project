@@ -72,6 +72,9 @@ def test_h_coulim_and_heat_flux():
     assert w0 == surface_kinematic_heat_flux(sp3, 1, 290.0, 900.0)
     assert w0 > 0  # SSHF_SIGN = -1: negative accumulation = surface heating
     assert np.isnan(surface_kinematic_heat_flux(sp3, 2, 290.0, 900.0))
+    # Meteo-France does not publish the accumulation at lead 0: taken as 0, leads 0 and 1 still have a flux
+    no0 = {1: {"sshf": {0.0: -360000.0}}}
+    assert surface_kinematic_heat_flux(no0, 0, 290.0, 900.0) == w0 == surface_kinematic_heat_flux(no0, 1, 290.0, 900.0)
 
 
 def test_display_grid():
@@ -209,3 +212,16 @@ def test_wind_direction_convention():
     assert wind_dir(-5.0, 0.0) == pytest.approx(90.0)  # blowing westwards: from the east
     assert wind_dir(0.0, 5.0) == pytest.approx(180.0)
     assert wind_dir(5.0, 0.0) == pytest.approx(270.0)
+
+
+def test_lead0_without_tke_takes_it_from_lead1():
+    # Meteo-France publishes no TKE at lead 0: the other fields of lead 0 are kept, only the TKE comes from lead 1
+    run = _synthetic_run(hours=(0, 1))
+    for pkg in ("HP2", "IP4"):
+        del run.data[pkg]["s"][0]["tke"]
+    full = compute_from_extracted(_synthetic_run(hours=(0, 1)), [SITE], 1)["s"].hours
+    hours = compute_from_extracted(run, [SITE], 1)["s"].hours
+    assert [h.tke_filled for h in hours] == [True, False] and not any(h.tke_filled for h in full)
+    # same TKE everywhere in the synthetic run: identical to a lead 0 that had it
+    np.testing.assert_allclose(hours[0].cn2, full[0].cn2, rtol=1e-12, equal_nan=True)
+    assert hours[0].seeing_arcsec == pytest.approx(full[0].seeing_arcsec)

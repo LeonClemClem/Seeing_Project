@@ -33,6 +33,14 @@ WEEK = timedelta(days=7)
 MAIN_RUN = func.mod(func.extract("hour", ModelRun.run_time), 6) == 0
 
 
+def usable_lead(model):
+    """Condition on Forecast / Cn2Profile rows for the views stitched from several runs (history, calibration, week
+    Cn2): Meteo-France publishes no TKE at lead 0, so a lead 0 stored without it (before tke_filled) has holes in the
+    first hundreds of metres and a seeing too low, and is left out (the previous run's lead 6 is used); a lead 0 whose
+    TKE was taken from lead 1 (tke_filled) is used."""
+    return or_(model.lead_hour >= 1, model.tke_filled.is_(True))
+
+
 def stitched(session: Session, model, site_id: int, run: ModelRun, span: timedelta | None = WEEK):
     """Rows of `model` (Forecast or Cn2Profile) for every valid hour from `span` (7 days; None = all) before
     `run` to the end of `run`: for each hour, the main run (00/06/12/18Z) issued last before it, i.e. the
@@ -41,6 +49,7 @@ def stitched(session: Session, model, site_id: int, run: ModelRun, span: timedel
         select(model.id, func.row_number().over(partition_by=model.valid_time, order_by=model.lead_hour).label("rk"))
         .join(ModelRun, ModelRun.id == model.run_id)
         .where(model.site_id == site_id, ModelRun.status == RunStatus.success, MAIN_RUN, ModelRun.run_time <= run.run_time,
+               usable_lead(model),
                *([model.valid_time >= run.run_time - span] if span is not None else []))
         .subquery()
     )

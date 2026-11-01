@@ -131,6 +131,9 @@ class Forecast(Base):
     i_cis: Mapped[float | None] = mapped_column(Float)
     # Model variables of the hour {t2, dth, u10, u100, u500, shl, shj, tke} (seeing_core.variables).
     variables: Mapped[dict | None] = mapped_column(JSONB)
+    #: Lead 0: TKE not published by Meteo-France, taken from lead 1 of the same run (False: computed as is; NULL:
+    #: stored before 2026-11-02, a lead 0 then lacks the TKE and is left out of the stitched views).
+    tke_filled: Mapped[bool | None] = mapped_column(Boolean)
 
     run: Mapped[ModelRun] = relationship(back_populates="forecasts")
     site: Mapped[Site] = relationship()
@@ -149,6 +152,8 @@ class Cn2Profile(Base):
     cn2: Mapped[list[float | None]] = mapped_column(ARRAY(REAL))
     #: True on the levels filled by the convective closure (hatched on the panel); NULL for older profiles.
     conv: Mapped[list[bool] | None] = mapped_column(ARRAY(Boolean))
+    #: as Forecast.tke_filled (not shown on the panel)
+    tke_filled: Mapped[bool | None] = mapped_column(Boolean)
 
     run: Mapped[ModelRun] = relationship(back_populates="cn2_profiles")
     site: Mapped[Site] = relationship()

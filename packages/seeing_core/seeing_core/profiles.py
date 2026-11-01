@@ -149,10 +149,12 @@ def display_profile_heights(hag: Profile, iso: Profile) -> np.ndarray:
 
 
 def _sshf_accum(sp3: SitePoints, hour: int) -> float:
-    """SP3:sshf accumulated since the start of the run, at a lead hour."""
+    """SP3:sshf accumulated since the start of the run, at a lead hour. 0 at lead 0 by definition: Meteo-France
+    does not publish that field, and without it the convective closure was skipped at leads 0 and 1 (holes in the
+    first hundreds of metres of the Cn2 at the run hour and the next one)."""
     source = sp3.get(hour, {}).get("sshf", {})
     if not source:
-        return np.nan
+        return 0.0 if hour == 0 else np.nan
     return float(next(iter(source.values())))
 
 

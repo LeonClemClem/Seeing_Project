@@ -89,7 +89,8 @@ def test_v2bd_close_to_v2_with_the_same_k(extracted, expected):
         b = np.array([h.seeing_arcsec for h in v2bd[site.slug].hours])
         assert np.all(np.isfinite(b)), site.slug
         assert [h.lead_hour for h in v2bd[site.slug].hours] == [h.lead_hour for h in v2[site.slug].hours]
-        assert np.all(np.abs(b / a - 1) < 0.30), site.slug
+        # lead 0 left out: V2 has no TKE there (not published), V2bd takes it from lead 1 (up to +50 % of seeing)
+        assert np.all(np.abs(b[1:] / a[1:] - 1) < 0.30), site.slug
         assert abs(np.median(b / a) - 1) < 0.10, site.slug
 
 

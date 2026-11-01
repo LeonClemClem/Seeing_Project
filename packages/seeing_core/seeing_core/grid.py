@@ -222,7 +222,10 @@ class GridExtractor:
         if self.geometry is None or self.surface_h is None:
             raise RuntimeError("grid geometry or model orography SP2:h not read")
         h = max(step, 1)
-        return map_integrals(fields, self._sshf.get(h), self._sshf.get(h - 1), self.surface_h)
+        prev = self._sshf.get(h - 1)
+        if prev is None and h == 1 and self._sshf.get(1) is not None:
+            prev = np.zeros_like(self._sshf[1])  # accumulation at lead 0: 0 by definition, not published
+        return map_integrals(fields, self._sshf.get(h), prev, self.surface_h)
 
 
 # --- physics on columns -----------------------------------------------------------------------

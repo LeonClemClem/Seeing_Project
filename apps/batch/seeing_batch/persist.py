@@ -99,12 +99,13 @@ def store_results(
                     h_coulim_m=_num(h.h_coulim_m), model_altitude_m=_num(h.model_altitude_m),
                     i_tke=_num(getattr(h, "i_tke", None)), i_conv=_num(getattr(h, "i_conv", None)),
                     i_cis=_num(getattr(h, "i_cis", None)),
-                    variables=getattr(h, "variables", None),
+                    variables=getattr(h, "variables", None), tke_filled=bool(getattr(h, "tke_filled", False)),
                 ))
                 profile_rows.append(dict(
                     run_id=run_id, site_id=site_id, valid_time=h.valid_time, lead_hour=h.lead_hour,
                     heights_m=[float(z) for z in h.heights_m], cn2=[_num(c) for c in h.cn2],
                     conv=None if getattr(h, "conv", None) is None else [bool(c) for c in h.conv],
+                    tke_filled=bool(getattr(h, "tke_filled", False)),
                 ))
         if forecast_rows:
             session.execute(pg_insert(Forecast), forecast_rows)
