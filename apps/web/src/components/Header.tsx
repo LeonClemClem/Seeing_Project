@@ -7,6 +7,9 @@ import { useLatestRunTime } from "../lib/hooks";
 import { fmt, pad2, runLabel } from "../lib/util";
 import { setState, useUi } from "../store";
 
+/** Age (hours) of the latest main run past which the site says, in red, that Météo-France is late. */
+const RUN_LATE_H = 12;
+
 const TABS: [path: string, label: string][] = [
   ["/carte", "Carte"],
   ["/prevision", "Prévision"],
@@ -40,6 +43,9 @@ export default function Header() {
   const loc = useLocation();
 
   const runMs = runTime ? Date.parse(runTime) : null;
+  // a main run is normally on the site ~4-5 h after its time, so the latest one is never more than ~11 h old:
+  // past RUN_LATE_H, Météo-France is late and the forecast shown comes from an older run
+  const lateH = runMs ? Math.floor((Date.now() - runMs) / 3600000) : 0;
   // Data badge: real AROME data wherever the page shows them; "mock-up" only where something fictitious is still
   // shown (Calibrer without the right to calibrate the place uses example nights); none on the text pages.
   const path = loc.pathname;
@@ -152,6 +158,12 @@ export default function Header() {
           <span>
             {tr("K du lieu")}{" "}
             <b className="mono">{tr(`${fmt(K[0])} / ${fmt(K[1])} / ${fmt(K[2])} · ${{ S: "enregistrés", A: "calés", M: "manuels" }[kmode]}`)}</b>
+          </span>
+        )}
+        {runMs && lateH >= RUN_LATE_H && (
+          <span className="pill p-bad">
+            {tr("Retard de Météo-France : le run")} {pad2(new Date(runMs + 6 * 3600000).getUTCHours())}Z{" "}
+            {tr("n'est pas encore disponible, la prévision vient du run")} {runLabel(runMs)} ({tr("âgé de")} {lateH} h).{" "}
           </span>
         )}
         {badge === "real" && <span className="pill p-ok">{tr("Données réelles")} · AROME</span>}
