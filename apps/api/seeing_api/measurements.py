@@ -17,9 +17,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from seeing_api.api import TEAM_SITE, SessionDep, utc
+from seeing_api.api import TEAM_SITE, SessionDep, seeing_of, utc
 from seeing_api.auth import CurrentUser, require_json, require_role
-from seeing_api.history import seeing_of
 from seeing_db import Forecast, Measurement, ModelRun, RunStatus, Site, SiteKHistory, User, UserRole
 
 router = APIRouter(prefix="/api/sites")
@@ -171,16 +170,27 @@ def _pearson(x: list[float], y: list[float]) -> float | None:
 
 
 @router.get("/{slug}/skill", response_model=SkillOut)
-def get_skill(slug: str, session: SessionDep, user: CurrentUser) -> SkillOut:
+def get_skill(
+    slug: str, session: SessionDep, user: CurrentUser,
+    k_tke: Annotated[float | None, Query(gt=0, le=150)] = None, k_cis: Annotated[float | None, Query(gt=0, le=150)] = None,
+) -> SkillOut:
     """Precision of the AROME forecast with the age of the run (lead), night hours only. Every run that has the
     integrals at K = 1 of the hour (main or research secondary run) is recomputed with the site's current K, so that
-    every age is compared with the same K; the hours without integrals are left out."""
-    if user is None:
+    every age is compared with the same K; the hours without integrals are left out. Calibrer passes the K being set
+    (k_tke, k_cis; K_conv 0.1): allowed to the accounts that may save the K of the site only."""
+    if k_tke is not None or k_cis is not None:
+        if user is None or k_tke is None or k_cis is None:
+            raise HTTPException(422, "k_tke and k_cis together, logged in")
+        site = editable_site(session, slug, user)
+        K = (k_tke, k_cis, 0.1)
+    elif user is None:
         site = public_site(session, slug)
         if site is None:
             raise HTTPException(401, "Not logged in")
     else:
         site = readable_site(session, slug, user)
+    if k_tke is None:
+        K = (site.k_tke, site.k_cis, site.k_tke_conv)
     fc = session.execute(
         select(Forecast.valid_time, Forecast.lead_hour, Forecast.i_tke, Forecast.i_conv, Forecast.i_cis, ModelRun.run_time)
         .join(ModelRun, ModelRun.id == Forecast.run_id)
@@ -199,7 +209,7 @@ def get_skill(slug: str, session: SessionDep, user: CurrentUser) -> SkillOut:
         m = measured_at(t)
         if m is None:
             continue
-        seeing, _ = seeing_of(site.k_tke * r.i_tke + site.k_tke_conv * r.i_conv + site.k_cis * r.i_cis)
+        seeing, _ = seeing_of(K[0] * r.i_tke + K[2] * r.i_conv + K[1] * r.i_cis)
         if seeing is None:
             continue
         groups.setdefault(r.lead_hour // SKILL_BIN_H, []).append((seeing, m, t))

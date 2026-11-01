@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from seeing_api.api import TEAM_SITE, SessionDep, get_site
+from seeing_api.api import TEAM_SITE, SessionDep, get_site, seeing_of
 from seeing_api.auth import CurrentUser, require_json, require_role
 from seeing_db import Cn2Profile, Forecast, ModelRun, RunStatus, Site, SiteHistory, User, UserRole
 
@@ -27,7 +27,6 @@ admin = APIRouter(prefix="/api/admin", dependencies=[Depends(require_json)])
 public = APIRouter(prefix="/api/sites")
 Admin = Annotated[User, Depends(require_role(UserRole.admin))]
 
-LAMBDA = 500e-9
 
 
 def _site(session, slug: str) -> Site:
@@ -54,13 +53,6 @@ class RunIn(BaseModel):
 
 class RunsIn(BaseModel):
     runs: list[RunIn] = Field(min_length=1, max_length=500)
-
-
-def seeing_of(integral: float) -> tuple[float | None, float | None]:
-    if not (integral > 0 and math.isfinite(integral)):
-        return None, None
-    r0 = (0.423 * (2 * math.pi / LAMBDA) ** 2 * integral) ** (-3 / 5)
-    return 0.98 * LAMBDA / r0 * 206265.0, r0
 
 
 @admin.post("/sites/{slug}/forecasts")

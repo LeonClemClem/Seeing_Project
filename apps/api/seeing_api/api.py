@@ -49,6 +49,25 @@ def stitched(session: Session, model, site_id: int, run: ModelRun, span: timedel
     ).all()
 
 IAP_EMAIL_HEADER = "X-Goog-Authenticated-User-Email"
+LAMBDA = 500e-9
+
+
+def seeing_of(integral: float) -> tuple[float | None, float | None]:
+    """(seeing [arcsec], r0 [m]) of an integral of Cn2 [m^1/3]; (None, None) if it is not positive."""
+    if not (integral > 0 and math.isfinite(integral)):
+        return None, None
+    r0 = (0.423 * (2 * math.pi / LAMBDA) ** 2 * integral) ** (-3 / 5)
+    return 0.98 * LAMBDA / r0 * 206265.0, r0
+
+
+def at_site_k(site: Site, f: Forecast) -> tuple[float | None, float | None, float | None]:
+    """(seeing, r0, integral) of a forecast hour with the site's CURRENT K, from its integrals at K = 1: K saved in
+    Calibrer apply at once to every stored run; the hours without integrals keep their stored values."""
+    if f.i_tke is None or f.i_conv is None or f.i_cis is None:
+        return f.seeing_arcsec, f.r0_m, f.integral_cn2
+    integral = site.k_tke * f.i_tke + site.k_tke_conv * f.i_conv + site.k_cis * f.i_cis
+    seeing, r0 = seeing_of(integral)
+    return seeing, r0, integral if seeing else None
 
 
 def clean(value: float | None) -> float | None:
@@ -163,19 +182,19 @@ def site_forecast(
             .where(Forecast.run_id == model_run.id, Forecast.site_id == site.id)
             .order_by(Forecast.lead_hour)
         )
-    points = [
-        ForecastPoint(
+    points = []
+    for f in rows:
+        seeing, r0, integral = at_site_k(site, f)
+        points.append(ForecastPoint(
             lead_hour=f.lead_hour,
             valid_time=utc(f.valid_time),
-            seeing_arcsec=clean(f.seeing_arcsec),
-            r0_m=clean(f.r0_m),
-            integral_cn2=clean(f.integral_cn2),
+            seeing_arcsec=clean(seeing),
+            r0_m=clean(r0),
+            integral_cn2=clean(integral),
             h_coulim_m=clean(f.h_coulim_m),
             model_altitude_m=clean(f.model_altitude_m),
             variables=f.variables,
-        )
-        for f in rows
-    ]
+        ))
     return ForecastOut(site=site_out(site, user), run_time=utc(model_run.run_time), points=points)
 
 

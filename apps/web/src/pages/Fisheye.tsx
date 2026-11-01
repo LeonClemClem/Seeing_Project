@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type Fisheye as FisheyeData } from "../api";
 
 import { Chip, ColorBar, Seg } from "../components/ui";
-import { useCurrentPlace } from "../data/places";
+import { kHidden, useCurrentPlace } from "../data/places";
 import { tr } from "../i18n";
 import { useLatestRunTime } from "../lib/hooks";
 import {
@@ -23,7 +23,7 @@ import {
   sunAltAz,
   type CatObj,
 } from "../lib/sky";
-import { D2R, pad2, runLabel, turbo, turboGradient } from "../lib/util";
+import { D2R, fmt, pad2, runLabel, turbo, turboGradient } from "../lib/util";
 import { KDEF, REF } from "../mock/engine";
 import { useUi, type K3 } from "../store";
 
@@ -117,7 +117,12 @@ export default function Fisheye() {
   const [FNI, setFNI] = useState(0);
   const [fcur, setFcur] = useState(3);
   const [playing, setPlaying] = useState(false);
-  const [cal, setCal] = useState<"mine" | "def">("mine");
+  // K of the fisheye: the map K, or the K calibrated for the place (only where its K are visible: own places, the
+  // administrator, the team for its site)
+  const role = useUi((s) => s.role);
+  const kSeen = place.real && !kHidden(place, role);
+  const [calPick, setCal] = useState<"lieu" | "carte">("lieu");
+  const cal = kSeen ? calPick : "carte";
   const [hov, setHov] = useState<{ x: number; y: number; alt: number; az: number; s: number; c: number } | null>(null);
   const [opt, setOpt] = useState<Record<OptKey, boolean>>({ cons: true, sol: true, trk: true, nua: false });
   const [plOn, setPlOn] = useState(() => new Set(["Jupiter", "Saturne", "Mars"]));
@@ -142,7 +147,7 @@ export default function Fisheye() {
     const lead = Math.round((tOf(i) - Date.parse(fe.run_time)) / 3600000);
     return fe.frames.find((f) => f.lead_hour === lead);
   };
-  const K: K3 = cal === "mine" ? place.K : fe ? [fe.k[0]!, fe.k[1]!, fe.k[2]!] : KDEF;
+  const K: K3 = cal === "lieu" ? place.K : fe ? [fe.k[0]!, fe.k[1]!, fe.k[2]!] : KDEF;
   /** Elevation of the relief [deg] in a direction (AROME orography of the run, every 2 degrees, interpolated). */
   const horizonAt = (az: number) => {
     const h = fe?.horizon;
@@ -509,11 +514,14 @@ export default function Fisheye() {
               value={cal}
               onChange={setCal}
               options={[
-                ["mine", tr("Calibration de mon lieu")],
-                ["def", tr("Sans calibration (K par défaut)")],
+                ...(kSeen ? ([["lieu", tr("K calibrés du lieu")]] as ["lieu" | "carte", string][]) : []),
+                ["carte", tr("K de la carte")],
               ]}
             />
-            <span className="small muted">{cal === "mine" ? `${tr("K calés de")} ${tr(place.nom)}` : tr("K des voisins")}</span>
+            <span className="small muted mono">
+              K_TKE {fmt(K[0])} · K_CIS {fmt(K[1])}
+              {cal === "lieu" ? ` (${tr(place.nom)})` : ""}
+            </span>
           </div>
         </div>
         <div className="stack">
@@ -542,7 +550,7 @@ export default function Fisheye() {
             <p className="small" style={{ margin: "10px 0 0" }}>
               <span className="pill p-ok">{tr("Fisheye du jour : 1 / 1")}</span>{" "}
               <span className="muted">
-                {tr(place.nom)} · run {runLabel(runMs)} · {tr("calculé en 18 s")}
+                {tr(place.nom)} · run {runLabel(runMs)}
               </span>
             </p>
           </div>

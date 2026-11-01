@@ -159,8 +159,31 @@ def test_skill_by_age_of_the_run():
     bins = r.json()["bins"]
     assert [(b["age_from"], b["n_hours"], b["n_nights"]) for b in bins] == [(a, 1, 1) for a in (2, 3, 4, 5, 14, 15, 16, 17)]
     assert all(b["mae"] >= 0 and b["rmse"] >= b["mae"] for b in bins)
+    # Calibrer: the K being set (the owner only)
+    r2 = ada.get(f"/api/sites/{slug}/skill", params={"k_tke": 10.0, "k_cis": 100.0}).json()["bins"]
+    assert [b["age_from"] for b in r2] == [b["age_from"] for b in bins] and r2[0]["bias"] > bins[0]["bias"]
+    assert client_for("bob@example.org").get(f"/api/sites/{slug}/skill", params={"k_tke": 1, "k_cis": 1}).status_code == 404
+    assert ada.get(f"/api/sites/{slug}/skill", params={"k_tke": 1}).status_code == 422
     # by night: the 18Z run is 6 h old at midnight (class 6-12 h), the 06Z run 18 h (class 18-24 h)
     assert [(n["age"], n["age_to"], n["n_nights"]) for n in r.json()["nights"]] == [(6, 12, 1), (18, 24, 1)]
+
+
+def test_forecast_uses_the_current_k():
+    ada = client_for("ada@example.org")
+    slug = ada.post("/api/places", json={"name": "Jardin", "lat": 44.3, "lon": 5.3}).json()["slug"]
+    with get_session_factory()() as s:
+        site = s.scalar(select(Site).where(Site.slug == slug))
+        run = ModelRun(run_time=T0, status=RunStatus.success)
+        s.add(run)
+        s.flush()
+        s.add(Forecast(run_id=run.id, site_id=site.id, valid_time=T0, lead_hour=0, seeing_arcsec=9.0, i_tke=1e-13, i_conv=0.0, i_cis=1e-15))
+        s.add(Forecast(run_id=run.id, site_id=site.id, valid_time=T0 + timedelta(hours=1), lead_hour=1, seeing_arcsec=9.0))
+        s.commit()
+    a = ada.get(f"/api/sites/{slug}/forecast", params={"run": "2026-10-13T00:00:00Z"}).json()["points"]
+    assert a[0]["seeing_arcsec"] != 9.0 and a[1]["seeing_arcsec"] == 9.0  # without integrals: the stored value
+    assert ada.put(f"/api/sites/{slug}/k", json={"k_tke": 50.0, "k_cis": 30.0, "k_conv": 0.1}).status_code == 204
+    b = ada.get(f"/api/sites/{slug}/forecast", params={"run": "2026-10-13T00:00:00Z"}).json()["points"]
+    assert b[0]["seeing_arcsec"] > a[0]["seeing_arcsec"]  # saved K apply at once
 
 
 def test_verif_one_forecast_per_hour_at_the_current_k():

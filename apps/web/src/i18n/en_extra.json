@@ -245,5 +245,7 @@
 "Chaque enregistrement est gardé ; « Restaurer » se fait dans Calibrer, pour le lieu choisi.": "Every save is kept; \"Restore\" is done in Calibrer, for the chosen place.",
 "Date": "Date",
 "Origine": "Source",
-"Par": "By"
+"Par": "By",
+"K calibrés du lieu": "K calibrated for the place",
+"K de la carte": "map K"
 }
