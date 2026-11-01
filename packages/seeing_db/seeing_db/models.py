@@ -9,6 +9,7 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
@@ -111,7 +112,8 @@ class MapFrame(Base):
 
 class Forecast(Base):
     __tablename__ = "forecasts"
-    __table_args__ = (UniqueConstraint("run_id", "site_id", "lead_hour"),)
+    # (site_id, valid_time): every history / calibration query reads one site's hours in time order
+    __table_args__ = (UniqueConstraint("run_id", "site_id", "lead_hour"), Index("ix_forecasts_site_valid", "site_id", "valid_time"))
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     run_id: Mapped[int] = mapped_column(ForeignKey("model_runs.id", ondelete="CASCADE"), index=True)
@@ -136,7 +138,7 @@ class Forecast(Base):
 
 class Cn2Profile(Base):
     __tablename__ = "cn2_profiles"
-    __table_args__ = (UniqueConstraint("run_id", "site_id", "lead_hour"),)
+    __table_args__ = (UniqueConstraint("run_id", "site_id", "lead_hour"), Index("ix_cn2_profiles_site_valid", "site_id", "valid_time"))
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     run_id: Mapped[int] = mapped_column(ForeignKey("model_runs.id", ondelete="CASCADE"), index=True)
