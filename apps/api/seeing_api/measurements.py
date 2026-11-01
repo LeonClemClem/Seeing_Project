@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from seeing_api.api import FIRST_LEAD, TEAM_SITE, SessionDep, seeing_of, utc
+from seeing_api.api import TEAM_SITE, SessionDep, seeing_of, usable_lead, utc
 from seeing_api.auth import CurrentUser, require_json, require_role
 from seeing_db import Forecast, Measurement, ModelRun, RunStatus, Site, SiteKHistory, User, UserRole
 
@@ -195,7 +195,7 @@ def get_skill(
         select(Forecast.valid_time, Forecast.lead_hour, Forecast.i_tke, Forecast.i_conv, Forecast.i_cis, ModelRun.run_time)
         .join(ModelRun, ModelRun.id == Forecast.run_id)
         .where(Forecast.site_id == site.id, ModelRun.status == RunStatus.success, Forecast.i_tke.is_not(None),
-               Forecast.i_conv.is_not(None), Forecast.i_cis.is_not(None), Forecast.lead_hour >= FIRST_LEAD)
+               Forecast.i_conv.is_not(None), Forecast.i_cis.is_not(None), usable_lead(Forecast))
     ).all()
     fc = [r for r in fc if _is_night(utc(r.valid_time))]
     if not fc:
@@ -346,7 +346,7 @@ def put_calib(slug: str, body: CalibSettings, session: SessionDep, user: LoggedI
 def _hour_terms(session, site_id: int, start: datetime | None = None, end: datetime | None = None):
     """Integrals at K = 1 of each valid hour, from one run: main runs first, then the shortest lead; a secondary run
     (research history) only for the hours no main run covers. The same selection for Calibrer and the history."""
-    where = [Forecast.site_id == site_id, ModelRun.status == RunStatus.success, Forecast.lead_hour >= FIRST_LEAD, Forecast.i_tke.is_not(None),
+    where = [Forecast.site_id == site_id, ModelRun.status == RunStatus.success, usable_lead(Forecast), Forecast.i_tke.is_not(None),
              Forecast.i_conv.is_not(None), Forecast.i_cis.is_not(None)]
     if start is not None:
         where.append(Forecast.valid_time >= start)

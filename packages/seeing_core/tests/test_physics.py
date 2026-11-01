@@ -212,3 +212,16 @@ def test_wind_direction_convention():
     assert wind_dir(-5.0, 0.0) == pytest.approx(90.0)  # blowing westwards: from the east
     assert wind_dir(0.0, 5.0) == pytest.approx(180.0)
     assert wind_dir(5.0, 0.0) == pytest.approx(270.0)
+
+
+def test_lead0_without_tke_takes_it_from_lead1():
+    # Meteo-France publishes no TKE at lead 0: the other fields of lead 0 are kept, only the TKE comes from lead 1
+    run = _synthetic_run(hours=(0, 1))
+    for pkg in ("HP2", "IP4"):
+        del run.data[pkg]["s"][0]["tke"]
+    full = compute_from_extracted(_synthetic_run(hours=(0, 1)), [SITE], 1)["s"].hours
+    hours = compute_from_extracted(run, [SITE], 1)["s"].hours
+    assert [h.tke_filled for h in hours] == [True, False] and not any(h.tke_filled for h in full)
+    # same TKE everywhere in the synthetic run: identical to a lead 0 that had it
+    np.testing.assert_allclose(hours[0].cn2, full[0].cn2, rtol=1e-12, equal_nan=True)
+    assert hours[0].seeing_arcsec == pytest.approx(full[0].seeing_arcsec)

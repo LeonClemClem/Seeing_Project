@@ -226,3 +226,22 @@ def test_terms_take_a_secondary_run_only_where_no_main_run_covers():
     r = ada.get(f"/api/sites/{slug}/terms", params={"from": "2026-10-13T00:00:00Z", "to": "2026-10-14T00:00:00Z"}).json()
     assert len(r["valid_times"]) == 14  # 01Z-14Z (lead 0 left out)
     assert r["i_tke"][:5] == [0.0] * 5 and r["i_tke"][5:] == [1.0] * 9  # 03Z run only from 06Z on
+
+
+def test_lead0_is_used_only_with_its_tke_filled():
+    ada = client_for("ada@example.org")
+    slug = ada.post("/api/places", json={"name": "Jardin", "lat": 44.3, "lon": 5.3}).json()["slug"]
+    with get_session_factory()() as s:
+        site = s.scalar(select(Site).where(Site.slug == slug))
+        for run_time, filled in ((T0, None), (T0 + timedelta(hours=6), True)):
+            run = ModelRun(run_time=run_time, status=RunStatus.success)
+            s.add(run)
+            s.flush()
+            for lead in range(0, 7):
+                s.add(Forecast(run_id=run.id, site_id=site.id, valid_time=run_time + timedelta(hours=lead), lead_hour=lead,
+                               seeing_arcsec=1.0, i_tke=1e-13, i_conv=0.0, i_cis=1e-15, tke_filled=filled if lead == 0 else False))
+        s.commit()
+    r = ada.get(f"/api/sites/{slug}/terms", params={"from": "2026-10-13T00:00:00Z", "to": "2026-10-14T00:00:00Z"}).json()
+    # 00Z lead 0 stored without its TKE: left out; 06Z lead 0 with its TKE taken from lead 1: used for 06Z
+    assert r["valid_times"][0] == "2026-10-13T01:00:00Z"
+    assert r["lead_hours"][r["valid_times"].index("2026-10-13T06:00:00Z")] == 0

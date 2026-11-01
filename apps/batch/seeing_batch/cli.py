@@ -13,7 +13,6 @@ from pathlib import Path
 
 from seeing_core import compute_from_extracted
 from seeing_core.grid import DEFAULT_STRIDE, MAP_K, GridExtractor, night_steps
-from seeing_core.pipeline import FIRST_LEAD
 from seeing_db import RunStatus, make_engine, make_session_factory
 from sqlalchemy.orm import sessionmaker
 
@@ -96,7 +95,7 @@ def run_batch(
             kw["grid"] = grid
         extracted, stats = fetch(run_time, sites, grib_dir, forecast_hours=forecast_hours, keep_gribs=keep_gribs, **kw)
         t0 = time.monotonic()
-        forecasts = compute_from_extracted(extracted, sites, forecast_hours, first_lead=FIRST_LEAD)
+        forecasts = compute_from_extracted(extracted, sites, forecast_hours)
         compute_s = time.monotonic() - t0
         if not any(fc.hours for fc in forecasts.values()):
             raise RuntimeError("No lead hour could be computed for any site")

@@ -27,10 +27,6 @@ from seeing_core.seeing import display_cn2_profile, integrate_seeing, seeing_fro
 from seeing_core.variables import model_variables
 
 
-#: First lead hour the batch computes: Meteo-France publishes neither the TKE (HP2) nor the accumulated sshf (SP3)
-#: at lead 0, so the boundary-layer Cn2 of the run hour has holes and its seeing is too low; the previous run covers it.
-FIRST_LEAD = 1
-
 logger = logging.getLogger(__name__)
 
 
@@ -64,6 +60,9 @@ class HourResult:
     variables: dict | None = None
     # True on the heights_m levels filled by the convective closure (display only, V2bd); None for V2.
     conv: np.ndarray | None = None
+    # True when the TKE of the hour was missing and taken from the next lead (lead 0, see fill_lead0_tke); recorded,
+    # not shown on the panel.
+    tke_filled: bool = False
 
 
 @dataclass
@@ -213,16 +212,30 @@ def _hour_v2bd(site: SiteSpec, sp3: dict, hour: int, h_coulim: float, hag: dict,
     return integral, r0, seeing, h_coulim, heights, cn2_display, terms, model_variables(hag, full, wind10), conv_display
 
 
+def fill_lead0_tke(hourly: dict) -> bool:
+    """Meteo-France publishes no TKE (HP2, IP4) at lead 0. Every other field of lead 0 is kept (temperature, wind,
+    pressure, H_COULIM: the analysis); only the missing TKE is taken from lead 1 of the same run (same simulation,
+    1 h later). Edits `hourly` in place (its per-package dicts are copied first); True if something was filled."""
+    filled = False
+    for pkg in ("HP2", "IP4"):
+        steps = hourly.get(pkg) or {}
+        if 1 in steps and "tke" in steps[1] and "tke" not in steps.get(0, {}):
+            hourly[pkg] = {**steps, 0: {**steps.get(0, {}), "tke": steps[1]["tke"]}}
+            filled = True
+    return filled
+
+
 def compute_from_extracted(
-    run: ExtractedRun, sites: Sequence[SiteSpec], forecast_hours: int = 51, model: str = MODEL, first_lead: int = 0
+    run: ExtractedRun, sites: Sequence[SiteSpec], forecast_hours: int = 51, model: str = MODEL
 ) -> dict[str, SiteForecast]:
-    """Physics for every site from already-extracted point data, lead hours `first_lead`..`forecast_hours` (the batch
-    starts at FIRST_LEAD). Hours with missing inputs are skipped with a warning."""
+    """Physics for every site from already-extracted point data. Hours with missing inputs are
+    skipped with a warning."""
     if run.run_time is None:
         raise RuntimeError("AROME cycle date not found in the GRIB files")
     out: dict[str, SiteForecast] = {}
     for site in sites:
         hourly = {pkg: run.data.get(pkg, {}).get(site.slug, {}) for pkg in HOURLY}
+        tke_filled = fill_lead0_tke(hourly)
         sp3 = run.data.get("SP3", {}).get(site.slug, {})
         if not sp3:
             logger.warning("%s: no SP3 data, convective closure disabled", site.slug)
@@ -231,7 +244,7 @@ def compute_from_extracted(
             raise RuntimeError(f"{site.slug}: model orography SP2:h not found")
 
         hours: list[HourResult] = []
-        for hour in range(first_lead, forecast_hours + 1):
+        for hour in range(forecast_hours + 1):
             try:
                 terms, variables, conv = (np.nan, np.nan, np.nan), None, None
                 if model == "V2bd":
@@ -260,6 +273,7 @@ def compute_from_extracted(
                     i_conv=terms[1],
                     i_cis=terms[2],
                     variables=variables,
+                    tke_filled=hour == 0 and tke_filled,
                     conv=conv,
                 )
             )
