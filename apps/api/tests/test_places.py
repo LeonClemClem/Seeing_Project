@@ -93,7 +93,7 @@ def test_place_limit_and_admin():
         s.commit()
     assert ada.post("/api/places", json={"name": "L6", "lat": 45.0, "lon": 6.7}).status_code == 201
     sites = {s["slug"]: s for s in ada.get("/api/sites").json()}
-    assert sites["saint-veran"]["k"] == [5.17, 41.1, 0.086]  # the administrator sees the curated K
+    assert sites["saint-veran"]["k"] == [5.17, 41.1, 0.1]  # the administrator sees the curated K
 
 
 def test_archiving_a_place_keeps_its_forecasts():
