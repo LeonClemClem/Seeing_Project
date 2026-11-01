@@ -112,3 +112,35 @@ def test_archiving_a_place_keeps_its_forecasts():
     with get_session_factory()() as s:
         assert s.scalar(select(Forecast)) is not None
         assert s.scalar(select(Site).where(Site.slug == p["slug"])).active is False
+
+
+def test_admin_knows_coordinates_never_emails():
+
+    ada, adm = client_for("ada@example.org"), client_for("adm@example.org")
+    with get_session_factory()() as s:
+        s.scalar(select(User).where(User.email == "adm@example.org")).role = UserRole.admin
+        s.commit()
+    pub = ada.post("/api/places", json={"name": "Col", "lat": 45.2, "lon": 6.2, "shared": True}).json()
+    seen = {s["slug"]: s for s in adm.get("/api/sites").json()}[pub["slug"]]
+    assert (seen["lat"], seen["lon"], seen["name"]) == (45.2, 6.2, "Lieu partagé")  # exact, still nameless
+    ov = adm.get("/api/admin/overview").json()
+    row = next(r for r in ov["sites"] if r["slug"] == pub["slug"])
+    assert (row["lat"], row["lon"]) == (45.2, 6.2) and row["owner"].startswith("compte n°")
+    assert "example.org" not in str(ov)
+
+
+def test_delete_account_anonymizes_and_keeps_the_data():
+    from seeing_db import AuthEvent
+
+    ada = client_for("ada@example.org")
+    p = ada.post("/api/places", json={"name": "Jardin", "lat": 45.0, "lon": 6.0}).json()
+    assert ada.post("/api/auth/delete-account", json={"password": "wrong password!!"}).status_code == 401
+    assert ada.post("/api/auth/delete-account", json={"password": PASSWORD}).status_code == 204
+    assert ada.get("/api/places/archived").status_code == 401  # logged out
+    with get_session_factory()() as s:
+        assert s.scalar(select(User).where(User.email == "ada@example.org")) is None
+        assert s.scalar(select(AuthEvent).where(AuthEvent.email == "ada@example.org")) is None
+        site = s.scalar(select(Site).where(Site.slug == p["slug"]))
+        assert site is not None and site.active is False and site.name == f"Lieu {site.id}"
+    again = TestClient(create_app(static_dir="/nonexistent"), base_url="https://testserver")
+    assert again.post("/api/auth/login", json={"email": "ada@example.org", "password": PASSWORD}).status_code == 401

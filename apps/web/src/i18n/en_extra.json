@@ -248,6 +248,12 @@
 "Par": "By",
 "K calibrés du lieu": "K calibrated for the place",
 "K de la carte": "map K",
+"Coordonnées": "Coordinates",
+"Supprimer mon compte": "Delete my account",
+"Ton e-mail, ton nom et ton mot de passe sont effacés. Tes lieux sont archivés sans nom : leurs prévisions et tes mesures restent, anonymes, pour améliorer le modèle.": "Your e-mail, name and password are erased. Your places are archived without a name: their forecasts and your measurements are kept, anonymous, to improve the model.",
+"Supprimer définitivement mon compte": "Delete my account for good",
+"Annuler": "Cancel",
+"Mot de passe": "Password",
 "Retard de Météo-France : le run": "Météo-France is late: run",
 "n'est pas encore disponible, la prévision vient du run": "is not available yet, the forecast comes from run",
 "âgé de": "age"

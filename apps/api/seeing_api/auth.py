@@ -1,5 +1,9 @@
 """App accounts: Argon2id password hashing, server-side sessions in an httpOnly cookie, and the
-/api/auth endpoints (sign-up, login, logout, e-mail confirmation).
+/api/auth endpoints (sign-up, login, logout, e-mail confirmation, account deletion).
+
+Deleting an account anonymizes it and keeps the data: the e-mail, name and password are replaced, the
+sessions and links removed, the e-mail erased from the rate-limit log; the places are archived (named
+"Lieu <id>") with their forecasts and measurements.
 
 New passwords follow the rules of `seeing_api.passwords`. Rate limits (table auth_events, by e-mail
 and client IP): failed logins, sign-ups and confirmation e-mails; past the limit the API answers 429.
@@ -34,14 +38,14 @@ from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from seeing_api.db import get_session_factory
 from seeing_api.mail import public_url, send_mail
 from seeing_api.passwords import MIN_LENGTH, password_problem
-from seeing_db import AuthEvent, EmailToken, User, UserRole, UserSession
+from seeing_db import AuthEvent, EmailToken, Site, User, UserRole, UserSession
 
 SESSION_COOKIE = "seeing_session"
 MIN_PASSWORD_LENGTH = MIN_LENGTH
@@ -308,6 +312,10 @@ class EmailIn(BaseModel):
     email: EmailStr
 
 
+class PasswordIn(BaseModel):
+    password: str = Field(max_length=MAX_PASSWORD_LENGTH)
+
+
 router = APIRouter(prefix="/api/auth", dependencies=[Depends(require_json)])
 
 
@@ -410,3 +418,31 @@ def resend(body: EmailIn, request: Request, response: Response, db: WriteSession
         return
     record_event("mail", email, ip)
     send_verification(db, user)
+
+
+@router.post("/delete-account", status_code=204)
+def delete_account(body: PasswordIn, request: Request, response: Response, db: WriteSessionDep, user: CurrentUser) -> None:
+    """Delete the account (password asked again): anonymized, its data kept (see the module docstring)."""
+    response.headers["Cache-Control"] = NO_STORE
+    if user is None:
+        raise HTTPException(401, "Not logged in")
+    if user.role == UserRole.admin:
+        raise HTTPException(409, "The administrator account cannot be deleted here")
+    email, ip = user.email, client_ip(request)
+    if over_limit(db, "login_fail", LOGIN_FAILS_PER_EMAIL, email=email):
+        raise too_many(LOGIN_FAILS_PER_EMAIL)
+    if not verify_password(user.password_hash, body.password):
+        record_event("login_fail", email, ip)
+        raise HTTPException(401, LOGIN_FAILED)
+    user.email = f"supprime-{user.id}@invalid"
+    user.display_name = None
+    user.password_hash = hash_password(secrets.token_urlsafe(32))  # nobody knows it
+    user.is_active = False
+    user.email_verified_at = None
+    db.execute(delete(UserSession).where(UserSession.user_id == user.id))
+    db.execute(delete(EmailToken).where(EmailToken.user_id == user.id))
+    db.execute(update(AuthEvent).where(AuthEvent.email == email).values(email=None))
+    for site in db.scalars(select(Site).where(Site.owner_id == user.id)):
+        site.active = False
+        site.name = f"Lieu {site.id}"
+    clear_session_cookie(response)
