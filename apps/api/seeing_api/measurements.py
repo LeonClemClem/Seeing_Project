@@ -20,7 +20,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from seeing_api.api import TEAM_SITE, SessionDep, utc
 from seeing_api.auth import CurrentUser, require_json, require_role
 from seeing_api.history import seeing_of
-from seeing_db import Forecast, Measurement, ModelRun, RunStatus, Site, User, UserRole
+from seeing_db import Forecast, Measurement, ModelRun, RunStatus, Site, SiteKHistory, User, UserRole
 
 router = APIRouter(prefix="/api/sites")
 LoggedIn = Annotated[User, Depends(require_role())]
@@ -263,11 +263,58 @@ def get_measurements(
     return MeasurementsOut(times=[utc(r.time) for r in rows], seeing_arcsec=[r.seeing_arcsec for r in rows])
 
 
+def record_k(session, site: Site, user: User | None, source: str) -> None:
+    """Add the site's K in service to its K history (never deleted)."""
+    session.add(SiteKHistory(site_id=site.id, k_tke=site.k_tke, k_cis=site.k_cis, k_conv=site.k_tke_conv,
+                             user_id=user.id if user else None, source=source))
+
+
 @router.put("/{slug}/k", status_code=204, dependencies=[Depends(require_json)])
 def put_k(slug: str, body: KIn, session: SessionDep, user: LoggedIn) -> Response:
     """Save the K of a site: its owner, the administrator for every site, the team for its site."""
     site = editable_site(session, slug, user)
     site.k_tke, site.k_cis, site.k_tke_conv = body.k_tke, body.k_cis, body.k_conv
+    record_k(session, site, user, "calibrer")
+    session.commit()
+    return Response(status_code=204)
+
+
+class KHistoryItem(BaseModel):
+    id: int
+    k_tke: float
+    k_cis: float
+    k_conv: float
+    saved_at: datetime
+    source: str
+    by: str | None  # e-mail of the account that saved them: shown to the administrator only
+
+
+def k_history_items(session, site_ids: list[int] | None, admin: bool, limit: int = 200) -> list[tuple[int, KHistoryItem]]:
+    q = (select(SiteKHistory, User.email).outerjoin(User, User.id == SiteKHistory.user_id)
+         .order_by(SiteKHistory.saved_at.desc(), SiteKHistory.id.desc()).limit(limit))
+    if site_ids is not None:
+        q = q.where(SiteKHistory.site_id.in_(site_ids))
+    return [(h.site_id, KHistoryItem(id=h.id, k_tke=h.k_tke, k_cis=h.k_cis, k_conv=h.k_conv, saved_at=utc(h.saved_at),
+                                     source=h.source, by=email if admin else None))
+            for h, email in session.execute(q).all()]
+
+
+@router.get("/{slug}/k-history", response_model=list[KHistoryItem])
+def get_k_history(slug: str, session: SessionDep, user: LoggedIn) -> list[KHistoryItem]:
+    """K saved for the site, most recent first (same rights as saving them)."""
+    site = editable_site(session, slug, user)
+    return [item for _, item in k_history_items(session, [site.id], user.role == UserRole.admin)]
+
+
+@router.post("/{slug}/k-history/{hid}/restore", status_code=204, dependencies=[Depends(require_json)])
+def restore_k(slug: str, hid: int, session: SessionDep, user: LoggedIn) -> Response:
+    """Put back a set of K of the history; recorded as a new entry ("restauration")."""
+    site = editable_site(session, slug, user)
+    h = session.get(SiteKHistory, hid)
+    if h is None or h.site_id != site.id:
+        raise HTTPException(404, "Unknown K history entry")
+    site.k_tke, site.k_cis, site.k_tke_conv = h.k_tke, h.k_cis, h.k_conv
+    record_k(session, site, user, "restauration")
     session.commit()
     return Response(status_code=204)
 

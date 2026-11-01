@@ -14,7 +14,8 @@ export interface UiState {
   /** K in use, K fitted for the place, and whether the K in use are the fitted ones ("A") or manual ("M"). */
   K: K3;
   KCAL: K3;
-  kmode: "A" | "M";
+  /** K in service: "S" the place's saved K (as Prévision), "A" the auto calibration, "M" set by hand */
+  kmode: "S" | "A" | "M";
   showObs: boolean;
   mesf: { brut: boolean; horaire: boolean; courbe: boolean };
   corrf: { horaire: boolean; nuit: boolean; brut: boolean };
@@ -36,7 +37,7 @@ let state: UiState = {
   place: "pub:ohp",
   K: [11.6, 20.8, 0.1],
   KCAL: [11.6, 20.8, 0.1],
-  kmode: "A",
+  kmode: "S",
   showObs: true,
   mesf: { brut: true, horaire: true, courbe: true },
   corrf: { horaire: true, nuit: true, brut: true },
@@ -77,7 +78,7 @@ export function useUi<T>(select: (s: UiState) => T): T {
 /** K bounds used by the mockup's ÷2 / ×2 buttons. */
 export const clipK = (v: number) => Math.min(150, Math.max(0.01, v));
 
-export function setK(K: K3, mode?: "A" | "M") {
+export function setK(K: K3, mode?: "S" | "A" | "M") {
   setState({ K: [clipK(K[0]), clipK(K[1]), K[2] ?? 0.1], ...(mode ? { kmode: mode } : {}) });
 }
 

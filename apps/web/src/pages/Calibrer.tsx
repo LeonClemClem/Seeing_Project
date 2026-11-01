@@ -5,7 +5,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 
-import { api, queryKeys } from "../api";
+import { api, queryKeys, type KHistoryItem } from "../api";
 
 import { corrChart } from "../charts/lieuCharts";
 import { cn2Svg, corrMock } from "../charts/mockCharts";
@@ -359,6 +359,13 @@ export default function Calibrer() {
         : calib(nights, filters),
     [nightsKey, filters, realModel, editable],
   );
+  // "K enregistrés" mode (default): the K in service are the place's saved K, the K of its forecasts, so that every
+  // panel shows the same model values as Prévision; they follow the place (and a save)
+  useEffect(() => {
+    if (kmode !== "S") return;
+    const cur = getState().K;
+    if (place.K.some((v, i) => Math.abs(v - cur[i]!) > 1e-9)) setK([...place.K], "S");
+  }, [kmode, place.K]);
   // In "K calés" mode, the K in service follow the auto calibration: every filter or night left out refits at once
   useEffect(() => {
     if (lock || kmode !== "A") return;
@@ -841,7 +848,7 @@ function KPanel(p: {
   lock: boolean;
   autoK: K3;
   stats: { r: number; b: number; q: number };
-  kmode: "A" | "M";
+  kmode: "S" | "A" | "M";
   saved: string;
   setSaved: (s: string) => void;
   krow: (lab: string, k: "L" | 0 | 1) => JSX.Element;
@@ -857,7 +864,22 @@ function KPanel(p: {
     api.saveK(p.place.slug, { k_tke: K[0], k_cis: K[1], k_conv: 0.1 }).then(
       () => {
         p.setSaved(done + tr(" Utilisés dès le prochain run."));
-        return qc.invalidateQueries({ queryKey: queryKeys.sites });
+        setState({ kmode: "S" }); // the K in service are now the saved K
+        return Promise.all([qc.invalidateQueries({ queryKey: queryKeys.sites }), qc.invalidateQueries({ queryKey: ["k-history"] })]);
+      },
+      (e: Error) => p.setSaved(e.message),
+    );
+  };
+  // history of the K saved for this place (never deleted): any of them can be put back
+  const slug = p.place.real ? (p.place.slug ?? "") : "";
+  const kh = useQuery({ queryKey: ["k-history", slug], queryFn: () => api.kHistory(slug), enabled: !!slug && !p.lock, retry: false });
+  const restore = (id: number, k: KHistoryItem) => {
+    if (!window.confirm(tr(`Remettre K_TKE = ${fmt(k.k_tke)}, K_CIS = ${fmt(k.k_cis)} pour ce lieu ? Utilisés dès le prochain run.`))) return;
+    api.restoreK(slug, id).then(
+      () => {
+        setState({ kmode: "S" });
+        p.setSaved(tr(`K remis : K_TKE = ${fmt(k.k_tke)}, K_CIS = ${fmt(k.k_cis)}.`));
+        return Promise.all([qc.invalidateQueries({ queryKey: queryKeys.sites }), qc.invalidateQueries({ queryKey: ["k-history"] })]);
       },
       (e: Error) => p.setSaved(e.message),
     );
@@ -884,10 +906,12 @@ function KPanel(p: {
             style={{ marginBottom: 8 }}
             value={p.kmode}
             onChange={(m) => {
-              if (m === "A") setK(getState().KCAL, "A");
+              if (m === "S") setK([...p.place.K], "S");
+              else if (m === "A") setK(getState().KCAL, "A");
               else setState({ kmode: "M" });
             }}
             options={[
+              ["S", tr("K enregistrés")],
               ["A", tr("K calés")],
               ["M", tr("Manuel")],
             ]}
@@ -905,6 +929,35 @@ function KPanel(p: {
               <span className="small muted">{tr("K_conv figé")}</span>
               <span className="okmsg">{p.saved}</span>
             </div>
+            {!!kh.data?.length && (
+              <details style={{ marginTop: 8 }}>
+                <summary className="small" style={{ cursor: "pointer" }}>
+                  {tr("Historique des K")} ({kh.data.length})
+                </summary>
+                <table className="list small" style={{ marginTop: 4 }}>
+                  <tbody>
+                    {kh.data.map((k, i) => (
+                      <tr key={k.id}>
+                        <td className="mono">{new Date(k.saved_at).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}</td>
+                        <td className="mono">
+                          {fmt(k.k_tke)} / {fmt(k.k_cis)}
+                        </td>
+                        <td className="muted">{tr(k.source)}</td>
+                        <td>
+                          {i === 0 ? (
+                            <span className="muted">{tr("en service")}</span>
+                          ) : (
+                            <button className="small" onClick={() => restore(k.id, k)}>
+                              {tr("Restaurer")}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
+            )}
           </div>
         </>
       )}

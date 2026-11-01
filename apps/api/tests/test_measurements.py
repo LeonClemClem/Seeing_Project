@@ -99,6 +99,24 @@ def test_save_k_owner_admin_only():
         assert (ohp.k_tke, ohp.k_cis) == (1.0, 30.0)
 
 
+def test_k_history_and_restore():
+    ada = client_for("ada@example.org")
+    slug = ada.post("/api/places", json={"name": "Jardin", "lat": 44.3, "lon": 5.3}).json()["slug"]
+    assert ada.put(f"/api/sites/{slug}/k", json={"k_tke": 1.0, "k_cis": 30.0, "k_conv": 0.1}).status_code == 204
+    assert ada.put(f"/api/sites/{slug}/k", json={"k_tke": 4.0, "k_cis": 20.0, "k_conv": 0.1}).status_code == 204
+    h = ada.get(f"/api/sites/{slug}/k-history").json()
+    assert [(e["k_tke"], e["source"]) for e in h] == [(4.0, "calibrer"), (1.0, "calibrer"), (2.0, "initial")]
+    assert all(e["by"] is None for e in h)  # the e-mail is shown to the administrator only
+    assert ada.post(f"/api/sites/{slug}/k-history/{h[1]['id']}/restore", json={}).status_code == 204
+    me = {s["slug"]: s for s in ada.get("/api/sites").json()}[slug]
+    assert me["k"] == [1.0, 30.0, 0.1]
+    assert ada.get(f"/api/sites/{slug}/k-history").json()[0]["source"] == "restauration"
+    bob = client_for("bob@example.org")
+    assert bob.get(f"/api/sites/{slug}/k-history").status_code == 404
+    assert bob.post(f"/api/sites/{slug}/k-history/{h[1]['id']}/restore", json={}).status_code == 404
+    assert bob.get("/api/admin/overview").status_code == 403
+
+
 def test_terms_use_the_latest_run_before_each_hour():
     ada = client_for("ada@example.org")
     slug = ada.post("/api/places", json={"name": "Jardin", "lat": 44.3, "lon": 5.3}).json()["slug"]
