@@ -106,7 +106,7 @@ def test_k_history_and_restore():
     assert ada.put(f"/api/sites/{slug}/k", json={"k_tke": 4.0, "k_cis": 20.0, "k_conv": 0.1}).status_code == 204
     h = ada.get(f"/api/sites/{slug}/k-history").json()
     assert [(e["k_tke"], e["source"]) for e in h] == [(4.0, "calibrer"), (1.0, "calibrer"), (2.0, "initial")]
-    assert all(e["by"] is None for e in h)  # the e-mail is shown to the administrator only
+    assert all(e["by"] is None for e in h)  # the account number is shown to the administrator only
     assert ada.post(f"/api/sites/{slug}/k-history/{h[1]['id']}/restore", json={}).status_code == 204
     me = {s["slug"]: s for s in ada.get("/api/sites").json()}[slug]
     assert me["k"] == [1.0, 30.0, 0.1]

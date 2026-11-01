@@ -36,5 +36,12 @@ export function useAuthActions() {
       return refresh();
     },
   });
-  return { login, signup, logout, verify, resend };
+  const deleteAccount = useMutation({
+    mutationFn: api.deleteAccount,
+    onSuccess: () => {
+      setState({ role: "user" });
+      return refresh();
+    },
+  });
+  return { login, signup, logout, verify, resend, deleteAccount };
 }

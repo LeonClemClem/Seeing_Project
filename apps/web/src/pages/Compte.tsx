@@ -119,7 +119,9 @@ function useVerifyLink(): { ok: boolean; text: string } | null {
 
 function Account() {
   const user = useMe().data!.user!;
-  const { logout } = useAuthActions();
+  const { logout, deleteAccount } = useAuthActions();
+  const [del, setDel] = useState(false);
+  const [pw, setPw] = useState("");
   return (
     <>
       <h2>{tr("Mon compte")}</h2>
@@ -147,6 +149,34 @@ function Account() {
         {tr("Se déconnecter")}
       </button>
       {logout.isError && <p className="err">{tr("Erreur du serveur. Réessaie dans un instant.")}</p>}
+      <div style={{ marginTop: 24 }}>
+        {!del ? (
+          <button className="small" onClick={() => setDel(true)}>
+            {tr("Supprimer mon compte")}
+          </button>
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              deleteAccount.mutate(pw);
+            }}
+          >
+            <p className="small">
+              {tr(
+                "Ton e-mail, ton nom et ton mot de passe sont effacés. Tes lieux sont archivés sans nom : leurs prévisions et tes mesures restent, anonymes, pour améliorer le modèle.",
+              )}
+            </p>
+            <input type="password" autoComplete="current-password" placeholder={tr("Mot de passe")} value={pw} onChange={(e) => setPw(e.target.value)} />{" "}
+            <button type="submit" disabled={!pw || deleteAccount.isPending}>
+              {tr("Supprimer définitivement mon compte")}
+            </button>{" "}
+            <button type="button" className="small" onClick={() => setDel(false)}>
+              {tr("Annuler")}
+            </button>
+            {deleteAccount.isError && <p className="err">{deleteAccount.error.message}</p>}
+          </form>
+        )}
+      </div>
     </>
   );
 }
