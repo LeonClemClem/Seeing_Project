@@ -83,6 +83,23 @@ export interface SkillNight {
   sd: number | null;
 }
 
+/** A set of K saved for a site (never deleted). `by`: e-mail, for the administrator only. */
+export interface KHistoryItem {
+  id: number;
+  k_tke: number;
+  k_cis: number;
+  k_conv: number;
+  saved_at: string;
+  source: string;
+  by: string | null;
+}
+
+/** Administrator tab. */
+export interface AdminOverview {
+  sites: { slug: string; name: string; owner: string | null; active: boolean; k_tke: number; k_cis: number; k_conv: number; k_saved_at: string | null }[];
+  k_history: (KHistoryItem & { site: string })[];
+}
+
 /** V2bd terms at K = 1 of each valid hour (latest run issued before it). */
 export interface Terms {
   valid_times: string[];
@@ -252,6 +269,9 @@ export const api = {
   /** Save the K of a site (owner, administrator, team for its site): used from the next run. */
   saveK: (slug: string, b: { k_tke: number; k_cis: number; k_conv: number }) =>
     send<void>("PUT", `/api/sites/${encodeURIComponent(slug)}/k`, b),
+  kHistory: (slug: string) => get<KHistoryItem[]>(`/api/sites/${encodeURIComponent(slug)}/k-history`),
+  restoreK: (slug: string, id: number) => post<void>(`/api/sites/${encodeURIComponent(slug)}/k-history/${id}/restore`, {}),
+  adminOverview: () => get<AdminOverview>("/api/admin/overview"),
   saveCalib: (slug: string, b: { pics: boolean; courtes: boolean; top: number; out: string[] }) =>
     send<void>("PUT", `/api/sites/${encodeURIComponent(slug)}/calib`, b),
   point: (lat: number, lon: number) => get<PointForecast>(`/api/point?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`),

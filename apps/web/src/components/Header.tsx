@@ -70,7 +70,7 @@ export default function Header() {
           Seeing AROME
         </div>
         <nav role="tablist" aria-label={tr("Pages")}>
-          {TABS.map(([path, label]) => (
+          {[...TABS, ...(user?.role === "admin" ? ([["/admin", "Administrateur"]] as [string, string][]) : [])].map(([path, label]) => (
             <NavLink key={path} to={path} className="tab" role="tab">
               {tr(label)}
             </NavLink>

@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 
 from seeing_api.api import SessionDep, site_out
 from seeing_api.auth import require_json, require_role
+from seeing_api.measurements import record_k
 from seeing_api.schemas import SiteOut
 from seeing_db import Site, User, UserRole
 
@@ -68,6 +69,8 @@ def create_place(body: PlaceIn, session: SessionDep, user: LoggedIn) -> SiteOut:
         visibility="shared" if body.shared else "private", owner_id=user.id,
     )
     session.add(site)
+    session.flush()
+    record_k(session, site, user, "initial")
     session.commit()
     return site_out(site, user)
 
@@ -79,10 +82,14 @@ def update_place(slug: str, body: PlacePatch, session: SessionDep, user: LoggedI
         site.name = body.name.strip()
     if body.shared is not None:
         site.visibility = "shared" if body.shared else "private"
+    k_changed = False
     for field, column in (("k_tke", "k_tke"), ("k_cis", "k_cis"), ("k_conv", "k_tke_conv")):
         value = getattr(body, field)
         if value is not None:
             setattr(site, column, value)
+            k_changed = True
+    if k_changed:
+        record_k(session, site, user, "lieu")
     session.commit()
     return site_out(site, user)
 

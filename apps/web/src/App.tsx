@@ -13,6 +13,7 @@ const Prevision = lazy(() => import("./pages/Prevision"));
 const Fisheye = lazy(() => import("./pages/Fisheye"));
 const Calibrer = lazy(() => import("./pages/Calibrer"));
 const Lieux = lazy(() => import("./pages/Lieux"));
+const Admin = lazy(() => import("./pages/Admin"));
 
 export default function App() {
   // Re-render the whole tree when the language changes: every view reads its strings through tr().
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="/tutoriel" element={<Tutoriel />} />
             <Route path="/a-propos" element={<APropos />} />
             <Route path="/seeing-monitor" element={<SeeingMonitor />} />
+            <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>

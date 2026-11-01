@@ -152,6 +152,22 @@ class Cn2Profile(Base):
     site: Mapped[Site] = relationship()
 
 
+class SiteKHistory(Base):
+    """Every set of K saved for a site (Calibrer, place settings, restoration), never deleted: the K can be put back."""
+
+    __tablename__ = "site_k_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id", ondelete="CASCADE"), index=True)
+    k_tke: Mapped[float] = mapped_column(Float)
+    k_cis: Mapped[float] = mapped_column(Float)
+    k_conv: Mapped[float] = mapped_column(Float)
+    saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    # "initial" (K in service when the history started), "calibrer", "lieu", "restauration"
+    source: Mapped[str] = mapped_column(String(20))
+
+
 class SiteHistory(Base):
     """History of a monitored site as computed by the research scripts (research/export_lieux_site.py):
     periods with forecast and measurements, hourly pairs, K = 1 integrals. Shown by the website."""

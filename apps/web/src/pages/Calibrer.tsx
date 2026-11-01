@@ -5,7 +5,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 
-import { api, queryKeys } from "../api";
+import { api, queryKeys, type KHistoryItem } from "../api";
 
 import { corrChart } from "../charts/lieuCharts";
 import { cn2Svg, corrMock } from "../charts/mockCharts";
@@ -865,7 +865,21 @@ function KPanel(p: {
       () => {
         p.setSaved(done + tr(" Utilisés dès le prochain run."));
         setState({ kmode: "S" }); // the K in service are now the saved K
-        return qc.invalidateQueries({ queryKey: queryKeys.sites });
+        return Promise.all([qc.invalidateQueries({ queryKey: queryKeys.sites }), qc.invalidateQueries({ queryKey: ["k-history"] })]);
+      },
+      (e: Error) => p.setSaved(e.message),
+    );
+  };
+  // history of the K saved for this place (never deleted): any of them can be put back
+  const slug = p.place.real ? (p.place.slug ?? "") : "";
+  const kh = useQuery({ queryKey: ["k-history", slug], queryFn: () => api.kHistory(slug), enabled: !!slug && !p.lock, retry: false });
+  const restore = (id: number, k: KHistoryItem) => {
+    if (!window.confirm(tr(`Remettre K_TKE = ${fmt(k.k_tke)}, K_CIS = ${fmt(k.k_cis)} pour ce lieu ? Utilisés dès le prochain run.`))) return;
+    api.restoreK(slug, id).then(
+      () => {
+        setState({ kmode: "S" });
+        p.setSaved(tr(`K remis : K_TKE = ${fmt(k.k_tke)}, K_CIS = ${fmt(k.k_cis)}.`));
+        return Promise.all([qc.invalidateQueries({ queryKey: queryKeys.sites }), qc.invalidateQueries({ queryKey: ["k-history"] })]);
       },
       (e: Error) => p.setSaved(e.message),
     );
@@ -915,6 +929,35 @@ function KPanel(p: {
               <span className="small muted">{tr("K_conv figé")}</span>
               <span className="okmsg">{p.saved}</span>
             </div>
+            {!!kh.data?.length && (
+              <details style={{ marginTop: 8 }}>
+                <summary className="small" style={{ cursor: "pointer" }}>
+                  {tr("Historique des K")} ({kh.data.length})
+                </summary>
+                <table className="list small" style={{ marginTop: 4 }}>
+                  <tbody>
+                    {kh.data.map((k, i) => (
+                      <tr key={k.id}>
+                        <td className="mono">{new Date(k.saved_at).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}</td>
+                        <td className="mono">
+                          {fmt(k.k_tke)} / {fmt(k.k_cis)}
+                        </td>
+                        <td className="muted">{tr(k.source)}</td>
+                        <td>
+                          {i === 0 ? (
+                            <span className="muted">{tr("en service")}</span>
+                          ) : (
+                            <button className="small" onClick={() => restore(k.id, k)}>
+                              {tr("Restaurer")}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
+            )}
           </div>
         </>
       )}
