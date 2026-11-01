@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.encoders import jsonable_encoder
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
@@ -27,6 +28,8 @@ INDEX_CACHE = "no-cache"
 
 def create_app(static_dir: str | Path | None = None) -> FastAPI:
     app = FastAPI(title="Seeing the Sky API", version="0.1.0", docs_url="/api/docs", openapi_url="/api/openapi.json")
+    # the history, Cn2 and fisheye answers are 0.2-0.7 MB of JSON: compressed ~5-10 times
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
 
     @app.middleware("http")
     async def api_cache_headers(request: Request, call_next):

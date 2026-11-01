@@ -256,3 +256,9 @@ def test_fisheye_horizon_from_the_relief(client, session):
     assert max(high) == 0.0
     # without the place's altitude, the observer stands on the AROME ground: flat horizon
     assert max(client.get("/api/fisheye", params={"lat": 45.0, "lon": 5.5}).json()["horizon"]) == 0.0
+
+
+def test_large_answers_are_gzipped(client):
+    r = client.get("/api/openapi.json", headers={"Accept-Encoding": "gzip"})
+    assert r.status_code == 200 and r.headers.get("content-encoding") == "gzip"
+    assert client.get("/healthz", headers={"Accept-Encoding": "gzip"}).headers.get("content-encoding") is None  # small
