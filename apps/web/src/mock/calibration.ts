@@ -176,6 +176,23 @@ function fit<C>(P: CalPair<C>[], model: CalModel<C>): { P: CalPair<C>[]; K: K3; 
         K = k;
       }
     }
+  // the coarse grid steps K by x1.22: refine twice around the best point (x1.02, then x1.002), so that removing a few
+  // hours (filters, nights left out) moves the K instead of staying on the same grid point; K kept in [0.01, 150]
+  let step = Math.pow(15000, 1 / 48);
+  for (let pass = 0; pass < 2; pass++) {
+    const s = Math.pow(step, 1 / 10),
+      [a, c] = K;
+    for (let i = -10; i <= 10; i++)
+      for (let j = -10; j <= 10; j++) {
+        const k: K3 = [Math.min(150, Math.max(0.01, a * Math.pow(s, i))), Math.min(150, Math.max(0.01, c * Math.pow(s, j))), model.k0[2]],
+          e = err(k);
+        if (e < best) {
+          best = e;
+          K = k;
+        }
+      }
+    step = s;
+  }
   return { P, K, mode: "K_TKE et K_CIS indépendants" };
 }
 

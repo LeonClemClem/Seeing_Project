@@ -284,7 +284,11 @@ export const api = {
     get<{ valid_times: string[]; seeing_arcsec: (number | null)[]; measured_arcsec: (number | null)[] }>(
       `/api/sites/${encodeURIComponent(slug)}/verif`,
     ),
-  skill: (slug: string) => get<{ bins: SkillBin[]; nights: SkillNight[] }>(`/api/sites/${encodeURIComponent(slug)}/skill`),
+  /** `k`: the K being set in Calibrer (accounts that may save the K of the site), else the site's K. */
+  skill: (slug: string, k?: [number, number]) =>
+    get<{ bins: SkillBin[]; nights: SkillNight[] }>(
+      `/api/sites/${encodeURIComponent(slug)}/skill${k ? `?k_tke=${k[0].toPrecision(6)}&k_cis=${k[1].toPrecision(6)}` : ""}`,
+    ),
   terms: (slug: string, from: string, to: string) =>
     get<Terms>(`/api/sites/${encodeURIComponent(slug)}/terms?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   latestRun: () => get<Run>("/api/runs/latest"),

@@ -10,6 +10,7 @@ import { api, queryKeys, type KHistoryItem } from "../api";
 import { corrChart } from "../charts/lieuCharts";
 import { cn2Svg, corrMock } from "../charts/mockCharts";
 import { Cn2RealPanel, DataChips, HistPanel } from "../components/panels";
+import { RunAgeSkill } from "../components/RunAgeSkill";
 import { Cn2Legend, LegMed, LegMes, Seg, Sw, SvgChart } from "../components/ui";
 import { useUser } from "../data/auth";
 import { useSiteHistory } from "../data/forecast";
@@ -825,6 +826,7 @@ export default function Calibrer() {
               </div>
             </div>
           </div>
+          {place.real && <RunAgeSkill place={place} K={editable ? K : undefined} />}
         </div>
         <div className="stack side">
           <KPanel

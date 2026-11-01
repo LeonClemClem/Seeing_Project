@@ -53,5 +53,7 @@ describe("mock model", () => {
     expect(f.F.out).toBe(1);
     expect(f.P.some((p) => p.key.startsWith(first + "|"))).toBe(false);
     expect(f.P.length).toBeLessThan(all.P.length);
+    // the fit is refined below the coarse grid step: leaving a night out moves the K
+    expect(f.K[0] !== all.K[0] || f.K[1] !== all.K[1]).toBe(true);
   });
 });
