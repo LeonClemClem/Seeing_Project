@@ -220,7 +220,7 @@ function KRead({ place }: { place: Place }) {
   if (place.real && kHidden(place, role)) return null; // K of the public sites: not shown, not mentioned
   const txt = place.real
     ? `${kTxt(place.K, kHidden(place, role), fmt)} (${tr("calcul du run, données réelles")})`
-    : `K_TKE = ${fmt(K[0])}  K_CIS = ${fmt(K[1])}  K_conv = 0.1 (${tr(kmode === "A" ? "calés" : "manuels")})`;
+    : `K_TKE = ${fmt(K[0])}  K_CIS = ${fmt(K[1])}  K_conv = 0.1 (${tr({ S: "enregistrés", A: "calés", M: "manuels" }[kmode])})`;
   return (
     <p className="small muted" style={{ margin: 0 }}>
       {tr("K en service :")} <span className="mono">{tr(txt)}</span> ·{" "}

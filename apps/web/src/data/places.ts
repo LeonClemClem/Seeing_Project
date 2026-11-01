@@ -123,7 +123,7 @@ export const kHidden = (p: Place, role: Role) =>
 export const kTxt = (K: K3, hid: boolean, f: (v: number) => string | number = (v) => v) =>
   hid ? "" : `K_TKE = ${f(K[0])}  K_CIS = ${f(K[1])}  K_conv = ${f(K[2])}`;
 
-/** Select a place and load its fitted K, like the mockup's applyLieuK(). */
+/** Select a place and load its saved K (the K of its forecasts, as in Prévision). */
 export function selectPlace(p: Place): Partial<UiState> {
-  return { place: p.id, KCAL: [...p.K], K: [...p.K], kmode: "A" };
+  return { place: p.id, KCAL: [...p.K], K: [...p.K], kmode: "S" };
 }

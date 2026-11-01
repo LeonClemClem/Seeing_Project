@@ -151,7 +151,7 @@ export default function Header() {
         {!hid && (
           <span>
             {tr("K du lieu")}{" "}
-            <b className="mono">{tr(`${fmt(K[0])} / ${fmt(K[1])} / ${fmt(K[2])} · ${kmode === "A" ? "calés" : "manuels"}`)}</b>
+            <b className="mono">{tr(`${fmt(K[0])} / ${fmt(K[1])} / ${fmt(K[2])} · ${{ S: "enregistrés", A: "calés", M: "manuels" }[kmode]}`)}</b>
           </span>
         )}
         {badge === "real" && <span className="pill p-ok">{tr("Données réelles")} · AROME</span>}

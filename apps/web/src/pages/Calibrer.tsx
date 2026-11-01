@@ -359,6 +359,13 @@ export default function Calibrer() {
         : calib(nights, filters),
     [nightsKey, filters, realModel, editable],
   );
+  // "K enregistrés" mode (default): the K in service are the place's saved K, the K of its forecasts, so that every
+  // panel shows the same model values as Prévision; they follow the place (and a save)
+  useEffect(() => {
+    if (kmode !== "S") return;
+    const cur = getState().K;
+    if (place.K.some((v, i) => Math.abs(v - cur[i]!) > 1e-9)) setK([...place.K], "S");
+  }, [kmode, place.K]);
   // In "K calés" mode, the K in service follow the auto calibration: every filter or night left out refits at once
   useEffect(() => {
     if (lock || kmode !== "A") return;
@@ -841,7 +848,7 @@ function KPanel(p: {
   lock: boolean;
   autoK: K3;
   stats: { r: number; b: number; q: number };
-  kmode: "A" | "M";
+  kmode: "S" | "A" | "M";
   saved: string;
   setSaved: (s: string) => void;
   krow: (lab: string, k: "L" | 0 | 1) => JSX.Element;
@@ -857,6 +864,7 @@ function KPanel(p: {
     api.saveK(p.place.slug, { k_tke: K[0], k_cis: K[1], k_conv: 0.1 }).then(
       () => {
         p.setSaved(done + tr(" Utilisés dès le prochain run."));
+        setState({ kmode: "S" }); // the K in service are now the saved K
         return qc.invalidateQueries({ queryKey: queryKeys.sites });
       },
       (e: Error) => p.setSaved(e.message),
@@ -884,10 +892,12 @@ function KPanel(p: {
             style={{ marginBottom: 8 }}
             value={p.kmode}
             onChange={(m) => {
-              if (m === "A") setK(getState().KCAL, "A");
+              if (m === "S") setK([...p.place.K], "S");
+              else if (m === "A") setK(getState().KCAL, "A");
               else setState({ kmode: "M" });
             }}
             options={[
+              ["S", tr("K enregistrés")],
               ["A", tr("K calés")],
               ["M", tr("Manuel")],
             ]}
