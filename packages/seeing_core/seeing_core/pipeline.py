@@ -235,7 +235,8 @@ def compute_from_extracted(
     out: dict[str, SiteForecast] = {}
     for site in sites:
         hourly = {pkg: run.data.get(pkg, {}).get(site.slug, {}) for pkg in HOURLY}
-        tke_filled = fill_lead0_tke(hourly)
+        # V2bd only: V2 stays the research script as is (test_v2_equivalence)
+        tke_filled = fill_lead0_tke(hourly) if model == "V2bd" else False
         sp3 = run.data.get("SP3", {}).get(site.slug, {})
         if not sp3:
             logger.warning("%s: no SP3 data, convective closure disabled", site.slug)
