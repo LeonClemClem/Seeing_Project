@@ -256,5 +256,6 @@
 "Mot de passe": "Password",
 "Retard de Météo-France : le run": "Météo-France is late: run",
 "n'est pas encore disponible, la prévision vient du run": "is not available yet, the forecast comes from run",
-"âgé de": "age"
+"âgé de": "age",
+"Le serveur se réveille (il s'endort quand personne ne s'en sert) : encore quelques secondes…": "The server is waking up (it sleeps when nobody uses it): a few more seconds…"
 }
