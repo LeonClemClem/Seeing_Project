@@ -296,17 +296,21 @@ class KHistoryItem(BaseModel):
     k_conv: float
     saved_at: datetime
     source: str
-    by: str | None  # e-mail of the account that saved them: shown to the administrator only
+    by: str | None  # "compte n°<id>" of the account that saved them (never the e-mail): administrator only
+
+
+def account_label(user_id: int | None) -> str | None:
+    """How the administrator sees a member: an account number, never the e-mail."""
+    return None if user_id is None else f"compte n°{user_id}"
 
 
 def k_history_items(session, site_ids: list[int] | None, admin: bool, limit: int = 200) -> list[tuple[int, KHistoryItem]]:
-    q = (select(SiteKHistory, User.email).outerjoin(User, User.id == SiteKHistory.user_id)
-         .order_by(SiteKHistory.saved_at.desc(), SiteKHistory.id.desc()).limit(limit))
+    q = select(SiteKHistory).order_by(SiteKHistory.saved_at.desc(), SiteKHistory.id.desc()).limit(limit)
     if site_ids is not None:
         q = q.where(SiteKHistory.site_id.in_(site_ids))
     return [(h.site_id, KHistoryItem(id=h.id, k_tke=h.k_tke, k_cis=h.k_cis, k_conv=h.k_conv, saved_at=utc(h.saved_at),
-                                     source=h.source, by=email if admin else None))
-            for h, email in session.execute(q).all()]
+                                     source=h.source, by=account_label(h.user_id) if admin else None))
+            for h in session.scalars(q).all()]
 
 
 @router.get("/{slug}/k-history", response_model=list[KHistoryItem])

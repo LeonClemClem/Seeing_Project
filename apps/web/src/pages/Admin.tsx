@@ -1,4 +1,5 @@
-/** Administrator tab: the K of every site and their history; more information will be added here. */
+/** Administrator tab: the K and exact position of every site and the K history; more information will be
+ * added here. No e-mail: a member is only "compte n°<id>". */
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "../api";
@@ -34,6 +35,7 @@ export default function Admin() {
               <tr>
                 <th>{tr("Lieu")}</th>
                 <th>{tr("Propriétaire")}</th>
+                <th>{tr("Coordonnées")}</th>
                 <th>K_TKE</th>
                 <th>K_CIS</th>
                 <th>K_conv</th>
@@ -48,6 +50,10 @@ export default function Admin() {
                     {!s.active && <span className="small muted"> ({tr("archivé")})</span>}
                   </td>
                   <td className="small">{s.owner ?? tr("site public")}</td>
+                  <td className="mono small">
+                    {s.lat.toFixed(5)}, {s.lon.toFixed(5)}
+                    {s.altitude_m != null && ` · ${Math.round(s.altitude_m)} m`}
+                  </td>
                   <td className="mono">{fmt(s.k_tke)}</td>
                   <td className="mono">{fmt(s.k_cis)}</td>
                   <td className="mono">{fmt(s.k_conv)}</td>

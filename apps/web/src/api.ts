@@ -83,7 +83,7 @@ export interface SkillNight {
   sd: number | null;
 }
 
-/** A set of K saved for a site (never deleted). `by`: e-mail, for the administrator only. */
+/** A set of K saved for a site (never deleted). `by`: "compte n°<id>", for the administrator only (no e-mail). */
 export interface KHistoryItem {
   id: number;
   k_tke: number;
@@ -96,7 +96,20 @@ export interface KHistoryItem {
 
 /** Administrator tab. */
 export interface AdminOverview {
-  sites: { slug: string; name: string; owner: string | null; active: boolean; k_tke: number; k_cis: number; k_conv: number; k_saved_at: string | null }[];
+  sites: {
+    slug: string;
+    name: string;
+    /** "compte n°<id>" (never the e-mail), null for a public site. */
+    owner: string | null;
+    lat: number;
+    lon: number;
+    altitude_m: number | null;
+    active: boolean;
+    k_tke: number;
+    k_cis: number;
+    k_conv: number;
+    k_saved_at: string | null;
+  }[];
   k_history: (KHistoryItem & { site: string })[];
 }
 
@@ -254,6 +267,8 @@ export const api = {
   resendVerification: (email: string) => post<void>("/api/auth/resend", { email }),
   login: (b: { email: string; password: string }) => post<User>("/api/auth/login", b),
   logout: () => post<void>("/api/auth/logout"),
+  /** Delete the account: anonymized, its places archived with their data. */
+  deleteAccount: (password: string) => post<void>("/api/auth/delete-account", { password }),
   sites: () => get<Site[]>("/api/sites"),
   createPlace: (b: PlaceIn) => post<Site>("/api/places", b),
   updatePlace: (slug: string, b: PlacePatch) => send<Site>("PATCH", `/api/places/${encodeURIComponent(slug)}`, b),
