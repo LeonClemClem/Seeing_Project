@@ -26,6 +26,11 @@ from seeing_core.profiles import (
 from seeing_core.seeing import display_cn2_profile, integrate_seeing, seeing_from_integral, v2bd_blend
 from seeing_core.variables import model_variables
 
+
+#: First lead hour the batch computes: Meteo-France publishes neither the TKE (HP2) nor the accumulated sshf (SP3)
+#: at lead 0, so the boundary-layer Cn2 of the run hour has holes and its seeing is too low; the previous run covers it.
+FIRST_LEAD = 1
+
 logger = logging.getLogger(__name__)
 
 
@@ -209,10 +214,10 @@ def _hour_v2bd(site: SiteSpec, sp3: dict, hour: int, h_coulim: float, hag: dict,
 
 
 def compute_from_extracted(
-    run: ExtractedRun, sites: Sequence[SiteSpec], forecast_hours: int = 51, model: str = MODEL
+    run: ExtractedRun, sites: Sequence[SiteSpec], forecast_hours: int = 51, model: str = MODEL, first_lead: int = 0
 ) -> dict[str, SiteForecast]:
-    """Physics for every site from already-extracted point data. Hours with missing inputs are
-    skipped with a warning."""
+    """Physics for every site from already-extracted point data, lead hours `first_lead`..`forecast_hours` (the batch
+    starts at FIRST_LEAD). Hours with missing inputs are skipped with a warning."""
     if run.run_time is None:
         raise RuntimeError("AROME cycle date not found in the GRIB files")
     out: dict[str, SiteForecast] = {}
@@ -226,7 +231,7 @@ def compute_from_extracted(
             raise RuntimeError(f"{site.slug}: model orography SP2:h not found")
 
         hours: list[HourResult] = []
-        for hour in range(forecast_hours + 1):
+        for hour in range(first_lead, forecast_hours + 1):
             try:
                 terms, variables, conv = (np.nan, np.nan, np.nan), None, None
                 if model == "V2bd":

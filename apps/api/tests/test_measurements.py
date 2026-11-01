@@ -131,9 +131,9 @@ def test_terms_use_the_latest_run_before_each_hour():
                                seeing_arcsec=1.0, i_tke=float(k), i_conv=0.0, i_cis=1e-14))
         s.commit()
     r = ada.get(f"/api/sites/{slug}/terms", params={"from": "2026-10-13T00:00:00Z", "to": "2026-10-14T00:00:00Z"}).json()
-    assert len(r["valid_times"]) == 18
-    assert r["i_tke"][:6] == [0.0] * 6 and r["i_tke"][6:] == [1.0] * 12  # from 06Z on: the 06Z run
-    assert r["lead_hours"][6] == 0
+    assert len(r["valid_times"]) == 17  # 01Z-17Z: lead 0 left out (no TKE), 06Z from the 00Z run (lead 6)
+    assert r["i_tke"][:6] == [0.0] * 6 and r["i_tke"][6:] == [1.0] * 11  # from 07Z on: the 06Z run
+    assert r["lead_hours"][5] == 6
 
 
 def test_skill_by_age_of_the_run():
@@ -203,7 +203,7 @@ def test_verif_one_forecast_per_hour_at_the_current_k():
             s.add(Measurement(site_id=site.id, time=T0 + timedelta(hours=6, minutes=m), seeing_arcsec=1.0 + m / 100))
         s.commit()
     r = ada.get(f"/api/sites/{slug}/verif").json()
-    assert len(r["valid_times"]) == 18
+    assert len(r["valid_times"]) == 17  # 01Z-17Z (lead 0 left out)
     assert all(v is not None and v != 9.0 for v in r["seeing_arcsec"])  # recomputed with the K, not the stored value
     i6 = r["valid_times"].index("2026-10-13T06:00:00Z")
     assert r["measured_arcsec"][i6] == 1.0 and r["measured_arcsec"][0] is None
@@ -224,5 +224,5 @@ def test_terms_take_a_secondary_run_only_where_no_main_run_covers():
                                seeing_arcsec=1.0, i_tke=float(k), i_conv=0.0, i_cis=1e-14))
         s.commit()
     r = ada.get(f"/api/sites/{slug}/terms", params={"from": "2026-10-13T00:00:00Z", "to": "2026-10-14T00:00:00Z"}).json()
-    assert len(r["valid_times"]) == 15
-    assert r["i_tke"][:6] == [0.0] * 6 and r["i_tke"][6:] == [1.0] * 9  # 03Z run only from 06Z on
+    assert len(r["valid_times"]) == 14  # 01Z-14Z (lead 0 left out)
+    assert r["i_tke"][:5] == [0.0] * 5 and r["i_tke"][5:] == [1.0] * 9  # 03Z run only from 06Z on

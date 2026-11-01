@@ -72,6 +72,9 @@ def test_h_coulim_and_heat_flux():
     assert w0 == surface_kinematic_heat_flux(sp3, 1, 290.0, 900.0)
     assert w0 > 0  # SSHF_SIGN = -1: negative accumulation = surface heating
     assert np.isnan(surface_kinematic_heat_flux(sp3, 2, 290.0, 900.0))
+    # Meteo-France does not publish the accumulation at lead 0: taken as 0, leads 0 and 1 still have a flux
+    no0 = {1: {"sshf": {0.0: -360000.0}}}
+    assert surface_kinematic_heat_flux(no0, 0, 290.0, 900.0) == w0 == surface_kinematic_heat_flux(no0, 1, 290.0, 900.0)
 
 
 def test_display_grid():

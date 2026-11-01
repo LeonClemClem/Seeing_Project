@@ -13,6 +13,7 @@ from pathlib import Path
 
 from seeing_core import compute_from_extracted
 from seeing_core.grid import DEFAULT_STRIDE, MAP_K, GridExtractor, night_steps
+from seeing_core.pipeline import FIRST_LEAD
 from seeing_db import RunStatus, make_engine, make_session_factory
 from sqlalchemy.orm import sessionmaker
 
@@ -51,8 +52,10 @@ def run_batch(
     find_cycle=None,
     fetch=None,
     map_enabled: bool | None = None,
+    force: bool = False,
 ) -> int:
-    """Whole job; returns the process exit code. `find_cycle` / `fetch` are injectable for tests."""
+    """Whole job; returns the process exit code. `find_cycle` / `fetch` are injectable for tests. `force`: compute
+    again a run already stored with success (e.g. one stored before the integrals at K = 1); its rows are replaced."""
     from seeing_batch import arome
 
     grib_dir = grib_dir or Path(os.environ.get("GRIB_DIR", "/tmp/arome"))
@@ -72,7 +75,7 @@ def run_batch(
         status = persist.run_status(session, run_time)
         started = persist.run_started_at(session, run_time)
         site_rows = persist.load_sites(session)
-    if status == RunStatus.success:
+    if status == RunStatus.success and not force:
         logger.info("Run %s already stored with success, nothing to do", rt, extra={"run_time": rt})
         return 0
     if status == RunStatus.running and started is not None and datetime.now(UTC) - started < RUNNING_TTL:
@@ -93,7 +96,7 @@ def run_batch(
             kw["grid"] = grid
         extracted, stats = fetch(run_time, sites, grib_dir, forecast_hours=forecast_hours, keep_gribs=keep_gribs, **kw)
         t0 = time.monotonic()
-        forecasts = compute_from_extracted(extracted, sites, forecast_hours)
+        forecasts = compute_from_extracted(extracted, sites, forecast_hours, first_lead=FIRST_LEAD)
         compute_s = time.monotonic() - t0
         if not any(fc.hours for fc in forecasts.values()):
             raise RuntimeError("No lead hour could be computed for any site")
@@ -145,6 +148,7 @@ def main(argv: list[str] | None = None) -> None:
     run.add_argument("--run-time", type=parse_run_time, default=None,
                      help="AROME cycle, ISO 8601 UTC (e.g. 2026-10-13T00:00Z). Default: latest complete cycle.")
     run.add_argument("--keep-gribs", action="store_true", help="Keep the downloaded GRIB files in GRIB_DIR.")
+    run.add_argument("--force", action="store_true", help="Compute again a run already stored with success (rows replaced).")
     mon = sub.add_parser("monitors", help="Fetch the online seeing monitors now and store their measurements.")
     mon.add_argument("--days", type=int, default=None, help="Days fetched where the source keeps them (default MONITORS_DAYS).")
     args = parser.parse_args(argv)
@@ -159,7 +163,7 @@ def main(argv: list[str] | None = None) -> None:
         else:
             if monitors_due():
                 monitors.collect(session_factory, days=monitors_days())
-            code = run_batch(session_factory, run_time=args.run_time, keep_gribs=args.keep_gribs)
+            code = run_batch(session_factory, run_time=args.run_time, keep_gribs=args.keep_gribs, force=args.force)
     except Exception:
         logger.exception("seeing-batch failed")
         code = 1
