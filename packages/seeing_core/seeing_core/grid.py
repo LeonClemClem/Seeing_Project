@@ -4,9 +4,10 @@ The per-site pipeline handles one vertical profile at a time; here every grid co
 is computed at once with 2-D arrays (columns x levels). The result is identical to compute_hour()
 with model="V2bd" for the same column (tests/test_grid.py).
 
-Memory: one lead hour of the needed fields is ~250 2-D fields. The grid is subsampled by `stride`
-(2 -> 0.05 deg, ~200 000 columns, ~200 MB per lead hour) and a lead hour is computed and freed as
-soon as all its packages have been read (files ordered by lead-hour group, see order_by_group).
+Memory: one lead hour of the needed fields is ~250 2-D fields. The grid is the full AROME 0.025 grid by default
+(`stride` 1, ~805 000 columns, ~800 MB per lead hour, up to the 6 lead hours of a file group at once: the batch needs
+8 GiB); `stride` 2 -> 0.05 deg, ~200 000 columns, ~200 MB per lead hour. A lead hour is computed and freed as soon as
+all its packages have been read (files ordered by lead-hour group, see order_by_group).
 """
 
 from __future__ import annotations
@@ -43,7 +44,7 @@ logger = logging.getLogger(__name__)
 MAP_K = (1.0, 30.0, 0.1)  # K_TKE, K_CIS, K_conv
 # Map hours: the night from 19h to 05h UTC (the map's night mean uses 20h-04h, the fisheye 19h-05h).
 NIGHT_HOURS_UTC = (19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5)
-DEFAULT_STRIDE = 2
+DEFAULT_STRIDE = 1  # full AROME resolution (2: every other point, 0.05 deg, before 2026-11-02)
 
 # Fields: fields[(package, shortName, level)] = 2-D array (ny, nx)
 Fields = dict[tuple[str, str, float], np.ndarray]

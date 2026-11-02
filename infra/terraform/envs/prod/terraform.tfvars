@@ -20,8 +20,9 @@ iap_members = [
 # collected once a day, at the 11h45 UTC firing (MONITORS_UTC_HOUR).
 batch_schedule = "45 * * * *"
 
-# Measured: ~364 MB RSS + at most 2 GRIB files (<= 1.6 GB) on the in-memory disk.
+# Measured at the 0.05 deg map: ~1.7 GB peak RSS. The full-resolution map (MAP_STRIDE 1) keeps up to 6 lead hours of
+# ~800 MB of fields, plus at most 2 GRIB files (<= 1.6 GB) on the in-memory disk: 8 GiB (the most with 2 CPU).
 batch_cpu    = "2"
-batch_memory = "4Gi"
+batch_memory = "8Gi"
 
 deletion_protection = true
