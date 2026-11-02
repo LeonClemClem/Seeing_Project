@@ -464,12 +464,27 @@ export function cn2ProfileSvg(c: Cn2Ctx, i: number, pfW: number) {
     return g + `<text x="${L + pw / 2}" y="${T + ph / 2}" text-anchor="middle" font-size="11" fill="${C_TXT}">${tr("pas de Cn² (H+0 ou trou)")}</text>`;
   for (let q = Math.ceil(x0); q <= Math.floor(x1); q++)
     g += `<line x1="${X(q)}" x2="${X(q)}" y1="${T}" y2="${T + ph}" stroke="#3a4258"/>${(q - Math.ceil(x0)) % 2 ? "" : `<text x="${X(q)}" y="${T + ph + 14}" text-anchor="middle" font-size="8" fill="${C_TXT}">1e${q}</text>`}`;
-  c.cv[i]?.forEach((on, k) => {
+  // levels filled by the convective closure: greyed, with "Conv" in the middle of each band (as the mock-up)
+  const cvRow = c.cv[i];
+  cvRow?.forEach((on, k) => {
     if (!on) return;
     const [z0, z1] = levelBand(c.heights, k);
     if (z1 < c.za || z0 > c.zb) return;
-    g += `<rect x="${L}" y="${Yz(z1)}" width="${pw}" height="${Math.max(1, Yz(z0) - Yz(z1))}" fill="url(#hh)" opacity=".55"/>`;
+    g += `<rect x="${L}" y="${Yz(z1)}" width="${pw}" height="${Math.max(1, Yz(z0) - Yz(z1))}" fill="#fff" opacity=".14"/>`;
   });
+  const convLabels: string[] = [];
+  for (let k = 0; cvRow && k < cvRow.length; k++) {
+    if (!cvRow[k]) continue;
+    let k2 = k;
+    while (k2 + 1 < cvRow.length && cvRow[k2 + 1]) k2++;
+    const a = levelBand(c.heights, k)[0],
+      b = levelBand(c.heights, k2)[1];
+    if (b > c.za && a < c.zb) {
+      const ym = (Yz(Math.max(a, c.za)) + Yz(Math.min(b, c.zb))) / 2;
+      convLabels.push(`<text x="${L + pw - 4}" y="${ym + 4}" text-anchor="end" font-size="11" font-weight="500" fill="#fff" stroke="#000" stroke-width="3" paint-order="stroke">Conv</text>`);
+    }
+    k = k2;
+  }
   const pts: number[][] = [];
   c.heights.forEach((z, k) => {
     if (z < c.za || z > c.zb) return;
@@ -489,6 +504,7 @@ export function cn2ProfileSvg(c: Cn2Ctx, i: number, pfW: number) {
   const step = c.zb - c.za > 8000 ? 2000 : c.zb - c.za > 2000 ? 500 : 100;
   for (let z = Math.ceil(c.za / step) * step; z <= c.zb; z += step)
     g += `<line x1="${L}" x2="${L + pw}" y1="${Yz(z)}" y2="${Yz(z)}" stroke="#3a4258" stroke-width="0.6"/>`;
+  g += convLabels.join("");
   const s = c.see[i];
   g += `<text x="${L + pw / 2}" y="${H - 6}" text-anchor="middle" font-size="9" fill="${C_TXT}">Cn²</text><text x="${L}" y="${T - 7}" font-size="9" fill="${C_TXT}">seeing ${s != null ? s.toFixed(2) + '"' : "–"}${isNightDate(d) ? "" : tr(" (jour)")}</text>`;
   return g;
