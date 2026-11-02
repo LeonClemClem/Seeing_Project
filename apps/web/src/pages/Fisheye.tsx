@@ -23,7 +23,7 @@ import {
   sunAltAz,
   type CatObj,
 } from "../lib/sky";
-import { D2R, fmt, pad2, runLabel, turbo, turboGradient } from "../lib/util";
+import { D2R, fmt, pad2, runLabel, seeingGradient, seeingRgb } from "../lib/util";
 import { KDEF, REF } from "../mock/engine";
 import { useUi, type K3 } from "../store";
 
@@ -210,16 +210,17 @@ export default function Fisheye() {
         const alt = 90 - (r / FR) * 90,
           az = (Math.atan2(-dx, dy) / D2R + 360) % 360;
         const s = vis(alt, az) ? seeSky(fcur, alt, az) : NaN;
-        // same colours as the map: turbo, 0-10" with a fixed square-root stretch
+        // same colours as the map: seeing palette, 0-10" linear
         // relief in dark brown; below ELMIN (or no value) grey
         let col: number[] =
-          alt < horizonAt(az) ? [62, 52, 42] : isNaN(s) ? [55, 62, 80] : turbo(Math.sqrt(Math.min(Math.max(s, 0), 10) / 10));
+          alt < horizonAt(az) ? [62, 52, 42] : isNaN(s) ? [55, 62, 80] : seeingRgb(Math.min(Math.max(s, 0), 10) / 10);
         if (opt.nua && vis(alt, az)) {
-          // grey veil as research/ciel_seeing.py: light grey and see-through for thin cover, darker when overcast
+          // cloud veil: the more cover, the more opaque (cover^0.6: 25 % -> 0.44, 50 % -> 0.66, 100 % -> opaque, the
+          // seeing hidden), light grey for thin cover, darker grey when overcast
           const cc = Math.min(Math.max(cloudSky(fcur, alt, az), 0), 1);
           if (cc > 0) {
-            const a = 0.82 * cc,
-              grey = [204 - 97 * cc, 204 - 97 * cc, 214 - 94 * cc];
+            const a = Math.pow(cc, 0.6),
+              grey = [222 - 92 * cc, 224 - 92 * cc, 230 - 88 * cc];
             col = col.map((v, k) => v * (1 - a) + grey[k]! * a);
           }
         }
@@ -478,7 +479,7 @@ export default function Fisheye() {
               </div>
             )}
           </div>
-          <ColorBar left={'0"'} right={'10"'} gradient={turboGradient()} />
+          <ColorBar left={'0"'} right={'10"'} gradient={seeingGradient()} />
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
             <span className="small muted">{tr("Nuit :")}</span>
             <Seg

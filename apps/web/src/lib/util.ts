@@ -26,6 +26,19 @@ export function turbo(x: number): [number, number, number] {
   return [c(r), c(g), c(b)];
 }
 
+/** Seeing palette of the map and the fisheye, x = seeing / 10" in [0, 1] (linear): turbo, darkened towards 0" (30 % of
+ * the brightness at 0", full again from 3.5", smoothstep in between). */
+export const SEE_DARK = { at0: 0.3, upTo: 0.35 };
+export function seeingRgb(x: number): [number, number, number] {
+  const c = turbo(x),
+    t = Math.max(0, Math.min(1, x / SEE_DARK.upTo)),
+    k = SEE_DARK.at0 + (1 - SEE_DARK.at0) * t * t * (3 - 2 * t);
+  return [Math.round(c[0] * k), Math.round(c[1] * k), Math.round(c[2] * k)];
+}
+
+export const seeingGradient = () =>
+  "linear-gradient(to right," + [...Array(11)].map((_, i) => "rgb(" + seeingRgb(i / 10).join(",") + ")").join(",") + ")";
+
 export const turboGradient = () =>
   "linear-gradient(to right," + [0, 0.2, 0.4, 0.6, 0.8, 1].map((x) => "rgb(" + turbo(x).join(",") + ")").join(",") + ")";
 

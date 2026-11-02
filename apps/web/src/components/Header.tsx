@@ -8,7 +8,7 @@ import { fmt, pad2, runLabel } from "../lib/util";
 import { setState, useUi } from "../store";
 
 /** Age (hours) of the latest main run past which the site says, in red, that Météo-France is late. */
-const RUN_LATE_H = 12;
+const RUN_LATE_H = 14;
 
 const TABS: [path: string, label: string][] = [
   ["/carte", "Carte"],
@@ -43,8 +43,8 @@ export default function Header() {
   const loc = useLocation();
 
   const runMs = runTime ? Date.parse(runTime) : null;
-  // a main run is normally on the site ~4-5 h after its time, so the latest one is never more than ~11 h old:
-  // past RUN_LATE_H, Météo-France is late and the forecast shown comes from an older run
+  // a main run is on the site up to ~6 h 15 after its time (18Z published ~5 h 25 after, batch at :45, ~25 min of
+  // computation), so the latest one is normally at most ~12 h 30 old: past RUN_LATE_H, Météo-France is late
   const lateH = runMs ? Math.floor((Date.now() - runMs) / 3600000) : 0;
   // Data badge: real AROME data wherever the page shows them; "mock-up" only where something fictitious is still
   // shown (Calibrer without the right to calibrate the place uses example nights); none on the text pages.

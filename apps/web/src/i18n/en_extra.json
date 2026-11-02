@@ -257,6 +257,7 @@
 "Retard de Météo-France : le run": "Météo-France is late: run",
 "n'est pas encore disponible, la prévision vient du run": "is not available yet, the forecast comes from run",
 "âgé de": "age",
+"Le serveur se réveille (il s'endort quand personne ne s'en sert) : encore quelques secondes…": "The server is waking up (it sleeps when nobody uses it): a few more seconds…",
 "Seeing lu sur la carte globale du dernier run (mailles de ~5 km, K de la carte, nuits seulement), sans créer de lieu. Le point devient le lieu affiché dans les autres onglets ; pour le Cn², l'historique et la calibration, enregistre-le comme lieu.": "Seeing read on the global map of the latest run (~5 km cells, map K, nights only), without creating a place. The point becomes the place shown in the other tabs; for the Cn², the history and the calibration, save it as a place.",
 "Enregistrer comme lieu": "Save as a place",
 "Le point est aussi affiché dans": "The point is also shown in",

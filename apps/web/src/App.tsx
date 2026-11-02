@@ -3,6 +3,7 @@ import { Link, Navigate, Route, Routes } from "react-router-dom";
 
 import Header from "./components/Header";
 import { HatchDefs, Spinner } from "./components/ui";
+import WakeNotice from "./components/WakeNotice";
 import { tr } from "./i18n";
 import Carte from "./pages/Carte";
 import Compte from "./pages/Compte";
@@ -21,6 +22,7 @@ export default function App() {
   return (
     <>
       <Header />
+      <WakeNotice />
       <main>
         <Suspense fallback={<Spinner />}>
           <Routes>
