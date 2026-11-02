@@ -25,7 +25,7 @@ def public_url() -> str:
 def send_mail(to: str, subject: str, text: str, link: str, link_label: str) -> bool:
     """Send one e-mail (plain text plus a simple HTML version with a button). False on failure (logged
     without the recipient's address)."""
-    key = os.environ.get("BREVO_API_KEY", "")
+    key = os.environ.get("BREVO_API_KEY", "").strip()  # a key pasted into the secret often ends with a newline
     sender = os.environ.get("MAIL_FROM", "")
     if not key or not sender:
         logger.error("E-mail not sent: BREVO_API_KEY or MAIL_FROM is not set")
