@@ -27,6 +27,23 @@ export function decodeFrame(codes: Uint8Array, meta: MapMeta): Float32Array {
   return out;
 }
 
+/** Share of the boundary-layer turbulence of every frame of the map (loaded only when asked: the map's
+ * "Couche limite" / "Au-dessus" options), by lead hour; a frame without it is absent. */
+export function useMapShares(meta: MapMeta | undefined, enabled: boolean): Map<number, Uint8Array> | undefined {
+  const q = useQuery({
+    queryKey: ["map-share", meta?.run_time ?? ""],
+    queryFn: async () => {
+      const m = meta!;
+      const got = await Promise.all(m.frames.map((f) => api.mapShare(m.run_time, f.lead_hour).catch(() => null)));
+      return new Map(m.frames.flatMap((f, i) => (got[i] ? [[f.lead_hour, got[i]!] as const] : [])));
+    },
+    enabled: enabled && !!meta,
+    staleTime: 30 * 60 * 1000,
+    retry: false,
+  });
+  return q.data;
+}
+
 /** Latest global seeing map with all its frames, or undefined while loading / when there is none. */
 export function useGlobalMap(): GlobalMap | undefined {
   const { runTime } = useLatestRunTime();

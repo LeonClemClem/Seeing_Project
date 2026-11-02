@@ -322,6 +322,12 @@ export const api = {
     for (let i = 0; i < q.length; i++) out[i] = q[i] === 65535 ? NaN : q[i]! - 500;
     return out;
   },
+  /** Share of the boundary-layer turbulence of one map frame (uint8, share = code / 254, 255 = none). */
+  mapShare: async (run: string, lead: number): Promise<Uint8Array> => {
+    const res = await fetch(`/api/map/share?run=${encodeURIComponent(run)}&lead=${lead}`, { credentials: "same-origin" });
+    if (!res.ok) throw new ApiError(res.status, res.statusText);
+    return new Uint8Array(await res.arrayBuffer());
+  },
   /** Raw codes of one map frame (uint8, 255 = no value). */
   mapFrame: async (run: string, lead: number): Promise<Uint8Array> => {
     const res = await fetch(`/api/map/frame?run=${encodeURIComponent(run)}&lead=${lead}`, { credentials: "same-origin" });

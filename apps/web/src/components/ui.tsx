@@ -72,12 +72,31 @@ export function Spinner({ label = "Chargement…", style }: { label?: string; st
 export const Sw = ({ style }: { style: CSSProperties }) => <span className="sw" style={style} />;
 
 /** Date band above the map and the fisheye, as in their exported PNG / GIF: the day and hour large
- * ("Samedi 20h00 TU"), the date and run below; it follows the animation. */
-export function DateBand({ title, sub }: { title: string; sub: string }) {
+ * ("Samedi 20h00 TU"), the date and run below, the days of the run side by side (the one shown highlighted, to see
+ * the change of day during the animation) and the yellow time bar; it follows the animation. */
+export function DateBand({ title, sub, days, progress }: { title: string; sub: string; days?: { label: string; on: boolean }[]; progress?: number | null }) {
   return (
     <div className="dateband" aria-live="off">
-      <div className="t">{title}</div>
-      <div className="s">{sub}</div>
+      <div className="row">
+        <div>
+          <div className="t">{title}</div>
+          <div className="s">{sub}</div>
+        </div>
+        {!!days?.length && (
+          <div className="days">
+            {days.map((d) => (
+              <span key={d.label} className={d.on ? "on" : ""}>
+                {d.label}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      {progress != null && (
+        <div className="bar">
+          <i style={{ width: `${Math.round(progress * 1000) / 10}%` }} />
+        </div>
+      )}
     </div>
   );
 }

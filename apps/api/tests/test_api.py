@@ -121,6 +121,7 @@ def test_global_map(client, session):
     import zlib
 
     from seeing_db import MapFrame
+    from sqlalchemy import select
 
     assert client.get("/api/map").status_code == 404
     run = add_run(session, T0)
@@ -138,6 +139,13 @@ def test_global_map(client, session):
     r = client.get("/api/map/frame", params={"lead": 21})
     assert r.status_code == 200 and r.content == codes
     assert client.get("/api/map/frame", params={"lead": 5}).status_code == 404
+    assert client.get("/api/map/share", params={"lead": 20}).status_code == 404  # frame stored without the split
+    f = session.scalar(select(MapFrame).where(MapFrame.lead_hour == 21))
+    share = bytes([0, 127, 254, 255, 10, 20])
+    f.extra = zlib.compress(share + bytes(12))  # share, then the other planes
+    session.commit()
+    r = client.get("/api/map/share", params={"lead": 21})
+    assert r.status_code == 200 and r.content == share
 
 
 def test_fisheye_from_the_map(client, session):
