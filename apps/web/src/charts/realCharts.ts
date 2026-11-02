@@ -464,16 +464,21 @@ export function cn2ProfileSvg(c: Cn2Ctx, i: number, pfW: number) {
     return g + `<text x="${L + pw / 2}" y="${T + ph / 2}" text-anchor="middle" font-size="11" fill="${C_TXT}">${tr("pas de Cn² (H+0 ou trou)")}</text>`;
   for (let q = Math.ceil(x0); q <= Math.floor(x1); q++)
     g += `<line x1="${X(q)}" x2="${X(q)}" y1="${T}" y2="${T + ph}" stroke="#3a4258"/>${(q - Math.ceil(x0)) % 2 ? "" : `<text x="${X(q)}" y="${T + ph + 14}" text-anchor="middle" font-size="8" fill="${C_TXT}">1e${q}</text>`}`;
-  // levels filled by the convective closure: greyed, with "Conv" in the middle of each band (as the mock-up)
-  const cvRow = c.cv[i];
-  cvRow?.forEach((on, k) => {
+  // unstable levels (potential temperature decreasing with height, dθ/dz <= 0: convection likely, the TKE model is
+  // undefined there): the levels filled by the convective closure by day, and the levels left empty below the top of
+  // the profile (unstable air near the ground at night). Greyed, with "Convection" in the middle of each band; the
+  // Cn² values are not changed (the empty levels stay without a point).
+  let topK = -1;
+  row.forEach((v, k) => v != null && (topK = k));
+  const cvRow = row.map((v, k) => !!c.cv[i]?.[k] || (v == null && k < topK));
+  cvRow.forEach((on, k) => {
     if (!on) return;
     const [z0, z1] = levelBand(c.heights, k);
     if (z1 < c.za || z0 > c.zb) return;
     g += `<rect x="${L}" y="${Yz(z1)}" width="${pw}" height="${Math.max(1, Yz(z0) - Yz(z1))}" fill="#fff" opacity=".14"/>`;
   });
   const convLabels: string[] = [];
-  for (let k = 0; cvRow && k < cvRow.length; k++) {
+  for (let k = 0; k < cvRow.length; k++) {
     if (!cvRow[k]) continue;
     let k2 = k;
     while (k2 + 1 < cvRow.length && cvRow[k2 + 1]) k2++;
@@ -481,7 +486,7 @@ export function cn2ProfileSvg(c: Cn2Ctx, i: number, pfW: number) {
       b = levelBand(c.heights, k2)[1];
     if (b > c.za && a < c.zb) {
       const ym = (Yz(Math.max(a, c.za)) + Yz(Math.min(b, c.zb))) / 2;
-      convLabels.push(`<text x="${L + pw - 4}" y="${ym + 4}" text-anchor="end" font-size="11" font-weight="500" fill="#fff" stroke="#000" stroke-width="3" paint-order="stroke">Conv</text>`);
+      convLabels.push(`<text x="${L + pw - 4}" y="${ym + 4}" text-anchor="end" font-size="11" font-weight="500" fill="#fff" stroke="#000" stroke-width="3" paint-order="stroke">Convection</text>`);
     }
     k = k2;
   }
