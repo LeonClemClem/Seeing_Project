@@ -392,6 +392,19 @@ export default function Carte() {
     `run${new Date(RUN0).toISOString().slice(0, 13).replace(/[-T]/g, "")}Z_` +
     (mode === "m" ? `nuit_${night.lab.replace(/[^0-9]+/g, "-")}` : frameT(MI).toISOString().slice(0, 13).replace(/[-T]/g, "") + "h");
   const [gifBusy, setGifBusy] = useState(false);
+  /** PNG being drawn: as for the GIF, the map is drawn once more without the clickable zone labels. */
+  const [pngBusy, setPngBusy] = useState(false);
+  const paint = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+  const exportPng = async () => {
+    if (!canvas.current) return;
+    setPngBusy(true);
+    try {
+      await paint();
+      canvasToPng(canvas.current, `carte_seeing_${fileStamp()}.png`);
+    } finally {
+      setPngBusy(false);
+    }
+  };
   /** Animated GIF of the night: every hour of the chosen night, drawn one by one on the map canvas (the frames are
    * already loaded, each hour is drawn on the next paint), then the view is put back. */
   const exportGif = async () => {
@@ -402,7 +415,6 @@ export default function Carte() {
     setPlaying(false);
     setMode("h");
     const frames: ImageData[] = [];
-    const paint = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
     try {
       for (let i = night.i0; i <= night.i1; i++) {
         setMI(i);
@@ -588,7 +600,8 @@ export default function Carte() {
       if (big) label(tr(p.nom), x + 12, y - (big ? 16 : 12));
     });
     const zh: ZoneHit[] = [];
-    if (VW.la1 - VW.la0 > 12) {
+    // clickable zone labels of the domain view: not in the exported PNG / GIF
+    if (VW.la1 - VW.la0 > 12 && !gifBusy && !pngBusy) {
       cx.font = "600 13px 'IBM Plex Sans',sans-serif";
       ZONES.forEach((z, i) => {
         const [x, y] = toXY(z[1], z[2]),
@@ -644,7 +657,7 @@ export default function Carte() {
     const hkm = Math.round((VW.la1 - VW.la0) * 111.2),
       zmax = VW.la1 - VW.la0 <= ZMIN + 1e-6;
     label(tr(`${hkm} × ${km} km${zmax ? " · zoom maximal" : ""} · isolignes ${VW.la1 - VW.la0 <= FINE_VIEW_DEG ? "250" : "1000 / 2000"} m`), CW - (zmax ? 300 : 200), CH - 12);
-  }, [VW, sample, contours, geo, gmap, toXY, pub, sh, mine, MZH, newPt, role, lang]);
+  }, [VW, sample, contours, geo, gmap, toXY, pub, sh, mine, MZH, newPt, role, lang, gifBusy, pngBusy]);
 
   /* ---------- animation ---------- */
   const last = NIGHTS[NIGHTS.length - 1]?.i1 ?? NH - 1;
@@ -889,7 +902,7 @@ export default function Carte() {
               <button aria-label={tr("Dézoomer")} onClick={() => zoomAt(CW / 2, CH / 2, 1.5)}>
                 −
               </button>
-              <button title={tr("Télécharger la carte affichée (PNG)")} onClick={() => canvas.current && canvasToPng(canvas.current, `carte_seeing_${fileStamp()}.png`)}>
+              <button title={tr("Télécharger la carte affichée (PNG)")} disabled={pngBusy} onClick={() => void exportPng()}>
                 ⤓ PNG
               </button>
               <button title={tr("Télécharger l'animation des heures de la nuit choisie (GIF)")} disabled={gifBusy} onClick={() => void exportGif()}>
