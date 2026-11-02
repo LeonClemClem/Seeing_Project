@@ -23,7 +23,7 @@ import {
   sunAltAz,
   type CatObj,
 } from "../lib/sky";
-import { D2R, fmt, pad2, runLabel, turbo, turboGradient } from "../lib/util";
+import { D2R, fmt, pad2, runLabel, seeingGradient, seeingRgb } from "../lib/util";
 import { KDEF, REF } from "../mock/engine";
 import { useUi, type K3 } from "../store";
 
@@ -210,10 +210,10 @@ export default function Fisheye() {
         const alt = 90 - (r / FR) * 90,
           az = (Math.atan2(-dx, dy) / D2R + 360) % 360;
         const s = vis(alt, az) ? seeSky(fcur, alt, az) : NaN;
-        // same colours as the map: turbo, 0-10" linear
+        // same colours as the map: seeing palette, 0-10" linear
         // relief in dark brown; below ELMIN (or no value) grey
         let col: number[] =
-          alt < horizonAt(az) ? [62, 52, 42] : isNaN(s) ? [55, 62, 80] : turbo(Math.min(Math.max(s, 0), 10) / 10);
+          alt < horizonAt(az) ? [62, 52, 42] : isNaN(s) ? [55, 62, 80] : seeingRgb(Math.min(Math.max(s, 0), 10) / 10);
         if (opt.nua && vis(alt, az)) {
           // cloud veil: the more cover, the more opaque (cover^0.6: 25 % -> 0.44, 50 % -> 0.66, 100 % -> opaque, the
           // seeing hidden), light grey for thin cover, darker grey when overcast
@@ -479,7 +479,7 @@ export default function Fisheye() {
               </div>
             )}
           </div>
-          <ColorBar left={'0"'} right={'10"'} gradient={turboGradient()} />
+          <ColorBar left={'0"'} right={'10"'} gradient={seeingGradient()} />
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
             <span className="small muted">{tr("Nuit :")}</span>
             <Seg
