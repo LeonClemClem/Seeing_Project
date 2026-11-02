@@ -393,6 +393,8 @@ export default function Carte() {
     `run${new Date(RUN0).toISOString().slice(0, 13).replace(/[-T]/g, "")}Z_` +
     (mode === "m" ? `nuit_${night.lab.replace(/[^0-9]+/g, "-")}` : frameT(MI).toISOString().slice(0, 13).replace(/[-T]/g, "") + "h");
   const [gifBusy, setGifBusy] = useState(false);
+  /** GIF export progress: [frame being drawn, frame count]. */
+  const [gifProg, setGifProg] = useState<[number, number] | null>(null);
   /** PNG being drawn: as for the GIF, the map is drawn once more without the clickable zone labels. */
   const [pngBusy, setPngBusy] = useState(false);
   const exportPng = async () => {
@@ -405,8 +407,8 @@ export default function Carte() {
       setPngBusy(false);
     }
   };
-  /** Animated GIF of the night: every hour of the chosen night, drawn one by one on the map canvas (the frames are
-   * already loaded, each hour is drawn on the next paint), then the view is put back. Same speed as the animation
+  /** Animated GIF of every forecast hour of the run (all its nights), drawn one by one on the map canvas (the frames
+   * are already loaded, each hour is drawn on the next paint), then the view is put back. Same speed as the animation
    * (x1: 0.9 s per hour, x2: 0.45 s, x3: 0.3 s). */
   const exportGif = async () => {
     if (!canvas.current) return;
@@ -416,18 +418,25 @@ export default function Carte() {
     setMode("h");
     const frames: ImageData[] = [];
     try {
-      for (let i = night.i0; i <= night.i1; i++) {
+      // every forecast hour of the run, night after night (the hours the run does not cover are left out)
+      const idx = NIGHTS.flatMap((q) => Array.from({ length: q.i1 - q.i0 + 1 }, (_, k) => q.i0 + k)).filter(
+        (i) => !gmap || gmap.frames.has(Math.round((frameT(i).getTime() - RUN0) / 3600000)),
+      );
+      for (const [k, i] of idx.entries()) {
+        setGifProg([k, idx.length]);
         setMI(i);
         await paint();
         const d = frameT(i);
-        frames.push(banded(canvas.current!, hourTitle(d), hourSub(d)).getContext("2d")!.getImageData(0, 0, CW, CH + BAND));
+        frames.push(banded(canvas.current!, hourTitle(d), hourSub(d), [k, idx.length]).getContext("2d")!.getImageData(0, 0, CW, CH + BAND));
       }
-      downloadBlob(encodeGif(frames, Math.round(90 / speed)), `carte_seeing_run${new Date(RUN0).toISOString().slice(0, 13).replace(/[-T]/g, "")}Z_nuit_${night.lab.replace(/[^0-9]+/g, "-")}.gif`);
+      if (frames.length)
+        downloadBlob(encodeGif(frames, Math.round(90 / speed)), `carte_seeing_run${new Date(RUN0).toISOString().slice(0, 13).replace(/[-T]/g, "")}Z_toutes_heures.gif`);
     } finally {
       setMode(keep.mode);
       setMI(keep.MI);
       setPlaying(keep.playing);
       setGifBusy(false);
+      setGifProg(null);
     }
   };
 
@@ -922,8 +931,8 @@ export default function Carte() {
               <button title={tr("Télécharger la carte affichée (PNG)")} disabled={pngBusy} onClick={() => void exportPng()}>
                 ⤓ PNG
               </button>
-              <button title={tr("Télécharger l'animation des heures de la nuit choisie (GIF)")} disabled={gifBusy} onClick={() => void exportGif()}>
-                {gifBusy ? tr("GIF…") : "⤓ GIF"}
+              <button title={tr("Télécharger l'animation de toutes les heures prévues (GIF)")} disabled={gifBusy} onClick={() => void exportGif()}>
+                {gifBusy ? (gifProg ? `GIF ${gifProg[0] + 1}/${gifProg[1]}` : tr("GIF…")) : "⤓ GIF"}
               </button>
             </div>
           </div>

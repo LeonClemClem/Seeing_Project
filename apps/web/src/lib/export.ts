@@ -13,8 +13,9 @@ export function downloadBlob(blob: Blob, name: string) {
 
 /** Height of the band above the map / fisheye in the exported PNG / GIF (the image itself is not covered). */
 export const BAND = 64;
-/** A canvas under a band with the day and hour large ("Samedi 20h00 TU") and the date / run below. */
-export function banded(src: HTMLCanvasElement, title: string, sub: string): HTMLCanvasElement {
+/** A canvas under a band with the day and hour large ("Samedi 20h00 TU") and the date / run below. `progress`
+ * (GIF frames): [frame index, frame count], drawn as a time bar along the bottom of the band. */
+export function banded(src: HTMLCanvasElement, title: string, sub: string, progress?: [number, number]): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = src.width;
   c.height = src.height + BAND;
@@ -27,6 +28,15 @@ export function banded(src: HTMLCanvasElement, title: string, sub: string): HTML
   g.fillStyle = "#c9d3e6";
   g.font = "500 12px 'IBM Plex Sans',sans-serif";
   g.fillText(sub, 14, 54);
+  if (progress && progress[1] > 1) {
+    const [k, n] = progress,
+      x0 = 14,
+      w = c.width - 28;
+    g.fillStyle = "rgba(255,255,255,.18)";
+    g.fillRect(x0, BAND - 5, w, 3);
+    g.fillStyle = "#f2c14e";
+    g.fillRect(x0, BAND - 5, (w * (k + 1)) / n, 3);
+  }
   g.drawImage(src, 0, BAND);
   return c;
 }
