@@ -63,7 +63,7 @@ export function APropos() {
             <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
               <li>{tr("Météo-France, pour le modèle AROME")}</li>
               <li>Christian Viladrich</li>
-              <li>Tom Williams</li>
+              <li>Albert</li>
               <li>Thomas Hossler</li>
             </ul>
           </div>
