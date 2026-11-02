@@ -210,10 +210,10 @@ export default function Fisheye() {
         const alt = 90 - (r / FR) * 90,
           az = (Math.atan2(-dx, dy) / D2R + 360) % 360;
         const s = vis(alt, az) ? seeSky(fcur, alt, az) : NaN;
-        // same colours as the map: turbo, 0-10" with a fixed square-root stretch
+        // same colours as the map: turbo, 0-10" linear
         // relief in dark brown; below ELMIN (or no value) grey
         let col: number[] =
-          alt < horizonAt(az) ? [62, 52, 42] : isNaN(s) ? [55, 62, 80] : turbo(Math.sqrt(Math.min(Math.max(s, 0), 10) / 10));
+          alt < horizonAt(az) ? [62, 52, 42] : isNaN(s) ? [55, 62, 80] : turbo(Math.min(Math.max(s, 0), 10) / 10);
         if (opt.nua && vis(alt, az)) {
           // cloud veil: the more cover, the more opaque (cover^0.6: 25 % -> 0.44, 50 % -> 0.66, 100 % -> opaque, the
           // seeing hidden), light grey for thin cover, darker grey when overcast

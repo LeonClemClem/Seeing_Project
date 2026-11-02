@@ -32,10 +32,10 @@ const LEADMAX = 51;
 const KGLOB = [1, 30, 0.1];
 const JS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
 const LUT = [...Array(256)].map((_, k) => turbo(k / 255));
-/** Colour of a seeing value: turbo on a fixed 0-10" range with a fixed square-root stretch, the same for
- * every run so that nights can be compared (1" -> 32 %, 2" -> 45 %, 3" -> 55 %, 5" -> 71 % of the scale). */
+/** Colour of a seeing value: turbo on a fixed 0-10" range, linear (1" -> 10 %, 5" -> 50 % of the scale), the same
+ * for every run so that nights can be compared, and the same as the fisheye. */
 const SEE_TOP = 10;
-const seeColor = (s: number) => LUT[Math.round(Math.sqrt(Math.min(Math.max(s, 0), SEE_TOP) / SEE_TOP) * 255)]!;
+const seeColor = (s: number) => LUT[Math.round((Math.min(Math.max(s, 0), SEE_TOP) / SEE_TOP) * 255)]!;
 /** Views taller than this show the large-zone style (1000 / 2000 m contours), else 250 m contours. */
 const FINE_VIEW_DEG = 4;
 
