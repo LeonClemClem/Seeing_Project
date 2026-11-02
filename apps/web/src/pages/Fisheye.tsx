@@ -215,11 +215,12 @@ export default function Fisheye() {
         let col: number[] =
           alt < horizonAt(az) ? [62, 52, 42] : isNaN(s) ? [55, 62, 80] : turbo(Math.sqrt(Math.min(Math.max(s, 0), 10) / 10));
         if (opt.nua && vis(alt, az)) {
-          // grey veil as research/ciel_seeing.py: light grey and see-through for thin cover, darker when overcast
+          // cloud veil: the more cover, the more opaque (cover^0.6: 25 % -> 0.44, 50 % -> 0.66, 100 % -> opaque, the
+          // seeing hidden), light grey for thin cover, darker grey when overcast
           const cc = Math.min(Math.max(cloudSky(fcur, alt, az), 0), 1);
           if (cc > 0) {
-            const a = 0.82 * cc,
-              grey = [204 - 97 * cc, 204 - 97 * cc, 214 - 94 * cc];
+            const a = Math.pow(cc, 0.6),
+              grey = [222 - 92 * cc, 224 - 92 * cc, 230 - 88 * cc];
             col = col.map((v, k) => v * (1 - a) + grey[k]! * a);
           }
         }
