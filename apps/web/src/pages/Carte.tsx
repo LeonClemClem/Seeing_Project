@@ -404,7 +404,7 @@ export default function Carte() {
     setPngBusy(true);
     try {
       await paint();
-      canvasToPng(banded(canvas.current, exportTitle, exportSub, undefined, bandDays(shownDays)), `carte_seeing_${fileStamp()}.png`);
+      canvasToPng(banded(canvas.current, shownBand, shownInfo), `carte_seeing_${fileStamp()}.png`);
     } finally {
       setPngBusy(false);
     }
@@ -430,7 +430,7 @@ export default function Carte() {
         await paint();
         const d = frameT(i);
         frames.push(
-          banded(canvas.current!, hourTitle(d), hourSub(d), [k, idx.length], bandDays([dayKey(d)])).getContext("2d")!.getImageData(0, 0, CW, CH + BAND),
+          banded(canvas.current!, bandDays([dayKey(d)], bandHour(d)), infoLine, [k, idx.length]).getContext("2d")!.getImageData(0, 0, CW, CH + BAND),
         );
       }
       if (frames.length)
@@ -540,23 +540,22 @@ export default function Carte() {
   const ddmm = (d: Date) => `${pad2(d.getUTCDate())}/${pad2(d.getUTCMonth() + 1)}`;
   const nightStart = frameT(night.i0),
     nightNext = new Date(nightStart.getTime() + 24 * 3600000);
-  const hourTitle = (d: Date) => `${dayName(d)} ${pad2(d.getUTCHours())}h00 TU`;
   const layerTxt = layer === "bl" ? ` · ${tr("couche limite seule")}` : layer === "haut" ? ` · ${tr("au-dessus de la couche limite seule")}` : "";
-  const hourSub = (d: Date) => `${ddmm(d)}/${d.getUTCFullYear()} · Seeing AROME V2bd${layerTxt} · run ${runL}`;
   // the days of the run side by side, the one shown highlighted (both days of the night for the night mean)
   const dayKey = (d: Date) => d.toISOString().slice(0, 10);
   const runDays = [
     ...new Map(NIGHTS.flatMap((q) => [frameT(q.i0), frameT(q.i1)]).map((d) => [dayKey(d), d] as const)).values(),
   ];
-  const bandDays = (on: string[]) => runDays.map((d) => ({ label: dayName(d), on: on.includes(dayKey(d)) }));
+  /** Boxes of the band: every day of the run, the ones in `on` highlighted with `hour`. */
+  const bandDays = (on: string[], hour: string) =>
+    runDays.map((d) => ({ day: dayName(d), date: `${ddmm(d)}/${d.getUTCFullYear()}`, hour, on: on.includes(dayKey(d)) }));
+  const infoLine = `Seeing AROME V2bd${layerTxt} · run ${runL}`;
+  const bandHour = (d: Date) => `${pad2(d.getUTCHours())}h00 TU`;
   const shownDays = mode === "m" ? [dayKey(nightStart), dayKey(nightNext)] : [dayKey(fd)];
   const lastI = NIGHTS[NIGHTS.length - 1]?.i1 ?? 0;
-  const exportTitle =
-    mode === "m" ? `${tr("Nuit de")} ${dayName(nightStart).toLowerCase()} ${tr("à")} ${dayName(nightNext).toLowerCase()}` : hourTitle(fd);
-  const exportSub =
-    mode === "m"
-      ? `${ddmm(nightStart)} → ${ddmm(nightNext)}/${nightNext.getUTCFullYear()} · ${tr("moyenne")} ${meanRange} · Seeing AROME V2bd${layerTxt} · run ${runL}`
-      : hourSub(fd);
+  // the band shown: the hour (or, for the night mean, the averaged range on the two days of the night)
+  const shownBand = bandDays(shownDays, mode === "m" ? `${tr("moyenne")} ${meanRange}` : bandHour(fd));
+  const shownInfo = (mode === "m" ? `${tr("Moyenne de la nuit")} · ` : "") + infoLine;
 
   /* ---------- drawing ---------- */
   useEffect(() => {
@@ -967,7 +966,7 @@ export default function Carte() {
               </button>
             </div>
           </div>
-          <DateBand title={exportTitle} sub={exportSub} days={bandDays(shownDays)} progress={mode === "h" && lastI > 0 ? MI / lastI : null} />
+          <DateBand days={shownBand} info={shownInfo} progress={mode === "h" && lastI > 0 ? MI / lastI : null} />
           <canvas
             ref={canvas}
             width={CW}

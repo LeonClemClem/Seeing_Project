@@ -200,25 +200,22 @@ export default function Fisheye() {
   const [busy, setBusy] = useState(false);
   /** GIF export progress: [frame being drawn, frame count]. */
   const [prog, setProg] = useState<[number, number] | null>(null);
-  // (titles from the time itself: during the GIF the night shown changes)
-  const title = (ms: number) => {
-    const d = new Date(ms);
-    return `${tr(JOURS[d.getUTCDay()]!)} ${pad2(d.getUTCHours())}h00 TU`;
-  };
-  const sub = (ms: number) => {
-    const d = new Date(ms);
-    return `${pad2(d.getUTCDate())}/${pad2(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} · ${tr(place.nom)} · Seeing AROME V2bd${fe ? " · run " + runLabel(Date.parse(fe.run_time)) : ""}`;
-  };
   const stamp = (ms: number) => new Date(ms).toISOString().slice(0, 13).replace(/[-T]/g, "");
   const fileName = (ext: string, ms: number) => `fisheye_${place.nom.replace(/[^A-Za-z0-9]+/g, "_")}_${stamp(ms)}h.${ext}`;
   // the days of the fisheye's nights side by side, the one shown highlighted
   const dayKey = (ms: number) => new Date(ms).toISOString().slice(0, 10);
   const bandDays = (ms: number) =>
-    Array.from({ length: nights.length + 1 }, (_, k) => T0 + k * 86400000).map((d) => ({
-      label: tr(JOURS[new Date(d).getUTCDay()]!),
-      on: dayKey(d) === dayKey(ms),
-    }));
-  const exportPng = () => cv.current && canvasToPng(banded(cv.current, title(t), sub(t), undefined, bandDays(t)), fileName("png", t));
+    Array.from({ length: nights.length + 1 }, (_, k) => T0 + k * 86400000).map((d) => {
+      const dd = new Date(d);
+      return {
+        day: tr(JOURS[dd.getUTCDay()]!),
+        date: `${pad2(dd.getUTCDate())}/${pad2(dd.getUTCMonth() + 1)}/${dd.getUTCFullYear()}`,
+        hour: `${pad2(new Date(ms).getUTCHours())}h00 TU`,
+        on: dayKey(d) === dayKey(ms),
+      };
+    });
+  const info = `${tr(place.nom)} · Seeing AROME V2bd${fe ? " · run " + runLabel(Date.parse(fe.run_time)) : ""}`;
+  const exportPng = () => cv.current && canvasToPng(banded(cv.current, bandDays(t), info), fileName("png", t));
   /** Animated GIF of every forecast hour of the run (19h-05h of each of its nights), at the speed of the animation
    * (x1: 0.9 s per hour, x2: 0.45 s, x3: 0.3 s). */
   const exportGif = async () => {
@@ -237,7 +234,7 @@ export default function Fisheye() {
         setFNI(n);
         setFcur(i);
         await nextPaint();
-        frames.push(banded(cv.current, title(ms), sub(ms), [k, hours.length], bandDays(ms)).getContext("2d")!.getImageData(0, 0, FN, FN + BAND));
+        frames.push(banded(cv.current, bandDays(ms), info, [k, hours.length]).getContext("2d")!.getImageData(0, 0, FN, FN + BAND));
       }
       if (frames.length) downloadBlob(encodeGif(frames, Math.round(90 / speed)), fileName("gif", T0));
     } finally {
@@ -480,7 +477,7 @@ export default function Fisheye() {
       </p>
       <div className="grid2">
         <div className="panel">
-          <DateBand title={title(t)} sub={sub(t)} days={bandDays(t)} progress={(FNI * 11 + fcur) / (nights.length * 11 - 1)} />
+          <DateBand days={bandDays(t)} info={info} progress={(FNI * 11 + fcur) / (nights.length * 11 - 1)} />
           <div style={{ position: "relative" }} onMouseLeave={() => setHov(null)}>
             <canvas
               ref={cv}

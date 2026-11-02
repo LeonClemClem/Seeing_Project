@@ -12,53 +12,64 @@ export function downloadBlob(blob: Blob, name: string) {
 }
 
 /** Height of the band above the map / fisheye in the exported PNG / GIF (the image itself is not covered). */
-export const BAND = 64;
-/** One day of the band (the days of the run side by side, the one shown highlighted). */
+export const BAND = 92;
+/** One day of the band: the days of the run side by side, the one shown highlighted with the hour. */
 export interface BandDay {
-  label: string;
+  day: string;
+  date: string;
+  /** hour shown ("02h00 TU", or the averaged range for the night mean), on the highlighted day(s) */
+  hour?: string;
   on: boolean;
 }
-/** A canvas under a band with the day and hour large ("Samedi 20h00 TU") and the date / run below, the days of the
- * run side by side on the right (the one shown highlighted). `progress` (GIF frames): [frame index, frame count],
- * drawn as a time bar along the bottom of the band. */
-export function banded(src: HTMLCanvasElement, title: string, sub: string, progress?: [number, number], days?: BandDay[]): HTMLCanvasElement {
+export const BAND_BLUE = "#4f9be8";
+/** A canvas under the date band: one box per day of the run (blue outlines; the day shown highlighted, with the hour
+ * large), the information line below, and the yellow time bar for the GIF frames (`progress`: [index, count]). */
+export function banded(src: HTMLCanvasElement, days: BandDay[], info: string, progress?: [number, number]): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = src.width;
   c.height = src.height + BAND;
   const g = c.getContext("2d")!;
   g.fillStyle = "#0b1220";
   g.fillRect(0, 0, c.width, c.height);
-  g.fillStyle = "#fff";
-  g.font = "600 26px 'IBM Plex Sans',sans-serif";
-  g.fillText(title, 14, 33);
+  const n = Math.max(1, days.length),
+    gap = 8,
+    x0 = 10,
+    w = (c.width - 2 * x0 - gap * (n - 1)) / n,
+    y = 8,
+    h = 50;
+  days.forEach((d, i) => {
+    const x = x0 + i * (w + gap);
+    g.globalAlpha = d.on ? 1 : 0.5;
+    g.fillStyle = d.on ? "rgba(79,155,232,.18)" : "rgba(255,255,255,.03)";
+    g.strokeStyle = BAND_BLUE;
+    g.lineWidth = d.on ? 2.5 : 1;
+    g.beginPath();
+    g.roundRect(x, y, w, h, 6);
+    g.fill();
+    g.stroke();
+    g.fillStyle = "#fff";
+    g.font = "600 20px 'IBM Plex Sans',sans-serif";
+    g.fillText(d.day, x + 10, y + 23);
+    if (d.on && d.hour) {
+      const dw = g.measureText(d.day + " ").width;
+      g.fillStyle = "#f2c14e";
+      g.fillText(d.hour, x + 10 + dw, y + 23);
+    }
+    g.fillStyle = "#c9d3e6";
+    g.font = "500 11px 'IBM Plex Sans',sans-serif";
+    g.fillText(d.date, x + 10, y + 41);
+    g.globalAlpha = 1;
+  });
   g.fillStyle = "#c9d3e6";
-  g.font = "500 12px 'IBM Plex Sans',sans-serif";
-  g.fillText(sub, 14, 54);
-  if (days?.length) {
-    g.font = "600 13px 'IBM Plex Sans',sans-serif";
-    const ws = days.map((d) => g.measureText(d.label).width + 18);
-    let x = c.width - 14 - ws.reduce((a, b) => a + b + 6, -6);
-    days.forEach((d, i) => {
-      g.fillStyle = d.on ? "#f2c14e" : "rgba(255,255,255,.08)";
-      g.strokeStyle = d.on ? "#f2c14e" : "rgba(255,255,255,.35)";
-      g.lineWidth = 1;
-      g.beginPath();
-      g.roundRect(x, 14, ws[i]!, 26, 6);
-      g.fill();
-      g.stroke();
-      g.fillStyle = d.on ? "#000" : "#c9d3e6";
-      g.fillText(d.label, x + 9, 32);
-      x += ws[i]! + 6;
-    });
-  }
+  g.font = "500 11px 'IBM Plex Sans',sans-serif";
+  g.fillText(info, x0, y + h + 17);
   if (progress && progress[1] > 1) {
-    const [k, n] = progress,
-      x0 = 14,
-      w = c.width - 28;
+    const [k, m] = progress,
+      bw = c.width - 2 * x0;
     g.fillStyle = "rgba(255,255,255,.18)";
-    g.fillRect(x0, BAND - 5, w, 3);
+    g.fillRect(x0, BAND - 6, bw, 3);
     g.fillStyle = "#f2c14e";
-    g.fillRect(x0, BAND - 5, (w * (k + 1)) / n, 3);
+    g.fillRect(x0, BAND - 6, (bw * (k + 1)) / m, 3);
   }
   g.drawImage(src, 0, BAND);
   return c;
