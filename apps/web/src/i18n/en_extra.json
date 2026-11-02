@@ -256,5 +256,15 @@
 "Mot de passe": "Password",
 "Retard de Météo-France : le run": "Météo-France is late: run",
 "n'est pas encore disponible, la prévision vient du run": "is not available yet, the forecast comes from run",
-"âgé de": "age"
+"âgé de": "age",
+"Seeing lu sur la carte globale du dernier run (mailles de ~5 km, K de la carte, nuits seulement), sans créer de lieu. Le point devient le lieu affiché dans les autres onglets ; pour le Cn², l'historique et la calibration, enregistre-le comme lieu.": "Seeing read on the global map of the latest run (~5 km cells, map K, nights only), without creating a place. The point becomes the place shown in the other tabs; for the Cn², the history and the calibration, save it as a place.",
+"Enregistrer comme lieu": "Save as a place",
+"Le point est aussi affiché dans": "The point is also shown in",
+"et": "and",
+"Enregistrer ce point comme lieu": "Save this point as a place",
+"Prévision ponctuelle": "One-off forecast",
+"Point de la carte (prévision ponctuelle) : seeing de la carte globale du dernier run, avec les K de la carte.": "Point of the map (one-off forecast): seeing of the global map of the latest run, with the map K.",
+"Cn², historique, corrélation et variables du modèle": "Cn², history, correlation and model variables",
+"Ces panneaux demandent un lieu enregistré : ses prévisions sont alors calculées à chaque run et comparées à tes mesures.": "These panels need a saved place: its forecasts are then computed at every run and compared with your measurements.",
+"Un point de la carte n'a ni mesures ni K à caler.": "A point of the map has no measurements nor K to fit."
 }

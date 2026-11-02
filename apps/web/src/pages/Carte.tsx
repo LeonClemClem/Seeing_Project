@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { useLocation } from "react-router-dom";
 
+import { PointForm } from "../components/PointForecast";
 import { ColorBar, Seg } from "../components/ui";
 import { useUser } from "../data/auth";
 import { MAX_PLACES, selectPlace, siteToPlace, useCurrentPlace, usePlaceActions, usePlaces } from "../data/places";
@@ -318,7 +319,7 @@ export default function Carte() {
   const [MZH, setMZH] = useState(-1);
   const [tip, setTip] = useState<string | null>(null);
   const loc = useLocation();
-  // "Créer un lieu ici" of the one-off forecast (Prévision) brings the coordinates
+  // "Enregistrer ce point comme lieu" (Prévision, Calibrer for a point of the map) brings the coordinates
   const st0 = loc.state as { newPlace?: boolean; lat?: number; lon?: number } | null;
   const [newPt, setNewPt] = useState<[number, number] | null>(() => (st0?.lat != null && st0.lon != null ? [st0.lat, st0.lon] : null));
   const [showNew, setShowNew] = useState(() => !!st0?.newPlace);
@@ -798,6 +799,13 @@ export default function Carte() {
           "Seeing V2bd sur tout le domaine AROME (France, îles Britanniques, péninsule Ibérique, Benelux, Allemagne, Alpes, Italie), recalculé toutes les 6 heures, à chaque run principal d'AROME (00Z, 06Z, 12Z, 18Z). Sur la vue du domaine, clique n'importe où dans une zone (France, Royaume-Uni…) pour zoomer dessus ; une fois zoomé, survole la carte pour lire une maille et clique pour créer un lieu.",
         )}
       </p>
+      <PointForm
+        onSave={(la, lo) => {
+          setNewPt([la, lo]);
+          setShowNew(true);
+          setNl((n) => ({ ...n, lat: la.toFixed(5), lon: lo.toFixed(5) }));
+        }}
+      />
       <div className="grid2">
         <div className="panel">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>

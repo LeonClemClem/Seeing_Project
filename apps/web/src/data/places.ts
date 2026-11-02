@@ -17,7 +17,8 @@ export interface Place {
   lat: number;
   lon: number;
   alt: number | null;
-  kind: "pub" | "mine";
+  /** "point": coordinates of the one-off forecast (Carte), not saved: map values only. */
+  kind: "pub" | "mine" | "point";
   /** API slug for public sites. */
   slug?: string;
   /** API site shared by its team with the community (as opposed to a public observatory). */
@@ -70,9 +71,15 @@ export function useSites() {
   return useQuery({ queryKey: [...queryKeys.sites, user?.id ?? 0], queryFn: api.sites, placeholderData: keepPreviousData });
 }
 
-export function usePlaces(): { pub: Place[]; sh: Place[]; hid: Place[]; mine: Place[]; all: Place[] } {
+/** Place of the one-off forecast at coordinates: the global maps' values at that point, with the map K. */
+export const pointPlace = (lat: number, lon: number): Place => ({
+  id: "point", nom: `Point ${lat.toFixed(3)} N ${lon.toFixed(3)} E`, lat, lon, alt: null, kind: "point", K: [1, 30, 0.1], real: true, f: 1,
+});
+
+export function usePlaces(): { pub: Place[]; sh: Place[]; hid: Place[]; mine: Place[]; pt: Place | null; all: Place[] } {
   const sites = useSites();
   const user = useUser();
+  const point = useUi((s) => s.point);
   return useMemo(() => {
     const api = (sites.data ?? []).map(siteToPlace);
     const own = api.filter((p) => p.kind === "mine"),
@@ -82,8 +89,9 @@ export function usePlaces(): { pub: Place[]; sh: Place[]; hid: Place[]; mine: Pl
       hid = others.filter((p) => p.hidden);
     // Only real places: a logged-out visitor has no personal place (no example places).
     const mine = user ? own : [];
-    return { pub, sh, hid, mine, all: [...others, ...mine] };
-  }, [sites.data, user]);
+    const pt = point ? pointPlace(point.lat, point.lon) : null;
+    return { pub, sh, hid, mine, pt, all: [...others, ...mine, ...(pt ? [pt] : [])] };
+  }, [sites.data, user, point]);
 }
 
 export const MAX_PLACES = 5;
@@ -118,7 +126,7 @@ export function useCurrentPlace(): Place {
 /** K of public and shared sites are visible to the administrator only (and to the team for its own site);
  * everyone sees the K of their own places. */
 export const kHidden = (p: Place, role: Role) =>
-  p.kind === "pub" && role !== "admin" && !(role === "team" && p.slug === TEAM_SITE);
+  p.kind === "point" || (p.kind === "pub" && role !== "admin" && !(role === "team" && p.slug === TEAM_SITE));
 
 export const kTxt = (K: K3, hid: boolean, f: (v: number) => string | number = (v) => v) =>
   hid ? "" : `K_TKE = ${f(K[0])}  K_CIS = ${f(K[1])}  K_conv = ${f(K[2])}`;

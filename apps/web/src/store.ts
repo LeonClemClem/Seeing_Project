@@ -9,7 +9,7 @@ export type Role = "user" | "team" | "admin";
 export interface UiState {
   lang: Lang;
   role: Role;
-  /** Selected place id: `pub:<slug>` (API site) or `mine:<id>` (mock personal place). */
+  /** Selected place id: `pub:<slug>` (API site), `mine:<id>` (personal place) or `point` (one-off forecast). */
   place: string;
   /** K in use, K fitted for the place, and whether the K in use are the fitted ones ("A") or manual ("M"). */
   K: K3;
@@ -21,6 +21,8 @@ export interface UiState {
   corrf: { horaire: boolean; nuit: boolean; brut: boolean };
   /** Night highlighted in the history and the correlation (date of the evening, UTC), or null. */
   selNight: string | null;
+  /** Point of the one-off forecast (Carte), selectable as the place `point` in every tab; null before any. */
+  point: { lat: number; lon: number } | null;
 }
 
 function initialLang(): Lang {
@@ -42,6 +44,7 @@ let state: UiState = {
   mesf: { brut: true, horaire: true, courbe: true },
   corrf: { horaire: true, nuit: true, brut: true },
   selNight: null,
+  point: null,
 };
 setTrLang(state.lang);
 
