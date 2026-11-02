@@ -17,6 +17,7 @@ import { useSiteHistory } from "../data/forecast";
 import { useNavigate } from "react-router-dom";
 
 import { kHidden, selectPlace, TEAM_SITE, useCurrentPlace, usePlaces, type Place } from "../data/places";
+import { PointNotice } from "../components/PointForecast";
 import { tr } from "../i18n";
 import { parseCsv, type CsvOpts, type DateFmt, type NightPt } from "../lib/csv";
 import { C_AR, C_DAY, C_LINE, C_OBS, C_OBSD, C_TXT, dnText, fmt, pl, yaxis } from "../lib/util";
@@ -225,7 +226,23 @@ function calCorr<C>(
 /** "28/10" of a night key "2026-10-28". */
 const ddmmOf = (n: string) => `${n.slice(8, 10)}/${n.slice(5, 7)}`;
 
-export default function Calibrer() {
+/** A point of the map (one-off forecast) has no measurements nor K to fit: Calibrer asks to save it as a place. */
+export default function CalibrerPage() {
+  const place = useCurrentPlace();
+  if (place.kind !== "point") return <Calibrer />;
+  return (
+    <section>
+      <h1>
+        {tr("Calibrer")} · {place.nom}
+      </h1>
+      <div className="panel">
+        <PointNotice place={place} text="Un point de la carte n'a ni mesures ni K à caler." />
+      </div>
+    </section>
+  );
+}
+
+function Calibrer() {
   const place = useCurrentPlace();
   const role = useUi((s) => s.role);
   const K = useUi((s) => s.K);

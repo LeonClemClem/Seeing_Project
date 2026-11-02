@@ -34,7 +34,7 @@ export default function Header() {
   const role = useUi((s) => s.role);
   const K = useUi((s) => s.K);
   const kmode = useUi((s) => s.kmode);
-  const { pub, sh, hid: hiddenSites, mine, all } = usePlaces();
+  const { pub, sh, hid: hiddenSites, mine, pt, all } = usePlaces();
   const place = useCurrentPlace();
   const me = useMe();
   useSyncRole();
@@ -116,6 +116,11 @@ export default function Header() {
                     {p.nom}
                   </option>
                 ))}
+              </optgroup>
+            )}
+            {pt && (
+              <optgroup label={tr("Prévision ponctuelle")}>
+                <option value={pt.id}>{pt.nom}</option>
               </optgroup>
             )}
             <optgroup label={tr("Mes lieux")}>
