@@ -33,6 +33,7 @@ const NIGHT_H = [19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5],
 const LEADMAX = 51;
 const KGLOB = [1, 30, 0.1];
 const JS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
+const JOURS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const LUT = [...Array(256)].map((_, k) => seeingRgb(k / 255));
 /** Colour of a seeing value: the seeing palette (seeingRgb) on a fixed 0-10" range, linear (1" -> 10 %, 5" -> 50 % of
  * the scale), the same for every run so that nights can be compared, and the same as the fisheye. */
@@ -487,6 +488,35 @@ export default function Carte() {
   const LA = useCallback((y: number) => VW.la1 - (y / CH) * (VW.la1 - VW.la0), [VW]);
   const LO = useCallback((x: number) => VW.lo0 + (x / CW) * (VW.lo1 - VW.lo0), [VW]);
 
+  const fd = frameT(MI),
+    lead = Math.round((fd.getTime() - RUN0) / 3600000);
+  // Hour range really averaged (the run may stop before the end of the night).
+  const meanRange = (() => {
+    const h = real?.hours ?? [];
+    if (!real) return "20h–04h TU";
+    if (!h.length) return "aucune heure couverte par le run";
+    const txt = `${pad2(h[0]!)}h–${pad2(h[h.length - 1]!)}h TU`;
+    return h.length < real.expected ? `${txt}, run incomplet : ${h.length} h sur ${real.expected}` : txt;
+  })();
+  const hourLabel =
+    mode === "m"
+      ? tr(`moyenne nuit du ${night.lab} (${meanRange})`)
+      : tr(`${JS[fd.getUTCDay()]} ${pad2(fd.getUTCDate())}/${pad2(fd.getUTCMonth() + 1)} · ${pad2(fd.getUTCHours())}h TU · +${lead} h`) +
+        (real && !real.hours.length ? tr(" · pas de prévision à cette heure") : "");
+  const runL = runLabel(RUN0);
+  // title of the exported PNG / GIF: the day and the hour large, the rest below
+  const dayName = (d: Date) => tr(JOURS[d.getUTCDay()]!);
+  const ddmm = (d: Date) => `${pad2(d.getUTCDate())}/${pad2(d.getUTCMonth() + 1)}`;
+  const nightStart = frameT(night.i0),
+    nightNext = new Date(nightStart.getTime() + 24 * 3600000);
+  const exportTitle =
+    mode === "m"
+      ? `${tr("Nuit de")} ${dayName(nightStart).toLowerCase()} ${tr("à")} ${dayName(nightNext).toLowerCase()}`
+      : `${dayName(fd)} ${pad2(fd.getUTCHours())}h00 TU`;
+  const exportSub =
+    (mode === "m" ? `${ddmm(nightStart)} → ${ddmm(nightNext)}/${nightNext.getUTCFullYear()} · ${tr("moyenne")} ${meanRange}` : `${ddmm(fd)}/${fd.getUTCFullYear()}`) +
+    ` · Seeing AROME V2bd · run ${runL}`;
+
   /* ---------- drawing ---------- */
   useEffect(() => {
     const cv = canvas.current;
@@ -648,16 +678,41 @@ export default function Carte() {
       cx.stroke();
     }
     const km = Math.round((VW.lo1 - VW.lo0) * 111.32 * Math.cos(((VW.la0 + VW.la1) / 2) * D2R));
-    label(
-      tr("Calibration globale (administrateur)") +
-        (role === "admin" ? ` · K_TKE = ${fmt(KGLOB[0]!)}  K_CIS = ${fmt(KGLOB[1]!)}  K_conv = ${fmt(KGLOB[2]!)}` : ""),
-      10,
-      CH - 12,
-    );
+    const exporting = gifBusy || pngBusy;
+    if (!exporting)
+      label(
+        tr("Calibration globale (administrateur)") +
+          (role === "admin" ? ` · K_TKE = ${fmt(KGLOB[0]!)}  K_CIS = ${fmt(KGLOB[1]!)}  K_conv = ${fmt(KGLOB[2]!)}` : ""),
+        10,
+        CH - 12,
+      );
+    else {
+      // exported PNG / GIF: no K; the day and hour large in a box at the top left ("Samedi 20h00 TU"), the date,
+      // the mean range and the run below
+      const big = "600 24px 'IBM Plex Sans',sans-serif",
+        small = "500 12px 'IBM Plex Sans',sans-serif";
+      cx.font = big;
+      const wb = cx.measureText(exportTitle).width;
+      cx.font = small;
+      const w = Math.max(wb, cx.measureText(exportSub).width) + 24;
+      cx.fillStyle = "rgba(10,15,29,.86)";
+      cx.strokeStyle = "rgba(255,255,255,.8)";
+      cx.lineWidth = 1;
+      cx.beginPath();
+      cx.roundRect(10, 10, w, 60, 7);
+      cx.fill();
+      cx.stroke();
+      cx.fillStyle = "#fff";
+      cx.font = big;
+      cx.fillText(exportTitle, 22, 39);
+      cx.fillStyle = "#c9d3e6";
+      cx.font = small;
+      cx.fillText(exportSub, 22, 59);
+    }
     const hkm = Math.round((VW.la1 - VW.la0) * 111.2),
       zmax = VW.la1 - VW.la0 <= ZMIN + 1e-6;
     label(tr(`${hkm} × ${km} km${zmax ? " · zoom maximal" : ""} · isolignes ${VW.la1 - VW.la0 <= FINE_VIEW_DEG ? "250" : "1000 / 2000"} m`), CW - (zmax ? 300 : 200), CH - 12);
-  }, [VW, sample, contours, geo, gmap, toXY, pub, sh, mine, MZH, newPt, role, lang, gifBusy, pngBusy]);
+  }, [VW, sample, contours, geo, gmap, toXY, pub, sh, mine, MZH, newPt, role, lang, gifBusy, pngBusy, exportTitle, exportSub]);
 
   /* ---------- animation ---------- */
   const last = NIGHTS[NIGHTS.length - 1]?.i1 ?? NH - 1;
@@ -827,23 +882,7 @@ export default function Carte() {
     );
   };
 
-  const fd = frameT(MI),
-    lead = Math.round((fd.getTime() - RUN0) / 3600000);
-  // Hour range really averaged (the run may stop before the end of the night).
-  const meanRange = (() => {
-    const h = real?.hours ?? [];
-    if (!real) return "20h–04h TU";
-    if (!h.length) return "aucune heure couverte par le run";
-    const txt = `${pad2(h[0]!)}h–${pad2(h[h.length - 1]!)}h TU`;
-    return h.length < real.expected ? `${txt}, run incomplet : ${h.length} h sur ${real.expected}` : txt;
-  })();
-  const hourLabel =
-    mode === "m"
-      ? tr(`moyenne nuit du ${night.lab} (${meanRange})`)
-      : tr(`${JS[fd.getUTCDay()]} ${pad2(fd.getUTCDate())}/${pad2(fd.getUTCMonth() + 1)} · ${pad2(fd.getUTCHours())}h TU · +${lead} h`) +
-        (real && !real.hours.length ? tr(" · pas de prévision à cette heure") : "");
-  const runL = runLabel(RUN0),
-    endL = new Date(RUN0 + LEADMAX * 3600000);
+  const endL = new Date(RUN0 + LEADMAX * 3600000);
   const nextRun = pad2(new Date(RUN0 + 6 * 3600000).getUTCHours()) + "Z";
   const nlInDomain = newPt ? inDomain(newPt[0], newPt[1]) : false;
 
