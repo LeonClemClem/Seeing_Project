@@ -1,9 +1,10 @@
 /**
  * Global seeing map (canvas): only real data. The maps of the latest run (GET /api/map, V2bd over the
- * whole AROME grid, land and sea, night hours 19h-05h UTC, mean of the night 20h-04h) and the AROME
- * orography drawn as in research/carte_seeing.py: coastline = 1 m contour of the 5x5-median relief,
- * relief contours (1000 / 2000 m in white on large views, every 250 m with labels when zoomed), cities.
+ * whole AROME grid, land and sea, night hours 19h-05h UTC, mean of the night 20h-04h), the real coastlines and
+ * land borders (Natural Earth 1:10m, public/geo/lines.json, at every zoom), the AROME relief contours (1000 / 2000 m
+ * in white on large views, every 250 m with labels when zoomed) and cities.
  */
+import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { useLocation } from "react-router-dom";
 
@@ -263,6 +264,33 @@ function PinIcon({ kind }: { kind: PinKind }) {
 
 type ZoneHit = [x: number, y: number, w: number, h: number, i: number];
 
+/** Coastlines and land borders (Natural Earth 1:10m clipped to the AROME domain, scripts/geo_lines.py) as segments
+ * [lat1, lon1, lat2, lon2, ...] like contourSegs. The AROME relief is smoothed (its 1 m contour runs kilometres out
+ * at sea and closed the strait of Bonifacio): the map draws the real coasts instead. */
+interface GeoLines {
+  coast: Float32Array;
+  borders: Float32Array;
+}
+function useGeoLines(): GeoLines | null {
+  const q = useQuery({
+    queryKey: ["geo-lines"],
+    queryFn: async () => {
+      const res = await fetch("/geo/lines.json");
+      if (!res.ok) throw new Error(res.statusText);
+      const d = (await res.json()) as { coast: number[][]; borders: number[][] };
+      const segs = (lines: number[][]) => {
+        const out: number[] = [];
+        for (const l of lines) for (let i = 0; i + 3 < l.length; i += 2) out.push(l[i + 1]!, l[i]!, l[i + 3]!, l[i + 2]!);
+        return Float32Array.from(out);
+      };
+      return { coast: segs(d.coast), borders: segs(d.borders) };
+    },
+    staleTime: Infinity,
+    retry: 1,
+  });
+  return q.data ?? null;
+}
+
 /** Bilinear sampling of a map grid at (lat, lon), ignoring undefined corners; NaN outside. */
 function sampler(g: MapGrid, a: Float32Array) {
   return (la: number, lo: number) => {
@@ -413,7 +441,8 @@ export default function Carte() {
     return { sample: sampler(gmap.meta.grid, mean), hours: used.map((i) => MAPH[i]!), expected: idx.length };
   }, [gmap, mode, MI, night.i0, night.i1, frameT, RUN0]);
   const sample = real?.sample ?? null;
-  /** Real AROME orography of the map grid, when the run has it, and its 5x5 median (coastline). */
+  const geo = useGeoLines();
+  /** Real AROME orography of the map grid, when the run has it. */
   const relReal = useMemo(() => (gmap?.relief ? sampler(gmap.meta.grid, gmap.relief) : null), [gmap]);
   /** Land of the AROME relief (coastline without the islets of the sea ripples): no relief drawn or read at sea. */
   const land = useMemo(() => {
@@ -430,7 +459,6 @@ export default function Carte() {
     if (!gmap?.relief || !land) return null;
     const g = gmap.meta.grid;
     return {
-      coast: contourSegs(g, land.med, 1),
       major: [1000, 2000].map((lv) => contourSegs(g, gmap.relief!, lv)),
       fine: Array.from({ length: 11 }, (_, k) => 250 * (k + 1)).map((lv) => [lv, contourSegs(g, gmap.relief!, lv)] as const),
     };
@@ -485,10 +513,14 @@ export default function Carte() {
     };
     if (contours) {
       if (fineView) contours.fine.forEach(([lv, s]) => stroke(s, "rgba(0,0,0,.5)", 0.55, lv));
-      else {
-        contours.major.forEach((s) => stroke(s, "rgba(255,255,255,.6)", 0.45));
-        stroke(contours.coast, "#000", 0.8);
-      }
+      else contours.major.forEach((s) => stroke(s, "rgba(255,255,255,.6)", 0.45));
+    }
+    // real coastlines and land borders, at every zoom (thicker when zoomed)
+    if (geo) {
+      cx.setLineDash([4, 3]);
+      stroke(geo.borders, "rgba(0,0,0,.75)", fineView ? 1 : 0.7);
+      cx.setLineDash([]);
+      stroke(geo.coast, "#000", fineView ? 1.2 : 0.8);
     }
     const big = VW.la1 - VW.la0 < 3.2;
     cx.font = "9px 'IBM Plex Sans',sans-serif";
@@ -608,7 +640,7 @@ export default function Carte() {
     const hkm = Math.round((VW.la1 - VW.la0) * 111.2),
       zmax = VW.la1 - VW.la0 <= ZMIN + 1e-6;
     label(tr(`${hkm} × ${km} km${zmax ? " · zoom maximal" : ""} · isolignes ${VW.la1 - VW.la0 <= FINE_VIEW_DEG ? "250" : "1000 / 2000"} m`), CW - (zmax ? 300 : 200), CH - 12);
-  }, [VW, sample, contours, gmap, toXY, pub, sh, mine, MZH, newPt, role, lang]);
+  }, [VW, sample, contours, geo, gmap, toXY, pub, sh, mine, MZH, newPt, role, lang]);
 
   /* ---------- animation ---------- */
   const last = NIGHTS[NIGHTS.length - 1]?.i1 ?? NH - 1;
@@ -704,12 +736,16 @@ export default function Carte() {
       zi = zz ? zz[4] : -1;
     if (zi !== MZH) setMZH(zi);
     canvas.current!.style.cursor = zi >= 0 ? "pointer" : isFullView(VW) ? "default" : "grab";
-    if (zz) return setTip(`${tr("Clique pour zoomer sur")} <b>${esc(tr(ZONES[zi]![0]))}</b>`);
     const la = LA(y),
       lo = LO(x);
+    // seeing of the map shown (the hour or the night mean) under the cursor, at every zoom
+    const sv = sample ? sample(la, lo) : NaN,
+      see = isNaN(sv) ? "" : `${tr("seeing")} <b class="mono">${sv.toFixed(1)}″</b> · `;
+    if (zz) return setTip(`${see}${tr("Clique pour zoomer sur")} <b>${esc(tr(ZONES[zi]![0]))}</b>`);
     setTip(
       relReal || onLand(x, y)
-        ? `<span class="mono">${la.toFixed(3)} N · ${lo.toFixed(3)} E</span>` +
+        ? see +
+            `<span class="mono">${la.toFixed(3)} N · ${lo.toFixed(3)} E</span>` +
             (relReal && land && land.at(la, lo) >= 0.5 ? ` · ${tr("relief AROME")} <span class="mono">${Math.round(relReal(la, lo))} m</span>` : "")
         : `<span class="mono">${la.toFixed(2)} N · ${lo.toFixed(2)} E</span> · ${tr("hors de la zone du calcul global")}`,
     );
@@ -971,8 +1007,8 @@ export default function Carte() {
                 {tr("Mes lieux")}
               </span>
               <span>
-                <span className="sw" style={{ width: 14, borderTop: "1px solid rgba(0,0,0,.6)" }} />
-                {tr("Relief AROME : trait de côte, isolignes 1000 et 2000 m (tous les 250 m en zoom)")}
+                <span className="sw" style={{ width: 14, borderTop: "1px solid #000" }} />
+                {tr("Côtes et frontières (pointillés) : Natural Earth ; relief AROME : isolignes 1000 et 2000 m (tous les 250 m en zoom)")}
               </span>
               <span>
                 <span className="sw" style={{ width: 14, height: 12, background: "rgb(60,66,80)" }} />
