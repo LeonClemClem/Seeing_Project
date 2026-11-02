@@ -320,10 +320,21 @@ export function cn2RealSvg(c: Cn2Ctx, runMs: number, smooth = false, rm?: Readon
     if (cx) {
       const im = cx.createImageData(NW, NR),
         D = im.data;
+      // a level left undefined inside a computed column (below its highest value: unstable air near the ground at
+      // night, where neither the TKE model nor the convective closure applies) adds nothing to the seeing, the
+      // integral counts it as 0: drawn with the lowest colour, not as a hole. A missing column stays a gap.
+      const top = c.lg.map((row) => {
+        if (!row) return -1;
+        for (let j = row.length - 1; j >= 0; j--) if (row[j] != null) return j;
+        return -1;
+      });
+      const lv = (i: number, j: number) => {
+        const v = c.lg[i]?.[j];
+        return v != null ? v : j < top[i]! ? lo : null;
+      };
       const at = (i: number, k: number, z: number) => {
-        const row = c.lg[i];
-        const a = row?.[k],
-          b = row?.[k + 1];
+        const a = lv(i, k),
+          b = lv(i, k + 1);
         return a == null || b == null ? null : a + ((b - a) * (z - Zh[k]!)) / (Zh[k + 1]! - Zh[k]!);
       };
       let k = 0;

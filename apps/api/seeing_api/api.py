@@ -35,10 +35,11 @@ MAIN_RUN = func.mod(func.extract("hour", ModelRun.run_time), 6) == 0
 
 def usable_lead(model):
     """Condition on Forecast / Cn2Profile rows for the views stitched from several runs (history, calibration, week
-    Cn2): Meteo-France publishes no TKE at lead 0, so a lead 0 stored without it (before tke_filled) has holes in the
-    first hundreds of metres and a seeing too low, and is left out (the previous run's lead 6 is used); a lead 0 whose
-    TKE was taken from lead 1 (tke_filled) is used."""
-    return or_(model.lead_hour >= 1, model.tke_filled.is_(True))
+    Cn2). Meteo-France publishes neither the TKE nor the accumulated surface heat flux at lead 0. Rows stored before
+    the fix (tke_filled NULL) have, at lead 0, holes in the first hundreds of metres and a seeing too low, and at lead 1
+    no convective closure (holes by day): their leads 0 and 1 are left out, the previous run's leads 6-7 are used.
+    Rows computed since (tke_filled set: lead 0 with the TKE of lead 1, sshf accumulation 0 at lead 0) are used."""
+    return or_(model.lead_hour >= 2, model.tke_filled.is_not(None))
 
 
 def stitched(session: Session, model, site_id: int, run: ModelRun, span: timedelta | None = WEEK):

@@ -209,17 +209,17 @@ def test_fisheye_cloud_cover(client, session):
 
 
 def test_week_view_stitches_main_runs(client, session):
-    # 00Z (3 h), 03Z secondary (3 h), 06Z (3 h): week view = 01Z-02Z from 00Z, then 07Z-08Z from 06Z (lead 0 left out:
-    # no TKE at lead 0); the secondary 03Z is never used (its hours stay a gap); the run view keeps the 06Z run only.
+    # 00Z (3 h), 03Z secondary (3 h), 06Z (3 h): week view = 02Z from 00Z, then 08Z from 06Z (rows stored without
+    # tke_filled: leads 0 and 1 left out); the secondary 03Z is never used; the run view keeps the 06Z run only.
     add_run(session, T0, seeing=[1.0, 1.1, 1.2])
     add_run(session, T0 + timedelta(hours=3), seeing=[2.0, 2.1, 2.2])
     add_run(session, T0 + timedelta(hours=6), seeing=[3.0, 3.1, 3.2])
     wk = client.get("/api/sites/saint-veran/forecast", params={"view": "week"}).json()
-    assert [p["seeing_arcsec"] for p in wk["points"]] == [1.1, 1.2, 3.1, 3.2]
+    assert [p["seeing_arcsec"] for p in wk["points"]] == [1.2, 3.2]
     run = client.get("/api/sites/saint-veran/forecast").json()
     assert [p["seeing_arcsec"] for p in run["points"]] == [3.0, 3.1, 3.2]
     cn = client.get("/api/sites/saint-veran/cn2", params={"view": "week"}).json()
-    assert len(cn["valid_times"]) == 4 and cn["run_time"] == "2026-10-13T06:00:00Z"
+    assert len(cn["valid_times"]) == 2 and cn["run_time"] == "2026-10-13T06:00:00Z"
     # a secondary run is never the latest nor readable by its time
     add_run(session, T0 + timedelta(hours=9), seeing=[4.0])
     assert client.get("/api/runs/latest").json()["run_time"] == "2026-10-13T06:00:00Z"
@@ -228,12 +228,12 @@ def test_week_view_stitches_main_runs(client, session):
 
 
 def test_all_view_goes_back_beyond_a_week(client, session):
-    add_run(session, T0 - timedelta(days=20), seeing=[0.5, 0.6])
-    add_run(session, T0, seeing=[1.0, 1.1])
+    add_run(session, T0 - timedelta(days=20), seeing=[0.5, 0.6, 0.7])
+    add_run(session, T0, seeing=[1.0, 1.1, 1.2])
     wk = client.get("/api/sites/saint-veran/forecast", params={"view": "week"}).json()
-    assert [p["seeing_arcsec"] for p in wk["points"]] == [1.1]
+    assert [p["seeing_arcsec"] for p in wk["points"]] == [1.2]
     al = client.get("/api/sites/saint-veran/forecast", params={"view": "all"}).json()
-    assert [p["seeing_arcsec"] for p in al["points"]] == [0.6, 1.1]  # leads 0 left out
+    assert [p["seeing_arcsec"] for p in al["points"]] == [0.7, 1.2]  # leads 0 and 1 of rows without tke_filled left out
 
 
 def test_fisheye_horizon_from_the_relief(client, session):
