@@ -267,5 +267,6 @@
 "Point de la carte (prévision ponctuelle) : seeing de la carte globale du dernier run, avec les K de la carte.": "Point of the map (one-off forecast): seeing of the global map of the latest run, with the map K.",
 "Cn², historique, corrélation et variables du modèle": "Cn², history, correlation and model variables",
 "Ces panneaux demandent un lieu enregistré : ses prévisions sont alors calculées à chaque run et comparées à tes mesures.": "These panels need a saved place: its forecasts are then computed at every run and compared with your measurements.",
-"Un point de la carte n'a ni mesures ni K à caler.": "A point of the map has no measurements nor K to fit."
+"Un point de la carte n'a ni mesures ni K à caler.": "A point of the map has no measurements nor K to fit.",
+"Côtes et frontières (pointillés) : Natural Earth ; relief AROME : isolignes 1000 et 2000 m (tous les 250 m en zoom)": "Coastlines and borders (dashed): Natural Earth; AROME relief: 1000 and 2000 m contours (every 250 m when zoomed)"
 }
