@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api, type Fisheye as FisheyeData } from "../api";
 
-import { Chip, ColorBar, Seg } from "../components/ui";
+import { Chip, ColorBar, DateBand, Seg } from "../components/ui";
 import { kHidden, useCurrentPlace } from "../data/places";
 import { tr } from "../i18n";
 import { useLatestRunTime } from "../lib/hooks";
@@ -473,6 +473,7 @@ export default function Fisheye() {
       </p>
       <div className="grid2">
         <div className="panel">
+          <DateBand title={title(t)} sub={sub(t)} />
           <div style={{ position: "relative" }} onMouseLeave={() => setHov(null)}>
             <canvas
               ref={cv}

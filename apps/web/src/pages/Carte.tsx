@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import { useLocation } from "react-router-dom";
 
 import { PointForm } from "../components/PointForecast";
-import { ColorBar, Seg } from "../components/ui";
+import { ColorBar, DateBand, Seg } from "../components/ui";
 import { useUser } from "../data/auth";
 import { MAX_PLACES, selectPlace, siteToPlace, useCurrentPlace, usePlaceActions, usePlaces } from "../data/places";
 import { tr } from "../i18n";
@@ -936,6 +936,7 @@ export default function Carte() {
               </button>
             </div>
           </div>
+          <DateBand title={exportTitle} sub={exportSub} />
           <canvas
             ref={canvas}
             width={CW}
