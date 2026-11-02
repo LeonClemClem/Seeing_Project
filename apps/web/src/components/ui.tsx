@@ -79,7 +79,7 @@ export function DateBand({ title, sub, progress }: { title: string; sub: string;
       <div className="t">{title}</div>
       <div className="s">{sub}</div>
       {progress != null && (
-        <div className="bar">
+        <div className="tbar">
           <i style={{ width: `${Math.round(progress * 1000) / 10}%` }} />
         </div>
       )}
