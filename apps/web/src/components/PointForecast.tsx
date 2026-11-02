@@ -4,7 +4,7 @@
  * another place is chosen; it can then be saved as a place.
  */
 import { useQuery } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
 import { api, type Forecast } from "../api";
@@ -50,11 +50,18 @@ export function PointSeeing({ lat, lon }: { lat: number; lon: number }) {
   );
 }
 
-/** Panel above the map: coordinates, "Voir la prévision", the forecast, and "Enregistrer comme lieu". */
-export function PointForm({ onSave }: { onSave: (lat: number, lon: number) => void }) {
+/** Panel above the map: coordinates, "Voir la prévision", the forecast, and "Enregistrer comme lieu". `pick`: the
+ * point last clicked on the map, written into the coordinate fields. */
+export function PointForm({ onSave, pick }: { onSave: (lat: number, lon: number) => void; pick?: [number, number] | null }) {
   const point = useUi((s) => s.point);
   const [txt, setTxt] = useState(() => ({ lat: point ? point.lat.toFixed(4) : "", lon: point ? point.lon.toFixed(4) : "" }));
   const [err, setErr] = useState("");
+  useEffect(() => {
+    if (pick) {
+      setTxt({ lat: pick[0].toFixed(4), lon: pick[1].toFixed(4) });
+      setErr("");
+    }
+  }, [pick]);
   const go = (e: FormEvent) => {
     e.preventDefault();
     const la = parseCoord(txt.lat, true),
