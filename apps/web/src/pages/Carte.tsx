@@ -15,7 +15,7 @@ import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, parseCoord, SARD, VILLES, ZON
 import { useGlobalMap, useLatestRunTime } from "../lib/hooks";
 import type { MapGrid } from "../api";
 import { canvasToPng, downloadBlob, encodeGif } from "../lib/export";
-import { D2R, esc, fmt, pad2, runLabel, turbo, turboGradient } from "../lib/util";
+import { D2R, esc, fmt, pad2, runLabel, seeingGradient, seeingRgb } from "../lib/util";
 import { REF } from "../mock/engine";
 import { setState, useUi } from "../store";
 
@@ -31,11 +31,11 @@ const NIGHT_H = [19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5],
 const LEADMAX = 51;
 const KGLOB = [1, 30, 0.1];
 const JS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
-const LUT = [...Array(256)].map((_, k) => turbo(k / 255));
-/** Colour of a seeing value: turbo on a fixed 0-10" range with a fixed square-root stretch, the same for
- * every run so that nights can be compared (1" -> 32 %, 2" -> 45 %, 3" -> 55 %, 5" -> 71 % of the scale). */
+const LUT = [...Array(256)].map((_, k) => seeingRgb(k / 255));
+/** Colour of a seeing value: the seeing palette (seeingRgb) on a fixed 0-10" range, linear (1" -> 10 %, 5" -> 50 % of
+ * the scale), the same for every run so that nights can be compared, and the same as the fisheye. */
 const SEE_TOP = 10;
-const seeColor = (s: number) => LUT[Math.round(Math.sqrt(Math.min(Math.max(s, 0), SEE_TOP) / SEE_TOP) * 255)]!;
+const seeColor = (s: number) => LUT[Math.round((Math.min(Math.max(s, 0), SEE_TOP) / SEE_TOP) * 255)]!;
 /** Views taller than this show the large-zone style (1000 / 2000 m contours), else 250 m contours. */
 const FINE_VIEW_DEG = 4;
 
@@ -857,7 +857,7 @@ export default function Carte() {
             onPointerCancel={() => (drag.current = null)}
             onPointerLeave={() => setTip(null)}
           />
-          <ColorBar left={tr("bon")} right={tr("mauvais")} gradient={turboGradient()} />
+          <ColorBar left={tr("bon")} right={tr("mauvais")} gradient={seeingGradient()} />
           <p className="small muted" style={{ margin: "4px 0 0", textAlign: "center" }}>
             <i>{tr("Les valeurs absolues seront bientôt disponibles, après la calibration globale.")}</i>
           </p>
