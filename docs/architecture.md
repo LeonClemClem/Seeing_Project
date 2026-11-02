@@ -205,7 +205,7 @@ All responses are JSON; times are ISO 8601 UTC (`Z`).
 - `POST /api/auth/logout` → 204, deletes the session and clears the cookie.
 - Auth POSTs must be `Content-Type: application/json` (415 otherwise).
 - Unknown slug or run → 404; a `run` that is neither `latest` nor ISO 8601 → 422.
-- `/api/*` responses carry `Cache-Control: private, max-age=300`; hashed SPA assets are cached for a
+- `/api/*` responses carry `Cache-Control: private, no-cache` (map frames: one day); hashed SPA assets are cached for a
   year (`immutable`), `index.html` is `no-cache`.
 - Everything else not under `/api` serves the SPA (`index.html` fallback for client routes).
 

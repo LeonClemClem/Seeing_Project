@@ -14,7 +14,7 @@ def test_healthz_needs_no_db(client):
 def test_sites_lists_active_seeded_sites(client, session):
     r = client.get("/api/sites")
     assert r.status_code == 200
-    assert r.headers["cache-control"] == "private, max-age=300"
+    assert r.headers["cache-control"] == "private, no-cache"
     sites = {s["slug"]: s for s in r.json()}
     assert set(sites) == {"saint-veran", "pic-du-midi", "ohp", "cosmodrome"}
     assert sites["saint-veran"]["altitude_m"] == 2930.0

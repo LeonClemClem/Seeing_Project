@@ -20,7 +20,10 @@ from seeing_api.measurements import router as measurements_router
 from seeing_api.places import router as places_router
 from seeing_api.schemas import Health
 
-API_CACHE = "private, max-age=300"
+# API answers change with what the account does (K saved, places, measurements): the browser must not serve them from
+# its cache (with max-age=300 a K saved in Calibrer came back as the old K for 5 minutes). The page keeps them in memory
+# itself (react-query); the map frames, which never change, keep their own day-long cache.
+API_CACHE = "private, no-cache"
 ASSET_CACHE = "public, max-age=31536000, immutable"
 STATIC_FILE_CACHE = "public, max-age=3600"
 INDEX_CACHE = "no-cache"
