@@ -75,7 +75,7 @@ export function PointForm({ onSave, pick }: { onSave: (lat: number, lon: number)
       <h2 style={{ margin: 0 }}>{tr("Prévision ponctuelle à des coordonnées")}</h2>
       <p className="small muted" style={{ margin: "6px 0" }}>
         {tr(
-          "Seeing lu sur la carte globale du dernier run (mailles de ~5 km, K de la carte, nuits seulement), sans créer de lieu. Le point devient le lieu affiché dans les autres onglets ; pour le Cn², l'historique et la calibration, enregistre-le comme lieu.",
+          "Seeing lu sur la carte globale du dernier run (mailles de ~2,5 km, calibration de la carte, nuits seulement), sans créer de lieu. Le point devient le lieu affiché dans les autres onglets ; pour le Cn², l'historique et la calibration, enregistre-le comme lieu.",
         )}
       </p>
       <form onSubmit={go} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>

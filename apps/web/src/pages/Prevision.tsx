@@ -107,7 +107,7 @@ function PointPrevision({ place }: { place: Place }) {
       <h1>
         {tr("Prévision")} · {place.nom}
       </h1>
-      <p className="lead">{tr("Point de la carte (prévision ponctuelle) : seeing de la carte globale du dernier run, avec les K de la carte.")}</p>
+      <p className="lead">{tr("Point de la carte (prévision ponctuelle) : seeing de la carte globale du dernier run, avec la calibration de la carte.")}</p>
       <div className="stack">
         <div className="panel">
           <h2>{tr("Seeing prévu")}</h2>
