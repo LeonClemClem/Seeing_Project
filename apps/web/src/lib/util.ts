@@ -39,6 +39,9 @@ export function seeingRgb(x: number): [number, number, number] {
 export const seeingGradient = () =>
   "linear-gradient(to right," + [...Array(11)].map((_, i) => "rgb(" + seeingRgb(i / 10).join(",") + ")").join(",") + ")";
 
+/** Day names (UTC day of the week), for the exported images ("Samedi 20h00 TU"). */
+export const JOURS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+
 export const turboGradient = () =>
   "linear-gradient(to right," + [0, 0.2, 0.4, 0.6, 0.8, 1].map((x) => "rgb(" + turbo(x).join(",") + ")").join(",") + ")";
 
