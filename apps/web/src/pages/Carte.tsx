@@ -33,6 +33,7 @@ const NIGHT_H = [19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5],
 const LEADMAX = 51;
 const KGLOB = [1, 30, 0.1];
 const JS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
+const JOURS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const LUT = [...Array(256)].map((_, k) => seeingRgb(k / 255));
 /** Colour of a seeing value: the seeing palette (seeingRgb) on a fixed 0-10" range, linear (1" -> 10 %, 5" -> 50 % of
  * the scale), the same for every run so that nights can be compared, and the same as the fisheye. */
@@ -264,6 +265,26 @@ function PinIcon({ kind }: { kind: PinKind }) {
 
 type ZoneHit = [x: number, y: number, w: number, h: number, i: number];
 
+/** Height of the band above the map in the exported PNG / GIF (the map itself is not covered). */
+const BAND = 64;
+/** The map canvas under a band with the day and hour large ("Samedi 20h00 TU") and the date / run below. */
+function banded(src: HTMLCanvasElement, title: string, sub: string): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = src.width;
+  c.height = src.height + BAND;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#0b1220";
+  g.fillRect(0, 0, c.width, BAND);
+  g.fillStyle = "#fff";
+  g.font = "600 26px 'IBM Plex Sans',sans-serif";
+  g.fillText(title, 14, 33);
+  g.fillStyle = "#c9d3e6";
+  g.font = "500 12px 'IBM Plex Sans',sans-serif";
+  g.fillText(sub, 14, 54);
+  g.drawImage(src, 0, BAND);
+  return c;
+}
+
 /** Coastlines and land borders (Natural Earth 1:10m clipped to the AROME domain, scripts/geo_lines.py) as segments
  * [lat1, lon1, lat2, lon2, ...] like contourSegs. The AROME relief is smoothed (its 1 m contour runs kilometres out
  * at sea and closed the strait of Bonifacio): the map draws the real coasts instead. */
@@ -392,22 +413,34 @@ export default function Carte() {
     `run${new Date(RUN0).toISOString().slice(0, 13).replace(/[-T]/g, "")}Z_` +
     (mode === "m" ? `nuit_${night.lab.replace(/[^0-9]+/g, "-")}` : frameT(MI).toISOString().slice(0, 13).replace(/[-T]/g, "") + "h");
   const [gifBusy, setGifBusy] = useState(false);
+  /** PNG being drawn: as for the GIF, the map is drawn once more without the clickable zone labels. */
+  const [pngBusy, setPngBusy] = useState(false);
+  const paint = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+  const exportPng = async () => {
+    if (!canvas.current) return;
+    setPngBusy(true);
+    try {
+      await paint();
+      canvasToPng(banded(canvas.current, exportTitle, exportSub), `carte_seeing_${fileStamp()}.png`);
+    } finally {
+      setPngBusy(false);
+    }
+  };
   /** Animated GIF of the night: every hour of the chosen night, drawn one by one on the map canvas (the frames are
    * already loaded, each hour is drawn on the next paint), then the view is put back. */
   const exportGif = async () => {
-    const cv = canvas.current?.getContext("2d");
-    if (!cv) return;
+    if (!canvas.current) return;
     setGifBusy(true);
     const keep = { mode, MI, playing };
     setPlaying(false);
     setMode("h");
     const frames: ImageData[] = [];
-    const paint = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
     try {
       for (let i = night.i0; i <= night.i1; i++) {
         setMI(i);
         await paint();
-        frames.push(cv.getImageData(0, 0, CW, CH));
+        const d = frameT(i);
+        frames.push(banded(canvas.current!, hourTitle(d), hourSub(d)).getContext("2d")!.getImageData(0, 0, CW, CH + BAND));
       }
       downloadBlob(encodeGif(frames, 90), `carte_seeing_run${new Date(RUN0).toISOString().slice(0, 13).replace(/[-T]/g, "")}Z_nuit_${night.lab.replace(/[^0-9]+/g, "-")}.gif`);
     } finally {
@@ -474,6 +507,36 @@ export default function Carte() {
   );
   const LA = useCallback((y: number) => VW.la1 - (y / CH) * (VW.la1 - VW.la0), [VW]);
   const LO = useCallback((x: number) => VW.lo0 + (x / CW) * (VW.lo1 - VW.lo0), [VW]);
+
+  const fd = frameT(MI),
+    lead = Math.round((fd.getTime() - RUN0) / 3600000);
+  // Hour range really averaged (the run may stop before the end of the night).
+  const meanRange = (() => {
+    const h = real?.hours ?? [];
+    if (!real) return "20h–04h TU";
+    if (!h.length) return "aucune heure couverte par le run";
+    const txt = `${pad2(h[0]!)}h–${pad2(h[h.length - 1]!)}h TU`;
+    return h.length < real.expected ? `${txt}, run incomplet : ${h.length} h sur ${real.expected}` : txt;
+  })();
+  const hourLabel =
+    mode === "m"
+      ? tr(`moyenne nuit du ${night.lab} (${meanRange})`)
+      : tr(`${JS[fd.getUTCDay()]} ${pad2(fd.getUTCDate())}/${pad2(fd.getUTCMonth() + 1)} · ${pad2(fd.getUTCHours())}h TU · +${lead} h`) +
+        (real && !real.hours.length ? tr(" · pas de prévision à cette heure") : "");
+  const runL = runLabel(RUN0);
+  // title of the exported PNG / GIF: the day and the hour large, the rest below
+  const dayName = (d: Date) => tr(JOURS[d.getUTCDay()]!);
+  const ddmm = (d: Date) => `${pad2(d.getUTCDate())}/${pad2(d.getUTCMonth() + 1)}`;
+  const nightStart = frameT(night.i0),
+    nightNext = new Date(nightStart.getTime() + 24 * 3600000);
+  const hourTitle = (d: Date) => `${dayName(d)} ${pad2(d.getUTCHours())}h00 TU`;
+  const hourSub = (d: Date) => `${ddmm(d)}/${d.getUTCFullYear()} · Seeing AROME V2bd · run ${runL}`;
+  const exportTitle =
+    mode === "m" ? `${tr("Nuit de")} ${dayName(nightStart).toLowerCase()} ${tr("à")} ${dayName(nightNext).toLowerCase()}` : hourTitle(fd);
+  const exportSub =
+    mode === "m"
+      ? `${ddmm(nightStart)} → ${ddmm(nightNext)}/${nightNext.getUTCFullYear()} · ${tr("moyenne")} ${meanRange} · Seeing AROME V2bd · run ${runL}`
+      : hourSub(fd);
 
   /* ---------- drawing ---------- */
   useEffect(() => {
@@ -588,7 +651,8 @@ export default function Carte() {
       if (big) label(tr(p.nom), x + 12, y - (big ? 16 : 12));
     });
     const zh: ZoneHit[] = [];
-    if (VW.la1 - VW.la0 > 12) {
+    // clickable zone labels of the domain view: not in the exported PNG / GIF
+    if (VW.la1 - VW.la0 > 12 && !gifBusy && !pngBusy) {
       cx.font = "600 13px 'IBM Plex Sans',sans-serif";
       ZONES.forEach((z, i) => {
         const [x, y] = toXY(z[1], z[2]),
@@ -635,16 +699,18 @@ export default function Carte() {
       cx.stroke();
     }
     const km = Math.round((VW.lo1 - VW.lo0) * 111.32 * Math.cos(((VW.la0 + VW.la1) / 2) * D2R));
-    label(
-      tr("Calibration globale (administrateur)") +
-        (role === "admin" ? ` · K_TKE = ${fmt(KGLOB[0]!)}  K_CIS = ${fmt(KGLOB[1]!)}  K_conv = ${fmt(KGLOB[2]!)}` : ""),
-      10,
-      CH - 12,
-    );
+    // exported PNG / GIF: no K
+    if (!gifBusy && !pngBusy)
+      label(
+        tr("Calibration globale (administrateur)") +
+          (role === "admin" ? ` · K_TKE = ${fmt(KGLOB[0]!)}  K_CIS = ${fmt(KGLOB[1]!)}  K_conv = ${fmt(KGLOB[2]!)}` : ""),
+        10,
+        CH - 12,
+      );
     const hkm = Math.round((VW.la1 - VW.la0) * 111.2),
       zmax = VW.la1 - VW.la0 <= ZMIN + 1e-6;
     label(tr(`${hkm} × ${km} km${zmax ? " · zoom maximal" : ""} · isolignes ${VW.la1 - VW.la0 <= FINE_VIEW_DEG ? "250" : "1000 / 2000"} m`), CW - (zmax ? 300 : 200), CH - 12);
-  }, [VW, sample, contours, geo, gmap, toXY, pub, sh, mine, MZH, newPt, role, lang]);
+  }, [VW, sample, contours, geo, gmap, toXY, pub, sh, mine, MZH, newPt, role, lang, gifBusy, pngBusy]);
 
   /* ---------- animation ---------- */
   const last = NIGHTS[NIGHTS.length - 1]?.i1 ?? NH - 1;
@@ -814,23 +880,7 @@ export default function Carte() {
     );
   };
 
-  const fd = frameT(MI),
-    lead = Math.round((fd.getTime() - RUN0) / 3600000);
-  // Hour range really averaged (the run may stop before the end of the night).
-  const meanRange = (() => {
-    const h = real?.hours ?? [];
-    if (!real) return "20h–04h TU";
-    if (!h.length) return "aucune heure couverte par le run";
-    const txt = `${pad2(h[0]!)}h–${pad2(h[h.length - 1]!)}h TU`;
-    return h.length < real.expected ? `${txt}, run incomplet : ${h.length} h sur ${real.expected}` : txt;
-  })();
-  const hourLabel =
-    mode === "m"
-      ? tr(`moyenne nuit du ${night.lab} (${meanRange})`)
-      : tr(`${JS[fd.getUTCDay()]} ${pad2(fd.getUTCDate())}/${pad2(fd.getUTCMonth() + 1)} · ${pad2(fd.getUTCHours())}h TU · +${lead} h`) +
-        (real && !real.hours.length ? tr(" · pas de prévision à cette heure") : "");
-  const runL = runLabel(RUN0),
-    endL = new Date(RUN0 + LEADMAX * 3600000);
+  const endL = new Date(RUN0 + LEADMAX * 3600000);
   const nextRun = pad2(new Date(RUN0 + 6 * 3600000).getUTCHours()) + "Z";
   const nlInDomain = newPt ? inDomain(newPt[0], newPt[1]) : false;
 
@@ -889,7 +939,7 @@ export default function Carte() {
               <button aria-label={tr("Dézoomer")} onClick={() => zoomAt(CW / 2, CH / 2, 1.5)}>
                 −
               </button>
-              <button title={tr("Télécharger la carte affichée (PNG)")} onClick={() => canvas.current && canvasToPng(canvas.current, `carte_seeing_${fileStamp()}.png`)}>
+              <button title={tr("Télécharger la carte affichée (PNG)")} disabled={pngBusy} onClick={() => void exportPng()}>
                 ⤓ PNG
               </button>
               <button title={tr("Télécharger l'animation des heures de la nuit choisie (GIF)")} disabled={gifBusy} onClick={() => void exportGif()}>
