@@ -404,7 +404,7 @@ export default function Carte() {
     setPngBusy(true);
     try {
       await paint();
-      canvasToPng(banded(canvas.current, exportTitle, exportSub, undefined, bandDays(shownDays)), `carte_seeing_${fileStamp()}.png`);
+      canvasToPng(banded(canvas.current, exportTitle, exportSub), `carte_seeing_${fileStamp()}.png`);
     } finally {
       setPngBusy(false);
     }
@@ -429,9 +429,7 @@ export default function Carte() {
         setMI(i);
         await paint();
         const d = frameT(i);
-        frames.push(
-          banded(canvas.current!, hourTitle(d), hourSub(d), [k, idx.length], bandDays([dayKey(d)])).getContext("2d")!.getImageData(0, 0, CW, CH + BAND),
-        );
+        frames.push(banded(canvas.current!, hourTitle(d), hourSub(d), [k, idx.length]).getContext("2d")!.getImageData(0, 0, CW, CH + BAND));
       }
       if (frames.length)
         downloadBlob(encodeGif(frames, Math.round(90 / speed)), `carte_seeing_run${new Date(RUN0).toISOString().slice(0, 13).replace(/[-T]/g, "")}Z_toutes_heures.gif`);
@@ -543,13 +541,6 @@ export default function Carte() {
   const hourTitle = (d: Date) => `${dayName(d)} ${pad2(d.getUTCHours())}h00 TU`;
   const layerTxt = layer === "bl" ? ` · ${tr("couche limite seule")}` : layer === "haut" ? ` · ${tr("au-dessus de la couche limite seule")}` : "";
   const hourSub = (d: Date) => `${ddmm(d)}/${d.getUTCFullYear()} · Seeing AROME V2bd${layerTxt} · run ${runL}`;
-  // the days of the run side by side, the one shown highlighted (both days of the night for the night mean)
-  const dayKey = (d: Date) => d.toISOString().slice(0, 10);
-  const runDays = [
-    ...new Map(NIGHTS.flatMap((q) => [frameT(q.i0), frameT(q.i1)]).map((d) => [dayKey(d), d] as const)).values(),
-  ];
-  const bandDays = (on: string[]) => runDays.map((d) => ({ label: dayName(d), on: on.includes(dayKey(d)) }));
-  const shownDays = mode === "m" ? [dayKey(nightStart), dayKey(nightNext)] : [dayKey(fd)];
   const lastI = NIGHTS[NIGHTS.length - 1]?.i1 ?? 0;
   const exportTitle =
     mode === "m" ? `${tr("Nuit de")} ${dayName(nightStart).toLowerCase()} ${tr("à")} ${dayName(nightNext).toLowerCase()}` : hourTitle(fd);
@@ -967,7 +958,7 @@ export default function Carte() {
               </button>
             </div>
           </div>
-          <DateBand title={exportTitle} sub={exportSub} days={bandDays(shownDays)} progress={mode === "h" && lastI > 0 ? MI / lastI : null} />
+          <DateBand title={exportTitle} sub={exportSub} progress={mode === "h" && lastI > 0 ? MI / lastI : null} />
           <canvas
             ref={canvas}
             width={CW}

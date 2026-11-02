@@ -13,15 +13,9 @@ export function downloadBlob(blob: Blob, name: string) {
 
 /** Height of the band above the map / fisheye in the exported PNG / GIF (the image itself is not covered). */
 export const BAND = 64;
-/** One day of the band (the days of the run side by side, the one shown highlighted). */
-export interface BandDay {
-  label: string;
-  on: boolean;
-}
-/** A canvas under a band with the day and hour large ("Samedi 20h00 TU") and the date / run below, the days of the
- * run side by side on the right (the one shown highlighted). `progress` (GIF frames): [frame index, frame count],
- * drawn as a time bar along the bottom of the band. */
-export function banded(src: HTMLCanvasElement, title: string, sub: string, progress?: [number, number], days?: BandDay[]): HTMLCanvasElement {
+/** A canvas under a band with the day and hour large ("Samedi 20h00 TU") and the date / run below. `progress`
+ * (GIF frames): [frame index, frame count], drawn as a time bar along the bottom of the band. */
+export function banded(src: HTMLCanvasElement, title: string, sub: string, progress?: [number, number]): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = src.width;
   c.height = src.height + BAND;
@@ -34,23 +28,6 @@ export function banded(src: HTMLCanvasElement, title: string, sub: string, progr
   g.fillStyle = "#c9d3e6";
   g.font = "500 12px 'IBM Plex Sans',sans-serif";
   g.fillText(sub, 14, 54);
-  if (days?.length) {
-    g.font = "600 13px 'IBM Plex Sans',sans-serif";
-    const ws = days.map((d) => g.measureText(d.label).width + 18);
-    let x = c.width - 14 - ws.reduce((a, b) => a + b + 6, -6);
-    days.forEach((d, i) => {
-      g.fillStyle = d.on ? "#f2c14e" : "rgba(255,255,255,.08)";
-      g.strokeStyle = d.on ? "#f2c14e" : "rgba(255,255,255,.35)";
-      g.lineWidth = 1;
-      g.beginPath();
-      g.roundRect(x, 14, ws[i]!, 26, 6);
-      g.fill();
-      g.stroke();
-      g.fillStyle = d.on ? "#000" : "#c9d3e6";
-      g.fillText(d.label, x + 9, 32);
-      x += ws[i]! + 6;
-    });
-  }
   if (progress && progress[1] > 1) {
     const [k, n] = progress,
       x0 = 14,
