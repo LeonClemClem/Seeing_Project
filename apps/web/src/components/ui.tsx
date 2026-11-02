@@ -71,6 +71,17 @@ export function Spinner({ label = "Chargement…", style }: { label?: string; st
 
 export const Sw = ({ style }: { style: CSSProperties }) => <span className="sw" style={style} />;
 
+/** Date band above the map and the fisheye, as in their exported PNG / GIF: the day and hour large
+ * ("Samedi 20h00 TU"), the date and run below; it follows the animation. */
+export function DateBand({ title, sub }: { title: string; sub: string }) {
+  return (
+    <div className="dateband" aria-live="off">
+      <div className="t">{title}</div>
+      <div className="s">{sub}</div>
+    </div>
+  );
+}
+
 export const LegArome = ({ label = "AROME V2bd" }: { label?: string }) => (
   <span>
     <Sw style={{ width: 16, height: 3, background: "var(--arome)" }} />
