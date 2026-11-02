@@ -26,9 +26,9 @@ export function turbo(x: number): [number, number, number] {
   return [c(r), c(g), c(b)];
 }
 
-/** Seeing palette of the map and the fisheye, x = seeing / 10" in [0, 1] (linear): turbo, darkened towards 0" (60 % of
- * the brightness at 0", full again from 3", smoothstep in between). */
-export const SEE_DARK = { at0: 0.6, upTo: 0.3 };
+/** Seeing palette of the map and the fisheye, x = seeing / 10" in [0, 1] (linear): turbo, darkened towards 0" (30 % of
+ * the brightness at 0", full again from 3.5", smoothstep in between). */
+export const SEE_DARK = { at0: 0.3, upTo: 0.35 };
 export function seeingRgb(x: number): [number, number, number] {
   const c = turbo(x),
     t = Math.max(0, Math.min(1, x / SEE_DARK.upTo)),
