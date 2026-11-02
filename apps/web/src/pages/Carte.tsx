@@ -711,13 +711,9 @@ export default function Carte() {
     }
     const km = Math.round((VW.lo1 - VW.lo0) * 111.32 * Math.cos(((VW.la0 + VW.la1) / 2) * D2R));
     // exported PNG / GIF: no K
-    if (!gifBusy && !pngBusy)
-      label(
-        tr("Calibration globale (administrateur)") +
-          (role === "admin" ? ` · K_TKE = ${fmt(KGLOB[0]!)}  K_CIS = ${fmt(KGLOB[1]!)}  K_conv = ${fmt(KGLOB[2]!)}` : ""),
-        10,
-        CH - 12,
-      );
+    // the map's K: administrator only (and never in the exported PNG / GIF)
+    if (!gifBusy && !pngBusy && role === "admin")
+      label(`${tr("Calibration globale (administrateur)")} · K_TKE = ${fmt(KGLOB[0]!)}  K_CIS = ${fmt(KGLOB[1]!)}  K_conv = ${fmt(KGLOB[2]!)}`, 10, CH - 12);
     const hkm = Math.round((VW.la1 - VW.la0) * 111.2),
       zmax = VW.la1 - VW.la0 <= ZMIN + 1e-6;
     label(tr(`${hkm} × ${km} km${zmax ? " · zoom maximal" : ""} · isolignes ${VW.la1 - VW.la0 <= FINE_VIEW_DEG ? "250" : "1000 / 2000"} m`), CW - (zmax ? 300 : 200), CH - 12);

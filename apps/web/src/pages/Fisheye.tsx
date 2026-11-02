@@ -570,22 +570,27 @@ export default function Fisheye() {
               {busy ? (prog ? `GIF ${prog[0] + 1}/${prog[1]}` : tr("GIF…")) : "⤓ GIF"}
             </button>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-            <span className="small muted">{tr("Calibration :")}</span>
-            <Seg
-              label={tr("Calibration du fisheye")}
-              value={cal}
-              onChange={setCal}
-              options={[
-                ...(kSeen ? ([["lieu", tr("K calibrés du lieu")]] as ["lieu" | "carte", string][]) : []),
-                ["carte", tr("K de la carte")],
-              ]}
-            />
-            <span className="small muted mono">
-              K_TKE {fmt(K[0])} · K_CIS {fmt(K[1])}
-              {cal === "lieu" ? ` (${tr(place.nom)})` : ""}
-            </span>
-          </div>
+          {/* the K of the map and of the public sites: administrator only; an account sees the K of its own places */}
+          {(role === "admin" || kSeen) && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              <span className="small muted">{tr("Calibration :")}</span>
+              <Seg
+                label={tr("Calibration du fisheye")}
+                value={cal}
+                onChange={setCal}
+                options={[
+                  ...(kSeen ? ([["lieu", tr("K calibrés du lieu")]] as ["lieu" | "carte", string][]) : []),
+                  ["carte", tr("K de la carte")],
+                ]}
+              />
+              {(role === "admin" || cal === "lieu") && (
+                <span className="small muted mono">
+                  K_TKE {fmt(K[0])} · K_CIS {fmt(K[1])}
+                  {cal === "lieu" ? ` (${tr(place.nom)})` : ""}
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div className="stack">
           <div className="panel">
