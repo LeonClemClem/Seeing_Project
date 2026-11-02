@@ -123,7 +123,10 @@ export default function Fisheye() {
   const kSeen = place.real && !kHidden(place, role);
   const [calPick, setCal] = useState<"lieu" | "carte">("lieu");
   const cal = kSeen ? calPick : "carte";
-  const [hov, setHov] = useState<{ x: number; y: number; alt: number; az: number; s: number; c: number } | null>(null);
+  /** Direction under the cursor; its seeing and clouds are read at render time, so they follow the animation. */
+  const [hov, setHov] = useState<{ x: number; y: number; alt: number; az: number } | null>(null);
+  /** Animation speed: x1 = one hour every 900 ms. */
+  const [speed, setSpeed] = useState<1 | 2 | 3>(1);
   const [opt, setOpt] = useState<Record<OptKey, boolean>>({ cons: true, sol: true, trk: true, nua: false });
   const [plOn, setPlOn] = useState(() => new Set(["Jupiter", "Saturne", "Mars"]));
   const [tgts, setTgts] = useState<CatObj[]>(() => [CAT[0]!, CAT[9]!]);
@@ -170,6 +173,10 @@ export default function Fisheye() {
     return fe && fr?.cloud ? dirSampler(fe, alt, az)(fr.cloud) : NaN;
   };
   const hasClouds = !!fe?.frames.some((f) => f.cloud);
+  // seeing and clouds of the direction under the cursor, at the hour shown (follows the animation)
+  const hovOn = !!hov && vis(hov.alt, hov.az),
+    hovS = hovOn ? seeSky(fcur, hov!.alt, hov!.az) : NaN,
+    hovC = hovOn && opt.nua ? cloudSky(fcur, hov!.alt, hov!.az) : NaN;
   const best = (o: CatObj) => {
     let b: [number, number] | null = null;
     for (let k = 0; k <= 10; k++) {
@@ -183,9 +190,9 @@ export default function Fisheye() {
 
   useEffect(() => {
     if (!playing) return;
-    const id = setInterval(() => setFcur((c) => (c + 1) % 11), 900);
+    const id = setInterval(() => setFcur((c) => (c + 1) % 11), 900 / speed);
     return () => clearInterval(id);
-  }, [playing]);
+  }, [playing, speed]);
 
   const t = tOf(fcur);
   const sun = sunAltAz(t, lat, lon),
@@ -438,15 +445,7 @@ export default function Fisheye() {
                 if (r > FR) return setHov(null);
                 const alt = 90 - (r / FR) * 90,
                   az = (Math.atan2(-dx, dy) / D2R + 360) % 360;
-                const on = vis(alt, az);
-                setHov({
-                  x: e.clientX - b.left,
-                  y: e.clientY - b.top,
-                  alt,
-                  az,
-                  s: on ? seeSky(fcur, alt, az) : NaN,
-                  c: on && opt.nua ? cloudSky(fcur, alt, az) : NaN,
-                });
+                setHov({ x: e.clientX - b.left, y: e.clientY - b.top, alt, az });
               }}
             />
             {hov && (
@@ -471,11 +470,11 @@ export default function Fisheye() {
                 ) : hov.alt < ELMIN ? (
                   <b>{tr(`sous ${ELMIN}° d'élévation`)}</b>
                 ) : (
-                  <b style={{ fontSize: 14, display: "block" }}>{isNaN(hov.s) ? "–" : hov.s.toFixed(2) + "″"}</b>
+                  <b style={{ fontSize: 14, display: "block" }}>{isNaN(hovS) ? "–" : hovS.toFixed(2) + "″"}</b>
                 )}
                 <div>{`${tr("élév.")} ${Math.round(hov.alt)}°`}</div>
                 <div>{`az ${Math.round(hov.az)}° ${dir8(hov.az)}`}</div>
-                {!isNaN(hov.c) && <div>{`${tr("nuages")} ${Math.round(hov.c * 100)} %`}</div>}
+                {!isNaN(hovC) && <div>{`${tr("nuages")} ${Math.round(hovC * 100)} %`}</div>}
               </div>
             )}
           </div>
@@ -493,6 +492,16 @@ export default function Fisheye() {
             <button aria-label={tr("Animer la nuit")} onClick={() => setPlaying(!playing)}>
               {playing ? "❚❚" : "▶"}
             </button>
+            <Seg
+              label={tr("Vitesse de l'animation")}
+              value={speed}
+              onChange={setSpeed}
+              options={[
+                [1, "×1"],
+                [2, "×2"],
+                [3, "×3"],
+              ]}
+            />
             <input
               type="range"
               min={0}

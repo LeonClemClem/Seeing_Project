@@ -345,7 +345,11 @@ export default function Carte() {
   const [MNI, setMNI] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [MZH, setMZH] = useState(-1);
-  const [tip, setTip] = useState<string | null>(null);
+  /** Cursor on the map (canvas pixels), null outside: the tip under it is recomputed at every render, so its
+   * seeing follows the hour shown during the animation. */
+  const [hoverXY, setHoverXY] = useState<[number, number] | null>(null);
+  /** Animation speed: x1 = one hour every 900 ms. */
+  const [speed, setSpeed] = useState<1 | 2 | 3>(1);
   const loc = useLocation();
   // "Enregistrer ce point comme lieu" (Prévision, Calibrer for a point of the map) brings the coordinates
   const st0 = loc.state as { newPlace?: boolean; lat?: number; lon?: number } | null;
@@ -652,9 +656,9 @@ export default function Carte() {
         setMNI(Math.max(0, NIGHTS.findIndex((q) => n >= q.i0 && n <= q.i1)));
         return n;
       });
-    }, 900);
+    }, 900 / speed);
     return () => clearInterval(id);
-  }, [playing, last, NIGHTS]);
+  }, [playing, last, NIGHTS, speed]);
 
   /* ---------- interactions ---------- */
   const setView = (v: Box, e: "dom" | "zoom" | "reg" | null = null) => {
@@ -736,20 +740,23 @@ export default function Carte() {
       zi = zz ? zz[4] : -1;
     if (zi !== MZH) setMZH(zi);
     canvas.current!.style.cursor = zi >= 0 ? "pointer" : isFullView(VW) ? "default" : "grab";
-    const la = LA(y),
+    setHoverXY([x, y]);
+  };
+  /** Tip under the cursor: seeing of the map shown (the hour or the night mean), position, AROME relief. */
+  const tipAt = (x: number, y: number) => {
+    const zz = zoneAt(x, y),
+      la = LA(y),
       lo = LO(x);
-    // seeing of the map shown (the hour or the night mean) under the cursor, at every zoom
     const sv = sample ? sample(la, lo) : NaN,
       see = isNaN(sv) ? "" : `${tr("seeing")} <b class="mono">${sv.toFixed(1)}″</b> · `;
-    if (zz) return setTip(`${see}${tr("Clique pour zoomer sur")} <b>${esc(tr(ZONES[zi]![0]))}</b>`);
-    setTip(
-      relReal || onLand(x, y)
-        ? see +
-            `<span class="mono">${la.toFixed(3)} N · ${lo.toFixed(3)} E</span>` +
-            (relReal && land && land.at(la, lo) >= 0.5 ? ` · ${tr("relief AROME")} <span class="mono">${Math.round(relReal(la, lo))} m</span>` : "")
-        : `<span class="mono">${la.toFixed(2)} N · ${lo.toFixed(2)} E</span> · ${tr("hors de la zone du calcul global")}`,
-    );
+    if (zz) return `${see}${tr("Clique pour zoomer sur")} <b>${esc(tr(ZONES[zz[4]]![0]))}</b>`;
+    return relReal || onLand(x, y)
+      ? see +
+          `<span class="mono">${la.toFixed(3)} N · ${lo.toFixed(3)} E</span>` +
+          (relReal && land && land.at(la, lo) >= 0.5 ? ` · ${tr("relief AROME")} <span class="mono">${Math.round(relReal(la, lo))} m</span>` : "")
+      : `<span class="mono">${la.toFixed(2)} N · ${lo.toFixed(2)} E</span> · ${tr("hors de la zone du calcul global")}`;
   };
+  const tip = hoverXY && !drag.current ? tipAt(hoverXY[0], hoverXY[1]) : null;
   const up = (e: RPointerEvent<HTMLCanvasElement>) => {
     const d = drag.current;
     if (!d) return;
@@ -836,6 +843,7 @@ export default function Carte() {
         )}
       </p>
       <PointForm
+        pick={newPt}
         onSave={(la, lo) => {
           setNewPt([la, lo]);
           setShowNew(true);
@@ -899,7 +907,7 @@ export default function Carte() {
             onPointerMove={move}
             onPointerUp={up}
             onPointerCancel={() => (drag.current = null)}
-            onPointerLeave={() => setTip(null)}
+            onPointerLeave={() => setHoverXY(null)}
           />
           <ColorBar left={tr("bon")} right={tr("mauvais")} gradient={seeingGradient()} />
           <p className="small muted" style={{ margin: "4px 0 0", textAlign: "center" }}>
@@ -970,6 +978,16 @@ export default function Carte() {
               >
                 {playing ? "❚❚" : "▶"}
               </button>
+              <Seg
+                label={tr("Vitesse de l'animation")}
+                value={speed}
+                onChange={setSpeed}
+                options={[
+                  [1, "×1"],
+                  [2, "×2"],
+                  [3, "×3"],
+                ]}
+              />
               <input
                 type="range"
                 min={0}
