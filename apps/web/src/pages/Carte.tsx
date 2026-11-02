@@ -14,7 +14,7 @@ import { useUser } from "../data/auth";
 import { MAX_PLACES, selectPlace, siteToPlace, useCurrentPlace, usePlaceActions, usePlaces } from "../data/places";
 import { tr } from "../i18n";
 import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, parseCoord, SARD, VILLES, ZONES, type Box } from "../lib/geo";
-import { useGlobalMap, useLatestRunTime } from "../lib/hooks";
+import { useGlobalMap, useLatestRunTime, useMapShares } from "../lib/hooks";
 import type { MapGrid } from "../api";
 import { BAND, banded, canvasToPng, downloadBlob, encodeGif, nextPaint as paint } from "../lib/export";
 import { D2R, esc, fmt, JOURS, pad2, runLabel, seeingGradient, seeingRgb } from "../lib/util";
@@ -342,6 +342,8 @@ export default function Carte() {
   const [ext, setExt] = useState<"dom" | "zoom" | "reg">("dom");
   const [reg, setReg] = useState("");
   const [mode, setMode] = useState<"m" | "h">("m");
+  /** Turbulence shown: all of it (the map as computed, default), the boundary layer only, or above it only. */
+  const [layer, setLayer] = useState<"tot" | "bl" | "haut">("tot");
   const [MI, setMI] = useState(0);
   const [MNI, setMNI] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -402,7 +404,7 @@ export default function Carte() {
     setPngBusy(true);
     try {
       await paint();
-      canvasToPng(banded(canvas.current, exportTitle, exportSub), `carte_seeing_${fileStamp()}.png`);
+      canvasToPng(banded(canvas.current, exportTitle, exportSub, undefined, bandDays(shownDays)), `carte_seeing_${fileStamp()}.png`);
     } finally {
       setPngBusy(false);
     }
@@ -427,7 +429,9 @@ export default function Carte() {
         setMI(i);
         await paint();
         const d = frameT(i);
-        frames.push(banded(canvas.current!, hourTitle(d), hourSub(d), [k, idx.length]).getContext("2d")!.getImageData(0, 0, CW, CH + BAND));
+        frames.push(
+          banded(canvas.current!, hourTitle(d), hourSub(d), [k, idx.length], bandDays([dayKey(d)])).getContext("2d")!.getImageData(0, 0, CW, CH + BAND),
+        );
       }
       if (frames.length)
         downloadBlob(encodeGif(frames, Math.round(90 / speed)), `carte_seeing_run${new Date(RUN0).toISOString().slice(0, 13).replace(/[-T]/g, "")}Z_toutes_heures.gif`);
@@ -444,11 +448,29 @@ export default function Carte() {
   /* Real map: the frame of the chosen hour, or the mean seeing of the night's frames. Hours the run
      does not cover are left out (no interpolation, no fictitious field): no value at all for a
      missing hour, and the mean says which hours it really uses. */
+  const shares = useMapShares(gmap?.meta, layer !== "tot");
+  /** Frames of the boundary layer / free atmosphere alone (seeing ~ integral^0.6: the part alone is the seeing x
+   * share^0.6 or x (1 - share)^0.6); the map as computed for "tot", untouched. null while the shares load. */
+  const layerFrames = useMemo(() => {
+    if (!gmap || layer === "tot") return gmap?.frames ?? null;
+    if (!shares) return null;
+    const fac = new Float32Array(256).fill(NaN);
+    for (let c = 0; c < 255; c++) fac[c] = Math.pow(layer === "bl" ? c / 254 : 1 - c / 254, 0.6);
+    return new Map(
+      [...gmap.frames].flatMap(([lead, s]) => {
+        const sh = shares.get(lead);
+        if (!sh) return [];
+        const o = new Float32Array(s.length);
+        for (let j = 0; j < s.length; j++) o[j] = s[j]! * fac[sh[j]!]!;
+        return [[lead, o] as const];
+      }),
+    );
+  }, [gmap, layer, shares]);
   const real = useMemo(() => {
-    if (!gmap) return null;
+    if (!gmap || !layerFrames) return null;
     const idx = mode === "m" ? [...Array(night.i1 - night.i0 + 1)].map((_, k) => night.i0 + k).filter(inMean) : [MI];
-    const used = idx.filter((i) => gmap.frames.has(Math.round((frameT(i).getTime() - RUN0) / 3600000)));
-    const arrs = used.map((i) => gmap.frames.get(Math.round((frameT(i).getTime() - RUN0) / 3600000))!);
+    const used = idx.filter((i) => layerFrames.has(Math.round((frameT(i).getTime() - RUN0) / 3600000)));
+    const arrs = used.map((i) => layerFrames.get(Math.round((frameT(i).getTime() - RUN0) / 3600000))!);
     if (!arrs.length) return { sample: (): number => NaN, hours: [] as number[], expected: idx.length };
     const n = arrs[0]!.length,
       mean = new Float32Array(n);
@@ -465,7 +487,7 @@ export default function Carte() {
       mean[j] = c ? s / c : NaN;
     }
     return { sample: sampler(gmap.meta.grid, mean), hours: used.map((i) => MAPH[i]!), expected: idx.length };
-  }, [gmap, mode, MI, night.i0, night.i1, frameT, RUN0]);
+  }, [gmap, layerFrames, mode, MI, night.i0, night.i1, frameT, RUN0]);
   const sample = real?.sample ?? null;
   const geo = useGeoLines();
   /** Real AROME orography of the map grid, when the run has it. */
@@ -519,12 +541,21 @@ export default function Carte() {
   const nightStart = frameT(night.i0),
     nightNext = new Date(nightStart.getTime() + 24 * 3600000);
   const hourTitle = (d: Date) => `${dayName(d)} ${pad2(d.getUTCHours())}h00 TU`;
-  const hourSub = (d: Date) => `${ddmm(d)}/${d.getUTCFullYear()} · Seeing AROME V2bd · run ${runL}`;
+  const layerTxt = layer === "bl" ? ` · ${tr("couche limite seule")}` : layer === "haut" ? ` · ${tr("au-dessus de la couche limite seule")}` : "";
+  const hourSub = (d: Date) => `${ddmm(d)}/${d.getUTCFullYear()} · Seeing AROME V2bd${layerTxt} · run ${runL}`;
+  // the days of the run side by side, the one shown highlighted (both days of the night for the night mean)
+  const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+  const runDays = [
+    ...new Map(NIGHTS.flatMap((q) => [frameT(q.i0), frameT(q.i1)]).map((d) => [dayKey(d), d] as const)).values(),
+  ];
+  const bandDays = (on: string[]) => runDays.map((d) => ({ label: dayName(d), on: on.includes(dayKey(d)) }));
+  const shownDays = mode === "m" ? [dayKey(nightStart), dayKey(nightNext)] : [dayKey(fd)];
+  const lastI = NIGHTS[NIGHTS.length - 1]?.i1 ?? 0;
   const exportTitle =
     mode === "m" ? `${tr("Nuit de")} ${dayName(nightStart).toLowerCase()} ${tr("à")} ${dayName(nightNext).toLowerCase()}` : hourTitle(fd);
   const exportSub =
     mode === "m"
-      ? `${ddmm(nightStart)} → ${ddmm(nightNext)}/${nightNext.getUTCFullYear()} · ${tr("moyenne")} ${meanRange} · Seeing AROME V2bd · run ${runL}`
+      ? `${ddmm(nightStart)} → ${ddmm(nightNext)}/${nightNext.getUTCFullYear()} · ${tr("moyenne")} ${meanRange} · Seeing AROME V2bd${layerTxt} · run ${runL}`
       : hourSub(fd);
 
   /* ---------- drawing ---------- */
@@ -936,7 +967,7 @@ export default function Carte() {
               </button>
             </div>
           </div>
-          <DateBand title={exportTitle} sub={exportSub} />
+          <DateBand title={exportTitle} sub={exportSub} days={bandDays(shownDays)} progress={mode === "h" && lastI > 0 ? MI / lastI : null} />
           <canvas
             ref={canvas}
             width={CW}
@@ -1004,6 +1035,22 @@ export default function Carte() {
                   ["h", tr("Heure par heure")],
                 ]}
               />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span className="small muted" style={{ minWidth: 52 }}>
+                {tr("Turbulence")}
+              </span>
+              <Seg
+                label={tr("Turbulence affichée")}
+                value={layer}
+                onChange={setLayer}
+                options={[
+                  ["tot", tr("Toute la turbulence")],
+                  ["bl", tr("Couche limite")],
+                  ["haut", tr("Au-dessus de la couche limite")],
+                ]}
+              />
+              {layer !== "tot" && !shares && <span className="small muted">{tr("chargement…")}</span>}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <span className="small muted" style={{ minWidth: 52 }}>

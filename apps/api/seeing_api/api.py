@@ -310,6 +310,21 @@ def global_map_relief(session: SessionDep, run: RunParam = "latest") -> Response
                     headers={"Cache-Control": "public, max-age=86400"})
 
 
+@router.get("/map/share")
+def global_map_share(session: SessionDep, lead: int, run: RunParam = "latest") -> Response:
+    """Share of the boundary-layer turbulence (TKE + convection) in the integral of the map's Cn2 at each cell of a
+    frame: ny * nx uint8 codes, share = code / 254, 255 = none (first plane of MapFrame.extra). The map can show the
+    boundary-layer or the free-atmosphere turbulence alone (seeing x share^0.6 or x (1 - share)^0.6)."""
+    model_run = _map_run(session, run)
+    row = session.execute(
+        select(MapFrame.extra, MapFrame.ny, MapFrame.nx).where(MapFrame.run_id == model_run.id, MapFrame.lead_hour == lead)
+    ).first()
+    if row is None or row.extra is None:
+        raise HTTPException(404, f"No turbulence split at H+{lead}")
+    return Response(zlib.decompress(row.extra)[: row.ny * row.nx], media_type="application/octet-stream",
+                    headers={"Cache-Control": "public, max-age=86400"})
+
+
 @router.get("/map/frame")
 def global_map_frame(session: SessionDep, lead: int, run: RunParam = "latest") -> Response:
     model_run = _map_run(session, run)

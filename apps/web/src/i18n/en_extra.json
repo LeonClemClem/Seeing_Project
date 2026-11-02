@@ -282,5 +282,13 @@
 "moyenne": "mean",
 "Télécharger le fisheye affiché (PNG)": "Download the fisheye shown (PNG)",
 "Télécharger l'animation de la nuit (GIF)": "Download the night animation (GIF)",
-"Télécharger l'animation de toutes les heures prévues (GIF)": "Download the animation of every forecast hour (GIF)"
+"Télécharger l'animation de toutes les heures prévues (GIF)": "Download the animation of every forecast hour (GIF)",
+"Turbulence": "Turbulence",
+"Turbulence affichée": "Turbulence shown",
+"Toute la turbulence": "All the turbulence",
+"Couche limite": "Boundary layer",
+"Au-dessus de la couche limite": "Above the boundary layer",
+"couche limite seule": "boundary layer only",
+"au-dessus de la couche limite seule": "above the boundary layer only",
+"chargement…": "loading…"
 }
