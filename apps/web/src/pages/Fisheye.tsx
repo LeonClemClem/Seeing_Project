@@ -23,7 +23,8 @@ import {
   sunAltAz,
   type CatObj,
 } from "../lib/sky";
-import { D2R, fmt, pad2, runLabel, seeingGradient, seeingRgb } from "../lib/util";
+import { BAND, banded, canvasToPng, downloadBlob, encodeGif, nextPaint } from "../lib/export";
+import { D2R, fmt, JOURS, pad2, runLabel, seeingGradient, seeingRgb } from "../lib/util";
 import { KDEF, REF } from "../mock/engine";
 import { useUi, type K3 } from "../store";
 
@@ -195,6 +196,39 @@ export default function Fisheye() {
   }, [playing, speed]);
 
   const t = tOf(fcur);
+  // exported PNG / GIF: the sky under a band with the day and hour large, the date, place and run below
+  const [busy, setBusy] = useState(false);
+  const title = (i: number) => {
+    const d = new Date(tOf(i));
+    return `${tr(JOURS[d.getUTCDay()]!)} ${pad2(d.getUTCHours())}h00 TU`;
+  };
+  const sub = (i: number) => {
+    const d = new Date(tOf(i));
+    return `${pad2(d.getUTCDate())}/${pad2(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} · ${tr(place.nom)} · Seeing AROME V2bd${fe ? " · run " + runLabel(Date.parse(fe.run_time)) : ""}`;
+  };
+  const stamp = (i: number) => new Date(tOf(i)).toISOString().slice(0, 13).replace(/[-T]/g, "");
+  const fileName = (ext: string, i: number) => `fisheye_${place.nom.replace(/[^A-Za-z0-9]+/g, "_")}_${stamp(i)}h.${ext}`;
+  const exportPng = () => cv.current && canvasToPng(banded(cv.current, title(fcur), sub(fcur)), fileName("png", fcur));
+  /** Animated GIF of the night (19h-05h), at the speed of the animation (x1: 0.9 s per hour, x2: 0.45 s, x3: 0.3 s). */
+  const exportGif = async () => {
+    if (!cv.current) return;
+    setBusy(true);
+    const keep = { fcur, playing };
+    setPlaying(false);
+    const frames: ImageData[] = [];
+    try {
+      for (let i = 0; i <= 10; i++) {
+        setFcur(i);
+        await nextPaint();
+        frames.push(banded(cv.current, title(i), sub(i)).getContext("2d")!.getImageData(0, 0, FN, FN + BAND));
+      }
+      downloadBlob(encodeGif(frames, Math.round(90 / speed)), fileName("gif", 0));
+    } finally {
+      setFcur(keep.fcur);
+      setPlaying(keep.playing);
+      setBusy(false);
+    }
+  };
   const sun = sunAltAz(t, lat, lon),
     moon = moonAltAz(t, lat, lon),
     phase = moonPhase(t);
@@ -516,6 +550,12 @@ export default function Fisheye() {
               {`${pad2(d.getUTCDate())}/${pad2(d.getUTCMonth() + 1)} · ${pad2(d.getUTCHours())}h00 ${tr("TU")}`}
               {fe && !frameAt(fcur) ? tr(" · pas de prévision à cette heure") : ""}
             </span>
+            <button title={tr("Télécharger le fisheye affiché (PNG)")} onClick={exportPng}>
+              ⤓ PNG
+            </button>
+            <button title={tr("Télécharger l'animation de la nuit (GIF)")} disabled={busy} onClick={() => void exportGif()}>
+              {busy ? tr("GIF…") : "⤓ GIF"}
+            </button>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
             <span className="small muted">{tr("Calibration :")}</span>

@@ -11,6 +11,41 @@ export function downloadBlob(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
+/** Height of the band above the map / fisheye in the exported PNG / GIF (the image itself is not covered). */
+export const BAND = 64;
+/** A canvas under a band with the day and hour large ("Samedi 20h00 TU") and the date / run below. */
+export function banded(src: HTMLCanvasElement, title: string, sub: string): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = src.width;
+  c.height = src.height + BAND;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#0b1220";
+  g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = "#fff";
+  g.font = "600 26px 'IBM Plex Sans',sans-serif";
+  g.fillText(title, 14, 33);
+  g.fillStyle = "#c9d3e6";
+  g.font = "500 12px 'IBM Plex Sans',sans-serif";
+  g.fillText(sub, 14, 54);
+  g.drawImage(src, 0, BAND);
+  return c;
+}
+
+/** Two paints: the canvas drawn by an effect after a state change is ready to be read. A timer backs the animation
+ * frames up: a tab in the background gets no animation frame at all, and the export would wait forever. */
+export const nextPaint = () =>
+  new Promise<void>((r) => {
+    let done = false;
+    const go = () => {
+      if (!done) {
+        done = true;
+        r();
+      }
+    };
+    requestAnimationFrame(() => requestAnimationFrame(go));
+    setTimeout(go, 150);
+  });
+
 export function canvasToPng(canvas: HTMLCanvasElement, name: string) {
   canvas.toBlob((b) => b && downloadBlob(b, name), "image/png");
 }

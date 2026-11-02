@@ -16,8 +16,8 @@ import { tr } from "../i18n";
 import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, parseCoord, SARD, VILLES, ZONES, type Box } from "../lib/geo";
 import { useGlobalMap, useLatestRunTime } from "../lib/hooks";
 import type { MapGrid } from "../api";
-import { canvasToPng, downloadBlob, encodeGif } from "../lib/export";
-import { D2R, esc, fmt, pad2, runLabel, seeingGradient, seeingRgb } from "../lib/util";
+import { BAND, banded, canvasToPng, downloadBlob, encodeGif, nextPaint as paint } from "../lib/export";
+import { D2R, esc, fmt, JOURS, pad2, runLabel, seeingGradient, seeingRgb } from "../lib/util";
 import { REF } from "../mock/engine";
 import { setState, useUi } from "../store";
 
@@ -33,7 +33,6 @@ const NIGHT_H = [19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5],
 const LEADMAX = 51;
 const KGLOB = [1, 30, 0.1];
 const JS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
-const JOURS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const LUT = [...Array(256)].map((_, k) => seeingRgb(k / 255));
 /** Colour of a seeing value: the seeing palette (seeingRgb) on a fixed 0-10" range, linear (1" -> 10 %, 5" -> 50 % of
  * the scale), the same for every run so that nights can be compared, and the same as the fisheye. */
@@ -265,25 +264,6 @@ function PinIcon({ kind }: { kind: PinKind }) {
 
 type ZoneHit = [x: number, y: number, w: number, h: number, i: number];
 
-/** Height of the band above the map in the exported PNG / GIF (the map itself is not covered). */
-const BAND = 64;
-/** The map canvas under a band with the day and hour large ("Samedi 20h00 TU") and the date / run below. */
-function banded(src: HTMLCanvasElement, title: string, sub: string): HTMLCanvasElement {
-  const c = document.createElement("canvas");
-  c.width = src.width;
-  c.height = src.height + BAND;
-  const g = c.getContext("2d")!;
-  g.fillStyle = "#0b1220";
-  g.fillRect(0, 0, c.width, BAND);
-  g.fillStyle = "#fff";
-  g.font = "600 26px 'IBM Plex Sans',sans-serif";
-  g.fillText(title, 14, 33);
-  g.fillStyle = "#c9d3e6";
-  g.font = "500 12px 'IBM Plex Sans',sans-serif";
-  g.fillText(sub, 14, 54);
-  g.drawImage(src, 0, BAND);
-  return c;
-}
 
 /** Coastlines and land borders (Natural Earth 1:10m clipped to the AROME domain, scripts/geo_lines.py) as segments
  * [lat1, lon1, lat2, lon2, ...] like contourSegs. The AROME relief is smoothed (its 1 m contour runs kilometres out
@@ -415,7 +395,6 @@ export default function Carte() {
   const [gifBusy, setGifBusy] = useState(false);
   /** PNG being drawn: as for the GIF, the map is drawn once more without the clickable zone labels. */
   const [pngBusy, setPngBusy] = useState(false);
-  const paint = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
   const exportPng = async () => {
     if (!canvas.current) return;
     setPngBusy(true);
@@ -427,7 +406,8 @@ export default function Carte() {
     }
   };
   /** Animated GIF of the night: every hour of the chosen night, drawn one by one on the map canvas (the frames are
-   * already loaded, each hour is drawn on the next paint), then the view is put back. */
+   * already loaded, each hour is drawn on the next paint), then the view is put back. Same speed as the animation
+   * (x1: 0.9 s per hour, x2: 0.45 s, x3: 0.3 s). */
   const exportGif = async () => {
     if (!canvas.current) return;
     setGifBusy(true);
@@ -442,7 +422,7 @@ export default function Carte() {
         const d = frameT(i);
         frames.push(banded(canvas.current!, hourTitle(d), hourSub(d)).getContext("2d")!.getImageData(0, 0, CW, CH + BAND));
       }
-      downloadBlob(encodeGif(frames, 90), `carte_seeing_run${new Date(RUN0).toISOString().slice(0, 13).replace(/[-T]/g, "")}Z_nuit_${night.lab.replace(/[^0-9]+/g, "-")}.gif`);
+      downloadBlob(encodeGif(frames, Math.round(90 / speed)), `carte_seeing_run${new Date(RUN0).toISOString().slice(0, 13).replace(/[-T]/g, "")}Z_nuit_${night.lab.replace(/[^0-9]+/g, "-")}.gif`);
     } finally {
       setMode(keep.mode);
       setMI(keep.MI);
