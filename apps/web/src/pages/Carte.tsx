@@ -713,7 +713,7 @@ export default function Carte() {
     // exported PNG / GIF: no K
     // the map's K: administrator only (and never in the exported PNG / GIF)
     if (!gifBusy && !pngBusy && role === "admin")
-      label(`${tr("Calibration globale (administrateur)")} · K_TKE = ${fmt(KGLOB[0]!)}  K_CIS = ${fmt(KGLOB[1]!)}  K_conv = ${fmt(KGLOB[2]!)}`, 10, CH - 12);
+      label(`${tr("Calibration globale (administrateur)")} · K1 = ${fmt(KGLOB[0]!)}  K2 = ${fmt(KGLOB[1]!)}  K_conv = ${fmt(KGLOB[2]!)}`, 10, CH - 12);
     const hkm = Math.round((VW.la1 - VW.la0) * 111.2),
       zmax = VW.la1 - VW.la0 <= ZMIN + 1e-6;
     label(tr(`${hkm} × ${km} km${zmax ? " · zoom maximal" : ""} · isolignes ${VW.la1 - VW.la0 <= FINE_VIEW_DEG ? "250" : "1000 / 2000"} m`), CW - (zmax ? 300 : 200), CH - 12);

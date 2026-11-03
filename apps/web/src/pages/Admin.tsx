@@ -36,8 +36,8 @@ export default function Admin() {
                 <th>{tr("Lieu")}</th>
                 <th>{tr("Propriétaire")}</th>
                 <th>{tr("Coordonnées")}</th>
-                <th>K_TKE</th>
-                <th>K_CIS</th>
+                <th>K1</th>
+                <th>K2</th>
                 <th>K_conv</th>
                 <th>{tr("Enregistrés le")}</th>
               </tr>
@@ -73,8 +73,8 @@ export default function Admin() {
               <tr>
                 <th>{tr("Date")}</th>
                 <th>{tr("Lieu")}</th>
-                <th>K_TKE</th>
-                <th>K_CIS</th>
+                <th>K1</th>
+                <th>K2</th>
                 <th>K_conv</th>
                 <th>{tr("Origine")}</th>
                 <th>{tr("Par")}</th>

@@ -460,7 +460,7 @@ function Calibrer() {
   const kBanner = kDiff ? (
     <div className="kbanner warn" role="status">
       <b>{tr("⚠ Aperçu avec les K réglés")}</b>
-      {hideK ? "" : ` (K_TKE ${fmt(K[0])} · K_CIS ${fmt(K[1])})`}.{" "}
+      {hideK ? "" : ` (K1 ${fmt(K[0])} · K2 ${fmt(K[1])})`}.{" "}
       {tr("Le Cn² et les prévisions du site ne les prendront en compte qu'au prochain run AROME, après « Enregistrer pour ce lieu ».")}
     </div>
   ) : saved && place.real && editable ? (
@@ -536,7 +536,7 @@ function Calibrer() {
       <p className="lead">
         {tr("Dépose tes fichiers CSV de seeing (colonnes")} <span className="mono">date ; seeing_arcsec</span>
         {tr(
-          ", en TU ou en heure locale). Ils s'ajoutent les uns aux autres, sans pondération. Le calage se fait sur la nuit (17h30–06h TU) : K_TKE et K_CIS calés indépendamment dès les premières mesures. K_conv reste à 0,1.",
+          ", en TU ou en heure locale). Ils s'ajoutent les uns aux autres, sans pondération. Le calage se fait sur la nuit (17h30–06h TU) : K1 et K2 calés indépendamment dès les premières mesures. K_conv reste à 0,1.",
         )}
       </p>
       {lock && (
@@ -889,7 +889,7 @@ function KPanel(p: {
   // saved with the site on the server (owner, administrator for every site, team for its site), used by the batch
   // from the next run; the example places only keep them in the page
   const save = () => {
-    const done = p.hideK ? tr("Enregistré.") : tr(`Enregistré : K_TKE = ${fmt(K[0])}, K_CIS = ${fmt(K[1])}, K_conv = 0.1.`);
+    const done = p.hideK ? tr("Enregistré.") : tr(`Enregistré : K1 = ${fmt(K[0])}, K2 = ${fmt(K[1])}, K_conv = 0.1.`);
     if (!p.place.real || !p.place.slug) return p.setSaved(done);
     api.saveK(p.place.slug, { k_tke: K[0], k_cis: K[1], k_conv: 0.1 }).then(
       () => {
@@ -908,11 +908,11 @@ function KPanel(p: {
   const hiddenEntry = (k: KHistoryItem) => role !== "admin" && p.place.kind === "mine" && (k.source === "initial" || k.source === "carte");
   const restore = (id: number, k: KHistoryItem) => {
     const hid = hiddenEntry(k);
-    if (!window.confirm(hid ? tr("Remettre la calibration de la carte pour ce lieu ? Utilisée dès le prochain run.") : tr(`Remettre K_TKE = ${fmt(k.k_tke)}, K_CIS = ${fmt(k.k_cis)} pour ce lieu ? Utilisés dès le prochain run.`))) return;
+    if (!window.confirm(hid ? tr("Remettre la calibration de la carte pour ce lieu ? Utilisée dès le prochain run.") : tr(`Remettre K1 = ${fmt(k.k_tke)}, K2 = ${fmt(k.k_cis)} pour ce lieu ? Utilisés dès le prochain run.`))) return;
     api.restoreK(slug, id).then(
       () => {
         setState({ kmode: "S" });
-        p.setSaved(hid ? tr("Calibration de la carte remise.") : tr(`K remis : K_TKE = ${fmt(k.k_tke)}, K_CIS = ${fmt(k.k_cis)}.`));
+        p.setSaved(hid ? tr("Calibration de la carte remise.") : tr(`K remis : K1 = ${fmt(k.k_tke)}, K2 = ${fmt(k.k_cis)}.`));
         return Promise.all([qc.invalidateQueries({ queryKey: queryKeys.sites }), qc.invalidateQueries({ queryKey: ["k-history"] })]);
       },
       (e: Error) => p.setSaved(e.message),
@@ -933,7 +933,7 @@ function KPanel(p: {
           >
             {tr("Calibration auto")}
             <span className="small mono" style={{ fontWeight: 400 }}>
-              K_TKE {fmt(p.autoK[0])} · K_CIS {fmt(p.autoK[1])}
+              K1 {fmt(p.autoK[0])} · K2 {fmt(p.autoK[1])}
             </span>
           </button>
           <Seg
@@ -953,8 +953,8 @@ function KPanel(p: {
           <div id="kbox2">
             <div className="krows">
               {p.krow("Niveau (les deux)", "L")}
-              {p.krow("Couche limite · K_TKE", 0)}
-              {p.krow("Cisaillement · K_CIS", 1)}
+              {p.krow("Couche limite · K1", 0)}
+              {p.krow("Cisaillement · K2", 1)}
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
               <button onClick={save}>

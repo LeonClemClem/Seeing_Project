@@ -586,7 +586,7 @@ export default function Fisheye() {
               />
               {(role === "admin" || cal === "lieu") && (
                 <span className="small muted mono">
-                  K_TKE {fmt(K[0])} · K_CIS {fmt(K[1])}
+                  K1 {fmt(K[0])} · K2 {fmt(K[1])}
                   {cal === "lieu" ? ` (${tr(place.nom)})` : ""}
                 </span>
               )}
