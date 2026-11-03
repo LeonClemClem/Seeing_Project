@@ -29,6 +29,8 @@ export function useAuthActions() {
   const signup = useMutation({ mutationFn: api.signup, onSuccess: refresh });
   const verify = useMutation({ mutationFn: api.verifyEmail, onSuccess: refresh });
   const resend = useMutation({ mutationFn: api.resendVerification });
+  const forgot = useMutation({ mutationFn: api.forgotPassword });
+  const reset = useMutation({ mutationFn: api.resetPassword, onSuccess: refresh });
   const logout = useMutation({
     mutationFn: api.logout,
     onSuccess: () => {
@@ -43,5 +45,5 @@ export function useAuthActions() {
       return refresh();
     },
   });
-  return { login, signup, logout, verify, resend, deleteAccount };
+  return { login, signup, logout, verify, resend, forgot, reset, deleteAccount };
 }

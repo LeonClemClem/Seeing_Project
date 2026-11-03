@@ -3,7 +3,7 @@ from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from seeing_api import auth
 from seeing_api.auth import SESSION_COOKIE, now, token_id, verify_password
@@ -293,3 +293,35 @@ def test_confirmation_off_without_a_mail_key(client, monkeypatch):
     monkeypatch.delenv("EMAIL_VERIFICATION", raising=False)
     monkeypatch.delenv("BREVO_API_KEY", raising=False)
     assert signup(client).status_code == 201 and SESSION_COOKIE in client.cookies
+
+
+def test_forgotten_password_link_sets_a_new_password_once(client, mails):
+    signup(client)
+    client.post("/api/auth/verify", json={"token": mails[0][1].split("verif=")[1]})
+    other = client.cookies.get(SESSION_COOKIE)
+    assert client.post("/api/auth/forgot", json={"email": "nobody@example.org"}).status_code == 204
+    assert len(mails) == 1  # no account: nothing sent, same answer
+    assert client.post("/api/auth/forgot", json={"email": "ada@example.org"}).status_code == 204
+    assert len(mails) == 2 and "/compte?reset=" in mails[1][1]
+    token = mails[1][1].split("reset=")[1]
+    assert client.post("/api/auth/reset", json={"token": token, "password": "short"}).status_code == 422
+    new = "Nouveau-mot-2-passe!"
+    r = client.post("/api/auth/reset", json={"token": token, "password": new})
+    assert r.status_code == 200 and r.json()["email"] == "ada@example.org"
+    assert client.cookies.get(SESSION_COOKIE) != other
+    with get_session_factory()() as s:
+        assert s.scalar(select(func.count()).select_from(UserSession)) == 1  # the older session ended
+    assert client.post("/api/auth/reset", json={"token": token, "password": new}).status_code == 400  # once
+    client.cookies.clear()
+    assert client.post("/api/auth/login", json={"email": "ada@example.org", "password": PASSWORD}).status_code == 401
+    assert client.post("/api/auth/login", json={"email": "ada@example.org", "password": new}).status_code == 200
+
+
+def test_expired_reset_link_is_refused(client, mails):
+    signup(client)
+    client.post("/api/auth/forgot", json={"email": "ada@example.org"})
+    with get_session_factory()() as s:
+        s.scalar(select(EmailToken).where(EmailToken.purpose == "reset")).expires_at = now() - timedelta(seconds=1)
+        s.commit()
+    token = mails[-1][1].split("reset=")[1]
+    assert client.post("/api/auth/reset", json={"token": token, "password": "Nouveau-mot-2-passe!"}).status_code == 400

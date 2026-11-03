@@ -267,6 +267,8 @@ export const api = {
   signup: (b: { email: string; password: string; display_name?: string }) => post<User | Pending>("/api/auth/signup", b),
   verifyEmail: (token: string) => post<User>("/api/auth/verify", { token }),
   resendVerification: (email: string) => post<void>("/api/auth/resend", { email }),
+  forgotPassword: (email: string) => post<void>("/api/auth/forgot", { email }),
+  resetPassword: (b: { token: string; password: string }) => post<User>("/api/auth/reset", b),
   login: (b: { email: string; password: string }) => post<User>("/api/auth/login", b),
   logout: () => post<void>("/api/auth/logout"),
   /** Delete the account: anonymized, its places archived with their data. */

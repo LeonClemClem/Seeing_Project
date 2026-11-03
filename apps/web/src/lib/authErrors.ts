@@ -9,7 +9,7 @@ const DETAIL: Record<string, string> = {
   password_too_common: "Ce mot de passe est trop courant (mot usuel ou suite du clavier). Choisis-en un autre.",
   password_contains_email: "Le mot de passe ne doit pas contenir ton adresse e-mail.",
   email_not_verified: "Confirme d'abord ton adresse : ouvre le lien reçu par e-mail.",
-  invalid_or_expired: "Ce lien de confirmation n'est plus valable. Demande un nouvel e-mail.",
+  invalid_or_expired: "Ce lien n'est plus valable. Demande un nouvel e-mail.",
 };
 
 export function authErrorMessage(err: unknown, mode: "login" | "signup"): string {

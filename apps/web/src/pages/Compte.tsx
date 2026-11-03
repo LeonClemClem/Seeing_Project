@@ -18,6 +18,7 @@ export default function Compte() {
   const me = useMe();
   const user = me.data?.user ?? null;
   const verifMsg = useVerifyLink();
+  const resetToken = useResetToken();
 
   return (
     <section>
@@ -73,7 +74,15 @@ export default function Compte() {
               {tr(verifMsg.text)}
             </p>
           )}
-          {me.isLoading ? <Spinner /> : user ? <Account /> : <LoginForm />}
+          {resetToken.token ? (
+            <ResetForm token={resetToken.token} done={resetToken.clear} />
+          ) : me.isLoading ? (
+            <Spinner />
+          ) : user ? (
+            <Account />
+          ) : (
+            <LoginForm />
+          )}
         </div>
         <div className="panel">
           <h2>{tr("Vie privée et données")}</h2>
@@ -115,6 +124,82 @@ function useVerifyLink(): { ok: boolean; text: string } | null {
     });
   }, [token, setParams, verify]);
   return msg;
+}
+
+/** The e-mailed link to choose a new password (/compte?reset=<token>): the token is kept in the page and taken out
+ * of the address bar. */
+function useResetToken() {
+  const [params, setParams] = useSearchParams();
+  const [token, setToken] = useState<string | null>(() => params.get("reset"));
+  useEffect(() => {
+    if (params.get("reset")) setParams({}, { replace: true });
+  }, [params, setParams]);
+  return { token, clear: () => setToken(null) };
+}
+
+/** New password from the e-mailed link: same rules as the sign-up; every session of the account ends, then the
+ * account is logged in. */
+function ResetForm({ token, done }: { token: string; done: () => void }) {
+  const { reset } = useAuthActions();
+  const [f, setF] = useState({ password: "", password2: "" });
+  const [err, setErr] = useState("");
+  const rules = checkRules(f.password, "");
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!rules.length) return setErr(`Le mot de passe doit faire au moins ${MIN_LENGTH} caractères.`);
+    if (!rules.kinds)
+      return setErr("Le mot de passe doit mêler au moins 3 types de caractères : minuscules, majuscules, chiffres, symboles.");
+    if (f.password !== f.password2) return setErr("Les deux mots de passe ne correspondent pas.");
+    reset.mutate({ token, password: f.password }, { onSuccess: done, onError: (x) => setErr(authErrorMessage(x, "signup")) });
+  };
+  return (
+    <>
+      <h2>{tr("Nouveau mot de passe")}</h2>
+      <form noValidate onSubmit={submit}>
+        <label className="small muted" htmlFor="npw">
+          {tr("Nouveau mot de passe")}
+        </label>
+        <input
+          id="npw"
+          type="password"
+          autoComplete="new-password"
+          style={{ width: "100%", margin: "2px 0 8px" }}
+          value={f.password}
+          onChange={(e) => {
+            setF({ ...f, password: e.target.value });
+            setErr("");
+          }}
+        />
+        <StrengthMeter level={strength(f.password, "")} />
+        <p className="small muted" style={{ margin: "4px 0 8px" }}>
+          {tr("Au moins 12 caractères, et au moins 3 types : minuscules, majuscules, chiffres, symboles.")}
+        </p>
+        <label className="small muted" htmlFor="npw2">
+          {tr("Confirme le mot de passe")}
+        </label>
+        <input
+          id="npw2"
+          type="password"
+          autoComplete="new-password"
+          style={{ width: "100%", margin: "2px 0 4px" }}
+          value={f.password2}
+          onChange={(e) => {
+            setF({ ...f, password2: e.target.value });
+            setErr("");
+          }}
+        />
+        <p className="err" role="alert">
+          {err ? tr(err) : ""}
+        </p>
+        <button className="primary" type="submit" disabled={reset.isPending}>
+          {tr("Enregistrer le mot de passe")}
+        </button>{" "}
+        <button type="button" className="small" style={{ background: "none", border: "none", color: "#9cc7ff", padding: 0 }} onClick={done}>
+          {tr("Annuler")}
+        </button>
+      </form>
+    </>
+  );
 }
 
 function Account() {
@@ -182,8 +267,8 @@ function Account() {
 }
 
 function LoginForm() {
-  const { login, signup, resend } = useAuthActions();
-  const [mode, setMode] = useState<"login" | "signup" | "pending">("login");
+  const { login, signup, resend, forgot } = useAuthActions();
+  const [mode, setMode] = useState<"login" | "signup" | "pending" | "forgot" | "forgotSent">("login");
   const [f, setF] = useState({ email: "", password: "", password2: "", name: "" });
   const [err, setErr] = useState("");
   const [pending, setPending] = useState({ email: "", sent: true });
@@ -221,6 +306,54 @@ function LoginForm() {
       { onSuccess: (r) => ("pending" in r ? toPending(r.email, r.sent) : undefined), onError: fail },
     );
   };
+
+  if (mode === "forgot" || mode === "forgotSent")
+    return (
+      <>
+        <h2>{tr("Mot de passe oublié")}</h2>
+        {mode === "forgotSent" ? (
+          <p className="small">
+            {tr("Si un compte existe pour")} <b>{f.email.trim()}</b>
+            {tr(", un e-mail avec un lien pour choisir un nouveau mot de passe vient d'être envoyé (valable 1 heure). Pense à regarder dans les indésirables.")}
+          </p>
+        ) : (
+          <form
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault();
+              const email = f.email.trim();
+              if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setErr("Entre une adresse e-mail valide.");
+              forgot.mutate(email, { onSuccess: () => setMode("forgotSent"), onError: (x) => setErr(authErrorMessage(x, "login")) });
+            }}
+          >
+            <p className="small muted" style={{ marginTop: 0 }}>
+              {tr("Entre l'adresse de ton compte : tu recevras un lien pour choisir un nouveau mot de passe.")}
+            </p>
+            <label className="small muted" htmlFor="fem">
+              {tr("E-mail")}
+            </label>
+            <input id="fem" type="email" autoComplete="email" style={{ width: "100%", margin: "2px 0 8px" }} value={f.email} onChange={set("email")} />
+            <p className="err" role="alert">
+              {err ? tr(err) : ""}
+            </p>
+            <button className="primary" type="submit" disabled={forgot.isPending}>
+              {tr("Envoyer le lien")}
+            </button>
+          </form>
+        )}
+        <button
+          type="button"
+          className="small"
+          style={{ background: "none", border: "none", color: "#9cc7ff", padding: 0, marginTop: 8 }}
+          onClick={() => {
+            setMode("login");
+            setErr("");
+          }}
+        >
+          {tr("Retour à la connexion")}
+        </button>
+      </>
+    );
 
   if (mode === "pending")
     return (
@@ -338,6 +471,21 @@ function LoginForm() {
         >
           {tr(mode === "login" ? "Pas de compte ? Créer un compte" : "Déjà un compte ? Se connecter")}
         </button>
+        {mode === "login" && (
+          <div style={{ marginTop: 6 }}>
+            <button
+              type="button"
+              className="small"
+              style={{ background: "none", border: "none", color: "#9cc7ff", padding: 0 }}
+              onClick={() => {
+                setMode("forgot");
+                setErr("");
+              }}
+            >
+              {tr("Mot de passe oublié ?")}
+            </button>
+          </div>
+        )}
       </form>
     </>
   );

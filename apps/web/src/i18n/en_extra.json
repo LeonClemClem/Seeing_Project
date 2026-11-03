@@ -308,5 +308,15 @@
 "Calibre d'abord avec tes mesures (Calibration auto)": "First calibrate with your measurements (Auto calibration)",
 "Enregistré.": "Saved.",
 "Remettre la calibration de la carte pour ce lieu ? Utilisée dès le prochain run.": "Put back the map calibration for this place? Used from the next run.",
-"Calibration de la carte remise.": "Map calibration put back."
+"Calibration de la carte remise.": "Map calibration put back.",
+"Ce lien n'est plus valable. Demande un nouvel e-mail.": "This link is no longer valid. Ask for a new e-mail.",
+"Nouveau mot de passe": "New password",
+"Au moins 12 caractères, et au moins 3 types : minuscules, majuscules, chiffres, symboles.": "At least 12 characters, and at least 3 kinds: lower case, upper case, digits, symbols.",
+"Enregistrer le mot de passe": "Save the password",
+"Mot de passe oublié": "Forgotten password",
+"Mot de passe oublié ?": "Forgot your password?",
+"Si un compte existe pour": "If an account exists for",
+", un e-mail avec un lien pour choisir un nouveau mot de passe vient d'être envoyé (valable 1 heure). Pense à regarder dans les indésirables.": ", an e-mail with a link to choose a new password has just been sent (valid 1 hour). Check your spam folder too.",
+"Entre l'adresse de ton compte : tu recevras un lien pour choisir un nouveau mot de passe.": "Enter the address of your account: you will receive a link to choose a new password.",
+"Envoyer le lien": "Send the link"
 }
