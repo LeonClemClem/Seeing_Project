@@ -208,15 +208,9 @@ def send_reset(db: Session, user: User) -> bool:
     db.flush()
     link = f"{public_url()}/compte?reset={token}"
     text = (
-        "Bonjour,
-
-"
+        "Bonjour,\n\n"
         "Pour choisir un nouveau mot de passe pour ton compte Seeing AROME, ouvre ce lien "
-        f"(valable {RESET_HOURS} heure, une seule fois) :
-
-{link}
-
-"
+        f"(valable {RESET_HOURS} heure, une seule fois) :\n\n{link}\n\n"
         "Si tu n'as rien demandé, ignore ce message : ton mot de passe ne change pas."
     )
     return send_mail(user.email, "Nouveau mot de passe · Seeing AROME", text, link, "Choisir un nouveau mot de passe")
