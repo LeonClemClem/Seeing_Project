@@ -144,9 +144,8 @@ export default function Fisheye() {
     staleTime: 30 * 60 * 1000,
   });
   const fe = fq.data;
-  // "Calibré": only for a place whose K are visible and differ from those of the map (a place never calibrated has
-  // the K of the map: both versions would be the same)
-  const kSeen = place.real && !kHidden(place, role) && !!fe && place.K.some((v, i) => Math.abs(v - fe.k[i]!) > 1e-9);
+  // "Calibré": only once the place is calibrated (K saved at least once; curated sites), where its K are visible
+  const kSeen = place.real && !kHidden(place, role) && !!place.calibrated;
   const cal = kSeen ? calPick : "carte";
   const frameAt = (i: number) => {
     if (!fe) return undefined;

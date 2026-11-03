@@ -36,12 +36,13 @@ def test_create_list_update_archive_restore_place():
     assert r.status_code == 201
     p = r.json()
     assert p["name"] == "Jardin" and p["visibility"] == "private" and p["owned"] is True
-    assert p["k"] == [1.0, 30.0, 0.1]  # starting K: the global map K
+    assert p["k"] == [1.0, 30.0, 0.1] and p["calibrated"] is False  # starting K: the global map K, not calibrated
     mine = {s["slug"]: s for s in ada.get("/api/sites").json()}
     assert mine[p["slug"]]["owned"] and mine["saint-veran"]["k"] is None
 
     r = ada.patch(f"/api/places/{p['slug']}", json={"k_tke": 4.5, "shared": True})
     assert r.status_code == 200 and r.json()["k"] == [4.5, 30.0, 0.1] and r.json()["visibility"] == "shared"
+    assert r.json()["calibrated"] is True  # K saved by the owner
     assert ada.patch(f"/api/places/{p['slug']}", json={"k_cis": 151}).status_code == 422
 
     assert ada.delete(f"/api/places/{p['slug']}").status_code == 415  # CSRF guard: JSON only

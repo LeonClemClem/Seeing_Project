@@ -10,12 +10,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from seeing_api.auth import NO_STORE, CurrentUser, user_out
 from seeing_api.db import get_session
 from seeing_api.schemas import Cn2Out, ForecastOut, ForecastPoint, MapFrameOut, MapGridOut, MapOut, MeOut, RunOut, SiteOut
-from seeing_db import Cn2Profile, Forecast, MapFrame, ModelRun, RunStatus, Site, User, UserRole
+from seeing_db import Cn2Profile, Forecast, MapFrame, ModelRun, RunStatus, Site, SiteKHistory, User, UserRole
 
 router = APIRouter(prefix="/api")
 
@@ -114,10 +114,23 @@ def site_out(site: Site, user: User | None = None) -> SiteOut:
         if not admin:
             lat, lon = blur(site.slug, site.lat, site.lon)
             alt, cells = None, None
+    show_k = owned or team or (admin and site.owner_id is None)
     return SiteOut(
         slug=site.slug, name=name, lat=lat, lon=lon, altitude_m=alt, visibility=site.visibility, owned=owned, cells=cells,
-        k=[site.k_tke, site.k_cis, site.k_tke_conv] if owned or team or (admin and site.owner_id is None) else None,
+        k=[site.k_tke, site.k_cis, site.k_tke_conv] if show_k else None,
+        calibrated=is_calibrated(site) if show_k else None,
     )
+
+
+def is_calibrated(site: Site) -> bool:
+    """K calibrated for the site: the curated sites (K set by the administrator), or a place whose K were saved at least
+    once by its owner (Calibrer, place settings, restoration); a place still at its starting K is not calibrated."""
+    if site.owner_id is None:
+        return True
+    session = object_session(site)
+    return session is not None and session.scalar(
+        select(SiteKHistory.id).where(SiteKHistory.site_id == site.id, SiteKHistory.source.not_in(["initial", "carte"])).limit(1)
+    ) is not None
 
 
 def site_filter(user: User | None) -> list:

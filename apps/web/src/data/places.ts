@@ -27,6 +27,8 @@ export interface Place {
   hidden?: boolean;
   /** Fitted K of the place. For API sites these are placeholders: the batch computes with its own K. */
   K: K3;
+  /** API place whose K were calibrated (saved at least once; curated sites): the fisheye offers "Calibré". */
+  calibrated?: boolean;
   /** Real forecasts from the API (as opposed to the fictitious model). */
   real: boolean;
   /** AROME orography of the 5 x 5 cells around the place (API), when the batch has computed it. */
@@ -57,6 +59,7 @@ export const siteToPlace = (s: Site): Place => ({
   shared: s.visibility === "shared",
   hidden: s.visibility === "hidden",
   K: s.k && s.k.length === 3 ? [s.k[0]!, s.k[1]!, s.k[2]!] : [...KDEF],
+  calibrated: !!s.calibrated,
   real: true,
   cells: s.cells ?? null,
   f: 1,
