@@ -6,12 +6,12 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { PointForm } from "../components/PointForecast";
 import { ColorBar, DateBand, Seg } from "../components/ui";
 import { useUser } from "../data/auth";
-import { MAX_PLACES, selectPlace, siteToPlace, useCurrentPlace, usePlaceActions, usePlaces } from "../data/places";
+import { MAX_PLACES, selectPlace, siteToPlace, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, parseCoord, SARD, VILLES, ZONES, type Box } from "../lib/geo";
 import { useGlobalMap, useLatestRunTime, useMapShares, useRunUpdates } from "../lib/hooks";
@@ -327,6 +327,7 @@ export default function Carte() {
   const lang = useUi((s) => s.lang);
   const place = useCurrentPlace();
   const { pub, sh, mine } = usePlaces();
+  const nav = useNavigate();
   const user = useUser();
   const { create: createPlace } = usePlaceActions();
   const { runTime } = useLatestRunTime();
@@ -795,6 +796,20 @@ export default function Carte() {
     drag.current = { x, y, moved: false, snap };
     canvas.current!.setPointerCapture(e.pointerId);
   };
+  /** Place whose pin is under (x, y): head of the pin (radius r, 2.1 r above its tip) or its stem; my places first,
+   * then the public sites, then the shared places (drawn in the reverse order). */
+  const placeAt = (x: number, y: number): Place | undefined => {
+    const big = VW.la1 - VW.la0 < 3.2;
+    const hit = (p: Place, r: number) => {
+      const [px, py] = toXY(p.lat, p.lon);
+      return Math.hypot(x - px, y - (py - 2.1 * r)) <= r + 3 || (Math.abs(x - px) <= r * 0.6 && y <= py + 2 && y >= py - 2.1 * r);
+    };
+    return (
+      mine.filter((p) => p.real).find((p) => hit(p, big ? 10 : 8)) ??
+      pub.find((p) => hit(p, big ? 9 : 7)) ??
+      sh.find((p) => hit(p, big ? 8 : 6))
+    );
+  };
   const move = (e: RPointerEvent<HTMLCanvasElement>) => {
     const [x, y] = canvasXY(e);
     const d = drag.current;
@@ -813,7 +828,7 @@ export default function Carte() {
     const zz = zoneAt(x, y),
       zi = zz ? zz[4] : -1;
     if (zi !== MZH) setMZH(zi);
-    canvas.current!.style.cursor = zi >= 0 ? "pointer" : isFullView(VW) ? "default" : "grab";
+    canvas.current!.style.cursor = zi >= 0 || placeAt(x, y) ? "pointer" : isFullView(VW) ? "default" : "grab";
     setHoverXY([x, y]);
   };
   /** Tip under the cursor: seeing of the map shown (the hour or the night mean), position, AROME relief. */
@@ -823,6 +838,8 @@ export default function Carte() {
       lo = LO(x);
     const sv = sample ? sample(la, lo) : NaN,
       see = isNaN(sv) ? "" : `${tr("seeing")} <b class="mono">${sv.toFixed(1)}″</b> · `;
+    const pl = placeAt(x, y);
+    if (pl) return `<b>${esc(tr(pl.nom))}</b> · ${tr("clique pour voir sa prévision")}`;
     if (zz) return `${see}${tr("Clique pour zoomer sur")} <b>${esc(tr(ZONES[zz[4]]![0]))}</b>`;
     return relReal || onLand(x, y)
       ? see +
@@ -842,6 +859,11 @@ export default function Carte() {
       const dla = ((y - d.y) / CH) * (VW.la1 - VW.la0),
         dlo = ((x - d.x) / CW) * (VW.lo1 - VW.lo0);
       return setView({ la0: VW.la0 + dla, la1: VW.la1 + dla, lo0: VW.lo0 - dlo, lo1: VW.lo1 - dlo });
+    }
+    const pl = placeAt(x, y);
+    if (pl) {
+      setState(selectPlace(pl));
+      return nav("/prevision");
     }
     const zz = zoneAt(x, y);
     if (zz) {
