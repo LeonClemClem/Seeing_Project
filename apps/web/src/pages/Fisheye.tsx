@@ -579,8 +579,8 @@ export default function Fisheye() {
                 value={cal}
                 onChange={setCal}
                 options={[
-                  ...(kSeen ? ([["lieu", tr("K calibrés du lieu")]] as ["lieu" | "carte", string][]) : []),
-                  ["carte", tr("K de la carte")],
+                  ...(kSeen ? ([["lieu", tr("Calibré")]] as ["lieu" | "carte", string][]) : []),
+                  ["carte", tr("Non calibré")],
                 ]}
               />
               {(role === "admin" || cal === "lieu") && (

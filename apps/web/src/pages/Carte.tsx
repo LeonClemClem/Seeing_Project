@@ -830,6 +830,8 @@ export default function Carte() {
       : `<span class="mono">${la.toFixed(2)} N · ${lo.toFixed(2)} E</span> · ${tr("hors de la zone du calcul global")}`;
   };
   const tip = hoverXY && !drag.current ? tipAt(hoverXY[0], hoverXY[1]) : null;
+  /** Seeing under the cursor, written next to it on the map (the map shown: hour or night mean, layer). */
+  const tipSee = hoverXY && !drag.current && sample ? sample(LA(hoverXY[1]), LO(hoverXY[0])) : NaN;
   const up = (e: RPointerEvent<HTMLCanvasElement>) => {
     const d = drag.current;
     if (!d) return;
@@ -955,21 +957,37 @@ export default function Carte() {
             </div>
           </div>
           <DateBand title={exportTitle} sub={exportSub} progress={mode === "h" && lastI > 0 ? MI / lastI : null} />
-          <canvas
-            ref={canvas}
-            width={CW}
-            height={CH}
-            style={{ cursor: "grab", touchAction: "none" }}
-            aria-label={tr("Carte globale du seeing de la nuit, déplaçable et zoomable")}
-            onPointerDown={down}
-            onPointerMove={move}
-            onPointerUp={up}
-            onPointerCancel={() => (drag.current = null)}
-            onPointerLeave={() => setHoverXY(null)}
+          <div style={{ position: "relative" }}>
+            <canvas
+              ref={canvas}
+              width={CW}
+              height={CH}
+              style={{ cursor: "grab", touchAction: "none", display: "block" }}
+              aria-label={tr("Carte globale du seeing de la nuit, déplaçable et zoomable")}
+              onPointerDown={down}
+              onPointerMove={move}
+              onPointerUp={up}
+              onPointerCancel={() => (drag.current = null)}
+              onPointerLeave={() => setHoverXY(null)}
+            />
+            {hoverXY && !isNaN(tipSee) && (
+              <div className="maptip" style={{ left: `${(hoverXY[0] / CW) * 100}%`, top: `${(hoverXY[1] / CH) * 100}%` }}>
+                {tipSee.toFixed(1)}″
+              </div>
+            )}
+          </div>
+          <ColorBar
+            left={tr("bon")}
+            right={tr("mauvais")}
+            gradient={seeingGradient()}
+            ticks={[0, 2, 4, 6, 8, 10].map((v) => [v / SEE_TOP, v === SEE_TOP ? `${v}″ ${tr("et plus")}` : `${v}″`] as [number, string])}
           />
-          <ColorBar left={tr("bon")} right={tr("mauvais")} gradient={seeingGradient()} />
           <p className="small muted" style={{ margin: "4px 0 0", textAlign: "center" }}>
-            <i>{tr("Les valeurs absolues seront bientôt disponibles, après la calibration globale.")}</i>
+            <i>
+              {tr(
+                "Calibration en cours : les valeurs de la carte s'affineront au fil des nuits, à mesure que les mesures des seeing monitors s'accumulent. Les écarts entre régions et entre nuits sont déjà indicatifs.",
+              )}
+            </i>
           </p>
           {tip ? (
             <p className="tip" dangerouslySetInnerHTML={{ __html: tip }} />
@@ -1119,7 +1137,7 @@ export default function Carte() {
             </p>
             <p className="note">
               {tr(
-                "Calcul global sur tout le domaine AROME, terre et mer, toutes les 6 heures, à chaque run principal : 00Z, 06Z, 12Z, 18Z ; les runs secondaires ne sont pas utilisés. La carte est calibrée une fois pour toutes par l'administrateur : elle ne change pas avec la calibration des lieux. Hors du domaine AROME, un lieu passe par la file d'attente.",
+                "Calcul global sur tout le domaine AROME, terre et mer, toutes les 6 heures, à chaque run principal : 00Z, 06Z, 12Z, 18Z ; les runs secondaires ne sont pas utilisés. La carte a sa propre calibration, réglée par l'administrateur et affinée avec les mesures : elle ne change pas avec la calibration des lieux. Hors du domaine AROME, un lieu passe par la file d'attente.",
               )}
             </p>
           </div>

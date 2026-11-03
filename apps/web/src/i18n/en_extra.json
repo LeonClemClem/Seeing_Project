@@ -14,7 +14,7 @@
 "Étoiles, objets, planètes, Soleil et Lune placés à leurs vraies positions pour ce lieu et cette nuit.": "Stars, objects, planets, Sun and Moon at their real positions for this place and night.",
 "Aucun lieu partagé pour l'instant.": "No shared place yet.",
 "Pas de prévision à cette heure (run incomplet)": "No forecast at this hour (incomplete run)",
-"Calcul global sur tout le domaine AROME, terre et mer, toutes les 6 heures, à chaque run principal : 00Z, 06Z, 12Z, 18Z ; les runs secondaires ne sont pas utilisés. La carte est calibrée une fois pour toutes par l'administrateur : elle ne change pas avec la calibration des lieux. Hors du domaine AROME, un lieu passe par la file d'attente.": "Global computation over the whole AROME domain, land and sea, every 6 hours, at each main run: 00Z, 06Z, 12Z, 18Z; secondary runs are not used. The map is calibrated once and for all by the administrator: it does not change with the calibration of places. Outside the AROME domain, a place goes through the queue.",
+"Calcul global sur tout le domaine AROME, terre et mer, toutes les 6 heures, à chaque run principal : 00Z, 06Z, 12Z, 18Z ; les runs secondaires ne sont pas utilisés. La carte a sa propre calibration, réglée par l'administrateur et affinée avec les mesures : elle ne change pas avec la calibration des lieux. Hors du domaine AROME, un lieu passe par la file d'attente.": "Global computation over the whole AROME domain, land and sea, every 6 hours, at each main run: 00Z, 06Z, 12Z, 18Z; secondary runs are not used. The map has its own calibration, set by the administrator and refined with the measurements: it does not change with the calibration of places. Outside the AROME domain, a place goes through the queue.",
 "Moyenne de la nuit (20h–04h TU)": "Night mean (20h–04h UTC)",
 "nuits seulement (19h–05h TU, moyenne 20h–04h)": "nights only (19h–05h UTC, mean 20h–04h)",
 "Mesures enregistrées sur le serveur :": "Measurements stored on the server:",
@@ -298,5 +298,9 @@
 "dès que Météo-France l'aura publié.": "as soon as Météo-France publishes it.",
 "mis à jour le": "updated on",
 "sur le site vers": "on the site around",
-"Une amélioration à venir donnera les prévisions dès la création du lieu.": "A coming improvement will give the forecasts as soon as the place is created."
+"Une amélioration à venir donnera les prévisions dès la création du lieu.": "A coming improvement will give the forecasts as soon as the place is created.",
+"et plus": "and more",
+"Calibration en cours : les valeurs de la carte s'affineront au fil des nuits, à mesure que les mesures des seeing monitors s'accumulent. Les écarts entre régions et entre nuits sont déjà indicatifs.": "Calibration in progress: the values of the map will be refined night after night, as the seeing monitor measurements accumulate. The differences between regions and between nights are already indicative.",
+"Calibré": "Calibrated",
+"Non calibré": "Not calibrated"
 }
