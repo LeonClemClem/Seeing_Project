@@ -165,10 +165,16 @@ export default function Header() {
         </span>
         <span>
           {tr("Prochain run principal")} <b className="mono">{runMs ? pad2(new Date(runMs + 6 * 3600000).getUTCHours()) + "Z" : "–"}</b>
-          {next != null && (
+          {updated != null && (
             <>
               {" · "}
-              {tr("sur le site vers")} <b className="mono">{hhmm(next)} TU</b>
+              {next != null ? (
+                <>
+                  {tr("sur le site vers")} <b className="mono">{hhmm(next)} TU</b>
+                </>
+              ) : (
+                tr("en attente de sa publication par Météo-France")
+              )}
             </>
           )}
         </span>

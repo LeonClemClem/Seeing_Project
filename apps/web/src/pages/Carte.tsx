@@ -1161,10 +1161,16 @@ export default function Carte() {
               )}
               {" "}
               {tr("· prochaine mise à jour avec le run")} <b className="mono">{nextRun}</b>
-              {nextAt != null && (
+              {updated != null && (
                 <>
                   {", "}
-                  {tr("sur le site vers")} <b className="mono">{hhmm(nextAt)} TU</b>
+                  {nextAt != null ? (
+                    <>
+                      {tr("sur le site vers")} <b className="mono">{hhmm(nextAt)} TU</b>
+                    </>
+                  ) : (
+                    tr("en attente de sa publication par Météo-France")
+                  )}
                 </>
               )}
             </p>
