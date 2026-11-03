@@ -25,8 +25,9 @@ MAX_PLACES = 5  # per account (the administrator is not limited)
 # AROME 0.025 domain
 LAT_RANGE, LON_RANGE = (37.5, 55.4), (-12.0, 16.0)
 K_MAX = 150.0
-# Starting K of a new place: the global map K (the K of the curated sites stay confidential).
-DEFAULT_K = (2.0, 57.0, 0.1)  # K_TKE, K_CIS, K_conv
+# K_TKE, K_CIS, K_conv of a new place: those of the map (seeing_core.grid.MAP_K), so that the map, the one-off
+# forecast, the fisheye and the place's forecast agree until the place is calibrated
+DEFAULT_K = (1.0, 30.0, 0.1)
 
 
 class PlaceIn(BaseModel):

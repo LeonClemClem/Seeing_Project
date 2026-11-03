@@ -37,10 +37,10 @@ const FN = 520,
   ELMIN = 5;
 /* Only real elements: horizon = AROME orography of the run (always drawn); clouds = AROME low / medium / high cover. */
 const OPT0 = {
+  nua: ["Nuages", false],
   cons: ["Constellations", true],
   sol: ["Soleil et Lune", true],
   trk: ["Course des objets", true],
-  nua: ["Nuages", false],
 } as const;
 type OptKey = keyof typeof OPT0;
 
@@ -121,14 +121,12 @@ export default function Fisheye() {
   // K of the fisheye: the map K, or the K calibrated for the place (only where its K are visible: own places, the
   // administrator, the team for its site)
   const role = useUi((s) => s.role);
-  const kSeen = place.real && !kHidden(place, role);
   const [calPick, setCal] = useState<"lieu" | "carte">("lieu");
-  const cal = kSeen ? calPick : "carte";
   /** Direction under the cursor; its seeing and clouds are read at render time, so they follow the animation. */
   const [hov, setHov] = useState<{ x: number; y: number; alt: number; az: number } | null>(null);
   /** Animation speed: x1 = one hour every 900 ms. */
   const [speed, setSpeed] = useState<1 | 2 | 3>(1);
-  const [opt, setOpt] = useState<Record<OptKey, boolean>>({ cons: true, sol: true, trk: true, nua: false });
+  const [opt, setOpt] = useState<Record<OptKey, boolean>>({ nua: false, cons: true, sol: true, trk: true });
   const [plOn, setPlOn] = useState(() => new Set(["Jupiter", "Saturne", "Mars"]));
   const [tgts, setTgts] = useState<CatObj[]>(() => [CAT[0]!, CAT[9]!]);
   const [q, setQ] = useState("");
@@ -146,6 +144,10 @@ export default function Fisheye() {
     staleTime: 30 * 60 * 1000,
   });
   const fe = fq.data;
+  // "Calibré": only for a place whose K are visible and differ from those of the map (a place never calibrated has
+  // the K of the map: both versions would be the same)
+  const kSeen = place.real && !kHidden(place, role) && !!fe && place.K.some((v, i) => Math.abs(v - fe.k[i]!) > 1e-9);
+  const cal = kSeen ? calPick : "carte";
   const frameAt = (i: number) => {
     if (!fe) return undefined;
     const lead = Math.round((tOf(i) - Date.parse(fe.run_time)) / 3600000);
