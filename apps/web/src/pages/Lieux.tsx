@@ -53,8 +53,7 @@ export default function Lieux() {
       <p className="lead">
         {tr(
           "Tes lieux personnels : historique des prévisions et des mesures, corrélation et panneau Cn². Tu peux aussi consulter les sites publics et les lieux partagés par la communauté (lecture seule).",
-        )}{" "}
-        <b>{tr("Données réelles")}</b> {tr("pour les sites publics (prévisions AROME V2bd du dernier run), contrairement au reste de la maquette.")}
+        )}
       </p>
       <h2 style={{ marginTop: 6 }}>{tr("Mes lieux personnels")}</h2>
       <div className="panel">
