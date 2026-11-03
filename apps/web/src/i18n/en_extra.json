@@ -290,5 +290,13 @@
 "au-dessus de la couche limite seule": "above the boundary layer only",
 "chargement…": "loading…",
 "Seeing lu sur la carte globale du dernier run (mailles de ~2,5 km, calibration de la carte, nuits seulement), sans créer de lieu. Le point devient le lieu affiché dans les autres onglets ; pour le Cn², l'historique et la calibration, enregistre-le comme lieu.": "Seeing read on the global map of the latest run (~2.5 km cells, map calibration, nights only), without creating a place. The point becomes the place shown in the other tabs; for the Cn², the history and the calibration, save it as a place.",
-"Point de la carte (prévision ponctuelle) : seeing de la carte globale du dernier run, avec la calibration de la carte.": "Point of the map (one-off forecast): seeing of the global map of the latest run, with the map calibration."
+"Point de la carte (prévision ponctuelle) : seeing de la carte globale du dernier run, avec la calibration de la carte.": "Point of the map (one-off forecast): seeing of the global map of the latest run, with the map calibration.",
+"Prévisions pas encore calculées pour ce lieu : elles le seront au prochain run AROME": "Forecasts not computed yet for this place: they will be with the next AROME run",
+"vers": "around",
+"dans moins d'une heure": "in less than an hour",
+"dans environ": "in about",
+"dès que Météo-France l'aura publié.": "as soon as Météo-France publishes it.",
+"mis à jour le": "updated on",
+"sur le site vers": "on the site around",
+"Une amélioration à venir donnera les prévisions dès la création du lieu.": "A coming improvement will give the forecasts as soon as the place is created."
 }

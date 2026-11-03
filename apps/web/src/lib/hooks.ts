@@ -62,3 +62,14 @@ export function useGlobalMap(): GlobalMap | undefined {
   });
   return q.data;
 }
+
+/** When the latest run was put on the site, and the estimate of the next update: a main run arrives ~6 h after the
+ * previous one (Météo-France publishes it ~4 h 45 after its time, then ~35 min of computation). `next` is null once
+ * that time is past (Météo-France late): the next update then comes as soon as the run is published. */
+export function useRunUpdates() {
+  const { query } = useLatestRunTime();
+  const fin = query.data?.finished_at;
+  const updated = fin ? Date.parse(fin) : null;
+  const next = updated != null ? updated + 6 * 3600000 : null;
+  return { updated, next: next != null && next > Date.now() ? next : null };
+}
