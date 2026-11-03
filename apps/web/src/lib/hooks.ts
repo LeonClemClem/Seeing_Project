@@ -63,13 +63,27 @@ export function useGlobalMap(): GlobalMap | undefined {
   return q.data;
 }
 
-/** When the latest run was put on the site, and the estimate of the next update: a main run arrives ~6 h after the
- * previous one (Météo-France publishes it ~4 h 45 after its time, then ~35 min of computation). `next` is null once
- * that time is past (Météo-France late): the next update then comes as soon as the run is published. */
+/** Usual publication delay of each main AROME cycle by Météo-France [h] (00/06/12/18 UTC), as the batch schedule. */
+const PUB_DELAY_H: Record<number, number> = { 0: 2.83, 6: 5.25, 12: 3.92, 18: 5.42 };
+/** Computation of a run by the batch, from its hourly firing at h+45 [min]. */
+const RUN_COMPUTE_MIN = 40;
+
+/** When the latest run was put on the site, and the estimate of the next update: the next main cycle (6 h later) is
+ * published by Météo-France after its usual delay, taken by the first hourly batch firing (h+45) after that, then
+ * computed in ~40 min. `next` is null once that time is past (Météo-France late): the next update then comes as
+ * soon as the run is published. */
 export function useRunUpdates() {
   const { query } = useLatestRunTime();
   const fin = query.data?.finished_at;
+  const run = query.data?.run_time;
   const updated = fin ? Date.parse(fin) : null;
-  const next = updated != null ? updated + 6 * 3600000 : null;
+  let next: number | null = null;
+  if (run) {
+    const cycle = Date.parse(run) + 6 * 3600000,
+      pub = cycle + (PUB_DELAY_H[new Date(cycle).getUTCHours()] ?? 5) * 3600000,
+      hour = Math.floor(pub / 3600000) * 3600000,
+      firing = hour + 45 * 60000 >= pub ? hour + 45 * 60000 : hour + 105 * 60000;
+    next = firing + RUN_COMPUTE_MIN * 60000;
+  }
   return { updated, next: next != null && next > Date.now() ? next : null };
 }
