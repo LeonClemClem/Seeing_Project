@@ -985,7 +985,7 @@ export default function Carte() {
           <p className="small muted" style={{ margin: "4px 0 0", textAlign: "center" }}>
             <i>
               {tr(
-                "Calibration en cours : les valeurs de la carte s'affineront au fil des nuits, à mesure que les mesures des seeing monitors s'accumulent. Les écarts entre régions et entre nuits sont déjà indicatifs.",
+                "Calibration en cours : les valeurs de la carte s'affineront. Les écarts entre régions et entre nuits sont déjà indicatifs.",
               )}
             </i>
           </p>
