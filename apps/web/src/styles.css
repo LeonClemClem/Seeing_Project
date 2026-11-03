@@ -108,3 +108,4 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .kbanner{border-radius:8px;padding:8px 12px;margin:4px 0 8px;font-size:13px;line-height:1.4}
 .kbanner.warn{background:rgba(242,193,78,.14);border:1px solid #f2c14e;color:#ffe3a3}
 .kbanner.ok{background:rgba(79,209,139,.12);border:1px solid #4fd18b;color:#c6f3d9}
+.pending{max-width:640px;text-align:center;color:#eaa6a6;background:rgba(239,107,107,.08);border:1px solid rgba(239,107,107,.28);border-radius:8px;padding:12px 16px}.pending .small{margin-top:4px;opacity:.85}
