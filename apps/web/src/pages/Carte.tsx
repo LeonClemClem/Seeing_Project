@@ -14,10 +14,10 @@ import { useUser } from "../data/auth";
 import { MAX_PLACES, selectPlace, siteToPlace, useCurrentPlace, usePlaceActions, usePlaces } from "../data/places";
 import { tr } from "../i18n";
 import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, parseCoord, SARD, VILLES, ZONES, type Box } from "../lib/geo";
-import { useGlobalMap, useLatestRunTime, useMapShares } from "../lib/hooks";
+import { useGlobalMap, useLatestRunTime, useMapShares, useRunUpdates } from "../lib/hooks";
 import type { MapGrid } from "../api";
 import { BAND, banded, canvasToPng, downloadBlob, encodeGif, nextPaint as paint } from "../lib/export";
-import { D2R, esc, fmt, JOURS, pad2, runLabel, seeingGradient, seeingRgb } from "../lib/util";
+import { D2R, esc, fmt, hhmm, JOURS, pad2, runLabel, seeingGradient, seeingRgb } from "../lib/util";
 import { REF } from "../mock/engine";
 import { setState, useUi } from "../store";
 
@@ -330,6 +330,7 @@ export default function Carte() {
   const user = useUser();
   const { create: createPlace } = usePlaceActions();
   const { runTime } = useLatestRunTime();
+  const { updated, next: nextAt } = useRunUpdates();
   const gmap = useGlobalMap();
   const RUN0 = gmap ? Date.parse(gmap.meta.run_time) : runTime ? Date.parse(runTime) : REF + 12 * 3600000;
 
@@ -1129,11 +1130,21 @@ export default function Carte() {
           <div className="panel">
             <h2>{tr("Cette nuit")}</h2>
             <p className="small" style={{ margin: "0 0 8px" }}>
-              {tr("Carte du run")} <b className="mono">{runL}</b> {tr("· prochaine mise à jour avec le run")} <b className="mono">{nextRun}</b>
-              {tr(", dans 6 h")}{" "}
-              <span className="muted">
-                {tr("(résultats disponibles environ")} <span className="mono">1 h 15</span> {tr("après l'arrivée du run)")}
-              </span>
+              {tr("Carte du run")} <b className="mono">{runL}</b>
+              {updated != null && (
+                <>
+                  {" · "}
+                  {tr("mis à jour le")} <b className="mono">{`${ddmm(new Date(updated))} ${hhmm(updated)} TU`}</b>
+                </>
+              )}
+              {" "}
+              {tr("· prochaine mise à jour avec le run")} <b className="mono">{nextRun}</b>
+              {nextAt != null && (
+                <>
+                  {", "}
+                  {tr("sur le site vers")} <b className="mono">{hhmm(nextAt)} TU</b>
+                </>
+              )}
             </p>
             <p className="note">
               {tr(
