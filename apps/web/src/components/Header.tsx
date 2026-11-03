@@ -47,8 +47,8 @@ export default function Header() {
   // a main run is on the site up to ~6 h 15 after its time (18Z published ~5 h 25 after, batch at :45, ~25 min of
   // computation), so the latest one is normally at most ~12 h 30 old: past RUN_LATE_H, Météo-France is late
   const lateH = runMs ? Math.floor((Date.now() - runMs) / 3600000) : 0;
-  // Data badge: real AROME data wherever the page shows them; "mock-up" only where something fictitious is still
-  // shown (Calibrer without the right to calibrate the place uses example nights); none on the map and the text pages.
+  // Data badge: only "mock-up", where something fictitious is still shown (Calibrer without the right to calibrate the
+  // place uses example nights); the real data are not flagged.
   const path = loc.pathname;
   const canCalibrate =
     place.real && !!user && (place.kind === "mine" || user.role === "admin" || (user.role === "team" && place.slug === TEAM_SITE));
@@ -184,7 +184,6 @@ export default function Header() {
             {tr("n'est pas encore disponible, la prévision vient du run")} {runLabel(runMs)} ({tr("âgé de")} {lateH} h).{" "}
           </span>
         )}
-        {badge === "real" && <span className="pill p-ok">{tr("Données réelles")} · AROME</span>}
         {badge === "mock" && <span className="pill p-warn">{tr("Maquette : données fictives")}</span>}
       </div>
     </header>
