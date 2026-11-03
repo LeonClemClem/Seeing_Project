@@ -168,11 +168,23 @@ export const HatchDefs = () => (
 );
 
 /** Turbo colour bar with end labels. */
-export function ColorBar({ left, right, gradient }: { left: string; right: string; gradient: string }) {
+/** `ticks`: [position 0-1 along the bar, label] written under it. */
+export function ColorBar({ left, right, gradient, ticks }: { left: string; right: string; gradient: string; ticks?: [number, string][] }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 8 }}>
       <span className="small muted">{left}</span>
-      <div style={{ flex: 1, height: 9, borderRadius: 2, background: gradient }} />
+      <div style={{ flex: 1 }}>
+        <div style={{ height: 9, borderRadius: 2, background: gradient }} />
+        {ticks && (
+          <div className="cticks">
+            {ticks.map(([x, l]) => (
+              <span key={l} style={{ left: `${x * 100}%` }}>
+                {l}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
       <span className="small muted">{right}</span>
     </div>
   );
