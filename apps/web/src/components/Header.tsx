@@ -1,7 +1,7 @@
 import { Link, NavLink, useLocation } from "react-router-dom";
 
 import { useMe, useSyncRole } from "../data/auth";
-import { kHidden, selectPlace, TEAM_SITE, useCurrentPlace, usePlaces } from "../data/places";
+import { kHidden, kSecret, selectPlace, TEAM_SITE, useCurrentPlace, usePlaces } from "../data/places";
 import { tr } from "../i18n";
 import { useLatestRunTime, useRunUpdates } from "../lib/hooks";
 import { ddmm, fmt, hhmm, pad2, runLabel } from "../lib/util";
@@ -63,7 +63,7 @@ export default function Header() {
         : place.real
           ? "real"
           : "mock";
-  const hid = kHidden(place, role);
+  const hid = kHidden(place, role) || kSecret(place, role);
 
   return (
     <header>

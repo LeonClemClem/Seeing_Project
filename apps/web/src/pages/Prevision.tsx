@@ -14,7 +14,7 @@ import { PendingForecast } from "../components/PendingForecast";
 import { PointNotice, PointSeeing } from "../components/PointForecast";
 import { hourlyMedians, useHourlyMedians, useRawMeasurements, usePlaceLoading, useRealForecast, useSiteHistory, type View } from "../data/forecast";
 import { Cn2Legend, LegArome, LegBreak, LegDay, LegMed, LegMes, Seg, Spinner, Sw, SvgChart } from "../components/ui";
-import { kHidden, kTxt, useCurrentPlace, type Place } from "../data/places";
+import { kHidden, kSecret, kTxt, useCurrentPlace, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { exportSvgIn, fileSafe } from "../lib/export";
 import { fmt } from "../lib/util";
@@ -175,6 +175,15 @@ function KRead({ place }: { place: Place }) {
   const K = useUi((s) => s.K);
   const kmode = useUi((s) => s.kmode);
   if (place.real && kHidden(place, role)) return null; // K of the public sites: not shown, not mentioned
+  if (kSecret(place, role))
+    return (
+      <p className="small muted" style={{ margin: 0 }}>
+        {tr("Lieu pas encore calibré : calcul avec la calibration de la carte.")} ·{" "}
+        <Link to="/calibrer" style={{ color: "#9cc7ff" }}>
+          {tr("le calibrer avec tes mesures")}
+        </Link>
+      </p>
+    );
   const txt = place.real
     ? `${kTxt(place.K, kHidden(place, role), fmt)} (${tr("calcul du run, données réelles")})`
     : `K_TKE = ${fmt(K[0])}  K_CIS = ${fmt(K[1])}  K_conv = 0.1 (${tr({ S: "enregistrés", A: "calés", M: "manuels" }[kmode])})`;
@@ -200,7 +209,7 @@ function RealSeeing({ place }: { place: Place }) {
   const svg = useLangMemo(
     () =>
       forecast.data
-        ? prevRealSvg(forecast.data, kTxt(place.K, kHidden(place, role), fmt), showObs ? obs : undefined, showObs ? raw : [], mesf)
+        ? prevRealSvg(forecast.data, kTxt(place.K, kHidden(place, role) || kSecret(place, role), fmt), showObs ? obs : undefined, showObs ? raw : [], mesf)
         : "",
     [forecast.data, place, role, obs, raw, showObs, mesf],
   );

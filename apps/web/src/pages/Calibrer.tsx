@@ -16,7 +16,7 @@ import { useUser } from "../data/auth";
 import { useSiteHistory } from "../data/forecast";
 import { useNavigate } from "react-router-dom";
 
-import { kHidden, selectPlace, TEAM_SITE, useCurrentPlace, usePlaces, type Place } from "../data/places";
+import { kHidden, kSecret, selectPlace, TEAM_SITE, useCurrentPlace, usePlaces, type Place } from "../data/places";
 import { PointNotice } from "../components/PointForecast";
 import { tr } from "../i18n";
 import { parseCsv, type CsvOpts, type DateFmt, type NightPt } from "../lib/csv";
@@ -251,6 +251,12 @@ function Calibrer() {
   const showObs = useUi((s) => s.showObs);
   const mesf = useUi((s) => s.mesf);
   const lock = kHidden(place, role);
+  // place not calibrated yet: its K (those of the map) stay hidden; the K shown from the calibration with the data on
+  const secret = kSecret(place, role);
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => setRevealed(kmode === "A" || (kmode === "M" && revealed)), [kmode]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => setRevealed(false), [place.id]);
+  const hideK = secret && !revealed;
   const { mine } = usePlaces();
   const nav = useNavigate();
   const user = useUser();
@@ -453,7 +459,8 @@ function Calibrer() {
   const kDiff = place.real && editable && (Math.abs(K[0] - place.K[0]) > 1e-6 || Math.abs(K[1] - place.K[1]) > 1e-6);
   const kBanner = kDiff ? (
     <div className="kbanner warn" role="status">
-      <b>{tr("⚠ Aperçu avec les K réglés")}</b> (K_TKE {fmt(K[0])} · K_CIS {fmt(K[1])}).{" "}
+      <b>{tr("⚠ Aperçu avec les K réglés")}</b>
+      {hideK ? "" : ` (K_TKE ${fmt(K[0])} · K_CIS ${fmt(K[1])})`}.{" "}
       {tr("Le Cn² et les prévisions du site ne les prendront en compte qu'au prochain run AROME, après « Enregistrer pour ce lieu ».")}
     </div>
   ) : saved && place.real && editable ? (
@@ -493,6 +500,7 @@ function Calibrer() {
   useEffect(() => setSaved(""), [K]);
 
   const kb = (k: "L" | 0 | 1, f: number) => {
+    if (hideK) return; // from hidden K: calibrate with the data first
     const n: K3 = [...K];
     if (k === "L") {
       n[0] *= f;
@@ -511,13 +519,13 @@ function Calibrer() {
           [1.2, "+"],
           [2, "×2"],
         ].map(([f, l]) => (
-          <button key={l} onClick={() => kb(k, f as number)}>
+          <button key={l} disabled={hideK} title={hideK ? tr("Calibre d'abord avec tes mesures (Calibration auto)") : undefined} onClick={() => kb(k, f as number)}>
             {l}
           </button>
         ))}
       </div>
       <span className="mono">
-        {k === "L" ? "" : lock ? "•••" : <>{fmt(K[k])} {bt(K[k])}</>}
+        {k === "L" ? "" : lock || hideK ? "•••" : <>{fmt(K[k])} {bt(K[k])}</>}
       </span>
     </div>
   );
@@ -852,6 +860,7 @@ function Calibrer() {
             autoK={cal.K}
             stats={s}
             kmode={kmode}
+            hideK={hideK}
             saved={saved}
             setSaved={setSaved}
             krow={krow}
@@ -868,6 +877,8 @@ function KPanel(p: {
   autoK: K3;
   stats: { r: number; b: number; q: number };
   kmode: "S" | "A" | "M";
+  /** K in service not shown (place not calibrated, before the calibration with the data) */
+  hideK: boolean;
   saved: string;
   setSaved: (s: string) => void;
   krow: (lab: string, k: "L" | 0 | 1) => JSX.Element;
@@ -878,7 +889,7 @@ function KPanel(p: {
   // saved with the site on the server (owner, administrator for every site, team for its site), used by the batch
   // from the next run; the example places only keep them in the page
   const save = () => {
-    const done = tr(`Enregistré : K_TKE = ${fmt(K[0])}, K_CIS = ${fmt(K[1])}, K_conv = 0.1.`);
+    const done = p.hideK ? tr("Enregistré.") : tr(`Enregistré : K_TKE = ${fmt(K[0])}, K_CIS = ${fmt(K[1])}, K_conv = 0.1.`);
     if (!p.place.real || !p.place.slug) return p.setSaved(done);
     api.saveK(p.place.slug, { k_tke: K[0], k_cis: K[1], k_conv: 0.1 }).then(
       () => {
@@ -892,12 +903,16 @@ function KPanel(p: {
   // history of the K saved for this place (never deleted): any of them can be put back
   const slug = p.place.real ? (p.place.slug ?? "") : "";
   const kh = useQuery({ queryKey: ["k-history", slug], queryFn: () => api.kHistory(slug), enabled: !!slug && !p.lock, retry: false });
+  // starting K of a member's place (those of the map) and the change to them: never shown to a member
+  const role = useUi((s) => s.role);
+  const hiddenEntry = (k: KHistoryItem) => role !== "admin" && p.place.kind === "mine" && (k.source === "initial" || k.source === "carte");
   const restore = (id: number, k: KHistoryItem) => {
-    if (!window.confirm(tr(`Remettre K_TKE = ${fmt(k.k_tke)}, K_CIS = ${fmt(k.k_cis)} pour ce lieu ? Utilisés dès le prochain run.`))) return;
+    const hid = hiddenEntry(k);
+    if (!window.confirm(hid ? tr("Remettre la calibration de la carte pour ce lieu ? Utilisée dès le prochain run.") : tr(`Remettre K_TKE = ${fmt(k.k_tke)}, K_CIS = ${fmt(k.k_cis)} pour ce lieu ? Utilisés dès le prochain run.`))) return;
     api.restoreK(slug, id).then(
       () => {
         setState({ kmode: "S" });
-        p.setSaved(tr(`K remis : K_TKE = ${fmt(k.k_tke)}, K_CIS = ${fmt(k.k_cis)}.`));
+        p.setSaved(hid ? tr("Calibration de la carte remise.") : tr(`K remis : K_TKE = ${fmt(k.k_tke)}, K_CIS = ${fmt(k.k_cis)}.`));
         return Promise.all([qc.invalidateQueries({ queryKey: queryKeys.sites }), qc.invalidateQueries({ queryKey: ["k-history"] })]);
       },
       (e: Error) => p.setSaved(e.message),
@@ -958,9 +973,7 @@ function KPanel(p: {
                     {kh.data.map((k, i) => (
                       <tr key={k.id}>
                         <td className="mono">{new Date(k.saved_at).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}</td>
-                        <td className="mono">
-                          {fmt(k.k_tke)} / {fmt(k.k_cis)}
-                        </td>
+                        <td className="mono">{hiddenEntry(k) ? "•••" : `${fmt(k.k_tke)} / ${fmt(k.k_cis)}`}</td>
                         <td className="muted">{tr(k.source)}</td>
                         <td>
                           {i === 0 ? (

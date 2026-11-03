@@ -12,7 +12,7 @@ import { Cn2RealPanel, HistPanel } from "../components/panels";
 import { api, queryKeys } from "../api";
 import { Chip, Cn2Legend, ColorBar, LegBreak, LegDay, LegMed, LegMes, Seg, Spinner, Sw, SvgChart } from "../components/ui";
 import { usePlaceLoading, useSiteHistory } from "../data/forecast";
-import { kHidden, kTxt, MAX_PLACES, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
+import { kHidden, kSecret, kTxt, MAX_PLACES, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { C_TXT, ddmm, fmt, pd, turboGradient } from "../lib/util";
 import { lieuData, type LieuData } from "../mock/engine";
@@ -244,7 +244,7 @@ function PlaceDetail({ l }: { l: Place }) {
   const role = useUi((s) => s.role);
   const corrf = useUi((s) => s.corrf);
   const mesf = useUi((s) => s.mesf);
-  const hid = kHidden(l, role);
+  const hid = kHidden(l, role) || kSecret(l, role);
   const real = useSiteHistory(l);
   const placeLoading = usePlaceLoading(l);
   const loading = l.real && !real && placeLoading;

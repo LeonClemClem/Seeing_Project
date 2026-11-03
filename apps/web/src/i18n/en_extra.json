@@ -302,5 +302,11 @@
 "et plus": "and more",
 "Calibration en cours : les valeurs de la carte s'affineront au fil des nuits, à mesure que les mesures des seeing monitors s'accumulent. Les écarts entre régions et entre nuits sont déjà indicatifs.": "Calibration in progress: the values of the map will be refined night after night, as the seeing monitor measurements accumulate. The differences between regions and between nights are already indicative.",
 "Calibré": "Calibrated",
-"Non calibré": "Not calibrated"
+"Non calibré": "Not calibrated",
+"Lieu pas encore calibré : calcul avec la calibration de la carte.": "Place not calibrated yet: computed with the map calibration.",
+"le calibrer avec tes mesures": "calibrate it with your measurements",
+"Calibre d'abord avec tes mesures (Calibration auto)": "First calibrate with your measurements (Auto calibration)",
+"Enregistré.": "Saved.",
+"Remettre la calibration de la carte pour ce lieu ? Utilisée dès le prochain run.": "Put back the map calibration for this place? Used from the next run.",
+"Calibration de la carte remise.": "Map calibration put back."
 }
