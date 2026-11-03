@@ -1,5 +1,5 @@
 """App accounts: Argon2id password hashing, server-side sessions in an httpOnly cookie, and the
-/api/auth endpoints (sign-up, login, logout, e-mail confirmation, account deletion).
+/api/auth endpoints (sign-up, login, logout, e-mail confirmation, forgotten password, account deletion).
 
 Deleting an account anonymizes it and keeps the data: the e-mail, name and password are replaced, the
 sessions and links removed, the e-mail erased from the rate-limit log; the places are archived (named
@@ -12,6 +12,10 @@ E-mail confirmation (when EMAIL_VERIFICATION is on): sign-up creates the account
 and e-mails a single-use link (`/compte?verif=<token>`, valid TOKEN_HOURS); opening it confirms the
 address and logs in. Until then, login answers 403 "email_not_verified" (only after a correct
 password, so it does not tell which e-mails have an account).
+
+Forgotten password: /forgot e-mails a single-use link (`/compte?reset=<token>`, valid RESET_HOURS) when the
+account exists, always answering 204 (it does not tell which e-mails have an account); /reset sets the new password
+(same rules), ends every session of the account, confirms the address (the link proves it) and logs in.
 
 The cookie holds a random token; the database stores only its SHA-256 (`user_sessions.id`), so a
 database leak cannot be replayed as a session. CSRF: the cookie is SameSite=Lax and every auth POST
@@ -62,6 +66,7 @@ SIGNUPS_PER_IP = (5, timedelta(hours=1))
 MAILS_PER_EMAIL = (3, timedelta(hours=1))
 MAIL_REQUESTS_PER_IP = (10, timedelta(hours=1))
 TOKEN_HOURS = 48
+RESET_HOURS = 1
 
 _hasher = PasswordHasher()
 
@@ -195,6 +200,28 @@ def send_verification(db: Session, user: User) -> bool:
     return send_mail(user.email, "Confirme ton adresse e-mail · Seeing AROME", text, link, "Confirmer mon adresse")
 
 
+def send_reset(db: Session, user: User) -> bool:
+    """New single-use link to choose a new password (older ones are dropped), sent by e-mail."""
+    db.execute(delete(EmailToken).where(EmailToken.user_id == user.id, EmailToken.purpose == "reset"))
+    token = secrets.token_urlsafe(32)
+    db.add(EmailToken(id=token_id(token), user_id=user.id, purpose="reset", expires_at=now() + timedelta(hours=RESET_HOURS)))
+    db.flush()
+    link = f"{public_url()}/compte?reset={token}"
+    text = (
+        "Bonjour,
+
+"
+        "Pour choisir un nouveau mot de passe pour ton compte Seeing AROME, ouvre ce lien "
+        f"(valable {RESET_HOURS} heure, une seule fois) :
+
+{link}
+
+"
+        "Si tu n'as rien demandé, ignore ce message : ton mot de passe ne change pas."
+    )
+    return send_mail(user.email, "Nouveau mot de passe · Seeing AROME", text, link, "Choisir un nouveau mot de passe")
+
+
 # ---- sessions and cookies -----------------------------------------------------------------------
 
 
@@ -316,6 +343,11 @@ class PasswordIn(BaseModel):
     password: str = Field(max_length=MAX_PASSWORD_LENGTH)
 
 
+class ResetIn(BaseModel):
+    token: str = Field(min_length=10, max_length=200)
+    password: str = Field(max_length=MAX_PASSWORD_LENGTH)
+
+
 router = APIRouter(prefix="/api/auth", dependencies=[Depends(require_json)])
 
 
@@ -418,6 +450,49 @@ def resend(body: EmailIn, request: Request, response: Response, db: WriteSession
         return
     record_event("mail", email, ip)
     send_verification(db, user)
+
+
+@router.post("/forgot", status_code=204)
+def forgot(body: EmailIn, request: Request, response: Response, db: WriteSessionDep) -> None:
+    """E-mail a link to choose a new password. Always 204 (whether the account exists is not told); at most
+    MAILS_PER_EMAIL e-mails per address."""
+    response.headers["Cache-Control"] = NO_STORE
+    email, ip = normalize_email(body.email), client_ip(request)
+    if over_limit(db, "mail_request", MAIL_REQUESTS_PER_IP, ip=ip):
+        raise too_many(MAIL_REQUESTS_PER_IP)
+    record_event("mail_request", None, ip)
+    if over_limit(db, "reset_mail", MAILS_PER_EMAIL, email=email):
+        return
+    user = db.scalar(select(User).where(User.email == email))
+    if user is None or not user.is_active:
+        return
+    record_event("reset_mail", email, ip)
+    send_reset(db, user)
+
+
+@router.post("/reset", response_model=UserOut)
+def reset(body: ResetIn, response: Response, db: WriteSessionDep) -> UserOut:
+    """Open the e-mailed link and choose the new password: every session of the account ends, then it logs in. The
+    link works once."""
+    response.headers["Cache-Control"] = NO_STORE
+    row = db.get(EmailToken, token_id(body.token))
+    if row is None or row.purpose != "reset" or row.expires_at <= now():
+        raise HTTPException(400, "invalid_or_expired")
+    user = db.get(User, row.user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(400, "invalid_or_expired")
+    problem = password_problem(body.password, user.email)
+    if problem:
+        raise HTTPException(422, f"password_{problem}")  # the link stays valid: another password can be tried
+    db.execute(delete(EmailToken).where(EmailToken.user_id == user.id, EmailToken.purpose == "reset"))
+    db.execute(delete(UserSession).where(UserSession.user_id == user.id))
+    db.execute(delete(AuthEvent).where(AuthEvent.kind == "login_fail", AuthEvent.email == user.email))
+    t = now()
+    user.password_hash = hash_password(body.password)
+    user.email_verified_at = user.email_verified_at or t
+    user.last_login_at = t
+    start_session(db, user, response)
+    return user_out(user)
 
 
 @router.post("/delete-account", status_code=204)

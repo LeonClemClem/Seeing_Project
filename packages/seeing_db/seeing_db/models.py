@@ -248,7 +248,7 @@ class UserSession(Base):
 
 
 class EmailToken(Base):
-    """A single-use link sent by e-mail (purpose "verify": confirm the address). `id` is the SHA-256 hex
+    """A single-use link sent by e-mail (purpose "verify": confirm the address; "reset": choose a new password). `id` is the SHA-256 hex
     digest of the token in the link, never the token itself."""
 
     __tablename__ = "email_tokens"
