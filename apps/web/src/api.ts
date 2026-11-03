@@ -22,6 +22,8 @@ export interface Site {
   owned?: boolean;
   /** (K_TKE, K_CIS, K_conv), sent to the owner, the administrator and the team for its own site only. */
   k?: number[] | null;
+  /** K calibrated (curated site, or K saved by the owner); sent with `k` only. */
+  calibrated?: boolean | null;
   /** AROME orography of the 5 x 5 cells around the site (written by the batch); none for another
    * member's shared place. */
   cells?: Cells | null;
