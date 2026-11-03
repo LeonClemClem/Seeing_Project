@@ -1,7 +1,7 @@
 import { Link, NavLink, useLocation } from "react-router-dom";
 
 import { useMe, useSyncRole } from "../data/auth";
-import { kHidden, selectPlace, TEAM_SITE, useCurrentPlace, usePlaces } from "../data/places";
+import { kHidden, kSecret, selectPlace, TEAM_SITE, useCurrentPlace, usePlaces } from "../data/places";
 import { tr } from "../i18n";
 import { useLatestRunTime, useRunUpdates } from "../lib/hooks";
 import { ddmm, fmt, hhmm, pad2, runLabel } from "../lib/util";
@@ -48,13 +48,13 @@ export default function Header() {
   // computation), so the latest one is normally at most ~12 h 30 old: past RUN_LATE_H, Météo-France is late
   const lateH = runMs ? Math.floor((Date.now() - runMs) / 3600000) : 0;
   // Data badge: real AROME data wherever the page shows them; "mock-up" only where something fictitious is still
-  // shown (Calibrer without the right to calibrate the place uses example nights); none on the text pages.
+  // shown (Calibrer without the right to calibrate the place uses example nights); none on the map and the text pages.
   const path = loc.pathname;
   const canCalibrate =
     place.real && !!user && (place.kind === "mine" || user.role === "admin" || (user.role === "team" && place.slug === TEAM_SITE));
-  const badge: "real" | "mock" | null = ["/compte", "/tutoriel", "/a-propos", "/seeing-monitor"].some((x) => path.startsWith(x))
+  const badge: "real" | "mock" | null = ["/carte", "/compte", "/tutoriel", "/a-propos", "/seeing-monitor"].some((x) => path.startsWith(x))
     ? null
-    : path.startsWith("/carte") || path.startsWith("/fisheye")
+    : path.startsWith("/fisheye")
       ? "real"
       : path.startsWith("/calibrer")
         ? canCalibrate
@@ -63,7 +63,7 @@ export default function Header() {
         : place.real
           ? "real"
           : "mock";
-  const hid = kHidden(place, role);
+  const hid = kHidden(place, role) || kSecret(place, role);
 
   return (
     <header>

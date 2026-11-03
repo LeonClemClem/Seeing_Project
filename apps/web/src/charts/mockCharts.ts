@@ -187,7 +187,7 @@ export function prevSvg(K: K3, KCAL: K3, manual: boolean, OB: boolean, ui: Flags
   }
   g += `<line x1="${X(NOW)}" x2="${X(NOW)}" y1="${T}" y2="${T + ph}" stroke="#e6ebf6" stroke-dasharray="2 3"/><text x="${X(NOW) + 4}" y="${T + 12}" font-size="11" fill="#e6ebf6">${tr("maintenant")}</text>`;
   g += `<rect x="${X(I0)}" y="${T}" width="${pw / (I1 - I0)}" height="${ph}" fill="#0a0f1d" opacity=".75"/>`;
-  g += `<text x="${L + 6}" y="${T + ph - 6}" font-size="11" fill="${C_TXT}">K_TKE = ${fmt(K[0])}  K_CIS = ${fmt(K[1])}  K_conv = 0.1</text>`;
+  g += `<text x="${L + 6}" y="${T + ph - 6}" font-size="11" fill="${C_TXT}">K1 = ${fmt(K[0])}  K2 = ${fmt(K[1])}  K_conv = 0.1</text>`;
   return g;
 }
 

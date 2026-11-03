@@ -193,7 +193,7 @@ function fit<C>(P: CalPair<C>[], model: CalModel<C>): { P: CalPair<C>[]; K: K3; 
       }
     step = s;
   }
-  return { P, K, mode: "K_TKE et K_CIS indépendants" };
+  return { P, K, mode: "K1 et K2 indépendants" };
 }
 
 export function cstats<C = Comp>(P: CalPair<C>[], K: K3, see: (K: K3, c: C) => number = seeC as unknown as (K: K3, c: C) => number) {

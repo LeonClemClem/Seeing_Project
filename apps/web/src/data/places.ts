@@ -131,8 +131,11 @@ export function useCurrentPlace(): Place {
 export const kHidden = (p: Place, role: Role) =>
   p.kind === "point" || (p.kind === "pub" && role !== "admin" && !(role === "team" && p.slug === TEAM_SITE));
 
+/** A member's place not calibrated yet: its K are those of the map, never shown (only the administrator knows them). */
+export const kSecret = (p: Place, role: Role) => p.real && p.kind === "mine" && !p.calibrated && role !== "admin";
+
 export const kTxt = (K: K3, hid: boolean, f: (v: number) => string | number = (v) => v) =>
-  hid ? "" : `K_TKE = ${f(K[0])}  K_CIS = ${f(K[1])}  K_conv = ${f(K[2])}`;
+  hid ? "" : `K1 = ${f(K[0])}  K2 = ${f(K[1])}  K_conv = ${f(K[2])}`;
 
 /** Select a place and load its saved K (the K of its forecasts, as in Prévision). */
 export function selectPlace(p: Place): Partial<UiState> {
