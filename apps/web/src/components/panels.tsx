@@ -10,6 +10,7 @@ import type { LieuData } from "../mock/engine";
 import { setState, useLangMemo, useUi, type UiState } from "../store";
 import { exportSvgIn, fileSafe } from "../lib/export";
 import { pad2 } from "../lib/util";
+import { PendingForecast } from "./PendingForecast";
 import { Chip, Seg, Spinner, SvgChart } from "./ui";
 
 /** Measurement display chips ("Données : brutes / médianes horaires / courbe / ☾ médianes nocturnes"). */
@@ -351,6 +352,12 @@ export function Cn2RealPanel({
       <div style={style}>
         {controls}
         <Spinner />
+      </div>
+    );
+  if (cn2.data && !cn2.data.valid_times.length)
+    return (
+      <div style={style}>
+        <PendingForecast />
       </div>
     );
   if (cn2.isError || !ctx)

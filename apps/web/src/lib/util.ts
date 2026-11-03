@@ -80,6 +80,11 @@ export const esc = (s: string) =>
 export const pad2 = (n: number) => String(n).padStart(2, "0");
 export const ddmm = (d: Date) => pad2(d.getUTCDate()) + "/" + pad2(d.getUTCMonth() + 1);
 /** "12/10 12Z" */
+/** "17h24" (UTC) of a time. */
+export const hhmm = (ms: number) => {
+  const d = new Date(ms);
+  return `${pad2(d.getUTCHours())}h${pad2(d.getUTCMinutes())}`;
+};
 export const runLabel = (ms: number) => {
   const d = new Date(ms);
   return `${ddmm(d)} ${pad2(d.getUTCHours())}Z`;

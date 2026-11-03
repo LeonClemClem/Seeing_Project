@@ -3,8 +3,8 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import { useMe, useSyncRole } from "../data/auth";
 import { kHidden, selectPlace, TEAM_SITE, useCurrentPlace, usePlaces } from "../data/places";
 import { tr } from "../i18n";
-import { useLatestRunTime } from "../lib/hooks";
-import { fmt, pad2, runLabel } from "../lib/util";
+import { useLatestRunTime, useRunUpdates } from "../lib/hooks";
+import { ddmm, fmt, hhmm, pad2, runLabel } from "../lib/util";
 import { setState, useUi } from "../store";
 
 /** Age (hours) of the latest main run past which the site says, in red, that Météo-France is late. */
@@ -40,6 +40,7 @@ export default function Header() {
   useSyncRole();
   const user = me.data?.user ?? null;
   const { runTime } = useLatestRunTime();
+  const { updated, next } = useRunUpdates();
   const loc = useLocation();
 
   const runMs = runTime ? Date.parse(runTime) : null;
@@ -155,9 +156,21 @@ export default function Header() {
         <span>
           Run <b className="mono">{runMs ? runLabel(runMs) : "–"}</b>
           {tr(" · run principal")}
+          {updated != null && (
+            <>
+              {" · "}
+              {tr("mis à jour le")} <b className="mono">{`${ddmm(new Date(updated))} ${hhmm(updated)} TU`}</b>
+            </>
+          )}
         </span>
         <span>
           {tr("Prochain run principal")} <b className="mono">{runMs ? pad2(new Date(runMs + 6 * 3600000).getUTCHours()) + "Z" : "–"}</b>
+          {next != null && (
+            <>
+              {" · "}
+              {tr("sur le site vers")} <b className="mono">{hhmm(next)} TU</b>
+            </>
+          )}
         </span>
         {!hid && (
           <span>

@@ -10,6 +10,7 @@ import { RunAgeSkill } from "../components/RunAgeSkill";
 import { cn2Svg, prevSvg } from "../charts/mockCharts";
 import { PVDEF, PVGRP, prevRealSvg, pvPanel } from "../charts/realCharts";
 import { Cn2RealPanel, DataChips, HistPanel } from "../components/panels";
+import { PendingForecast } from "../components/PendingForecast";
 import { PointNotice, PointSeeing } from "../components/PointForecast";
 import { hourlyMedians, useHourlyMedians, useRawMeasurements, usePlaceLoading, useRealForecast, useSiteHistory, type View } from "../data/forecast";
 import { Cn2Legend, LegArome, LegBreak, LegDay, LegMed, LegMes, Seg, Spinner, Sw, SvgChart } from "../components/ui";
@@ -205,6 +206,7 @@ function RealSeeing({ place }: { place: Place }) {
   );
   if (forecast.isLoading) return <Spinner />;
   if (forecast.isError || !forecast.data) return <NoData text="Pas de prévision enregistrée pour ce lieu." />;
+  if (!forecast.data.points.length) return <PendingForecast />;
   const run = forecast.data.run_time.slice(0, 13).replace(/[-T]/g, "");
   return (
     <div ref={box}>
@@ -274,6 +276,7 @@ function ModelVars({ place }: { place: Place }) {
     () => (forecast.data ? [0, 1].map((k) => pvPanel(forecast.data!, place.nom, sel[k]!, zoom)) : null),
     [forecast.data, place.nom, sel, zoom],
   );
+  if (forecast.data && !forecast.data.points.length) return <PendingForecast pad={16} />;
   if (!forecast.data || !panels) return <p className="muted small">{tr("Pas de variables enregistrées pour ce lieu.")}</p>;
   const dg = (v: number) => (Math.abs(v) >= 20 ? v.toFixed(0) : Math.abs(v) >= 2 ? v.toFixed(1) : v.toFixed(2));
   const toggle = (k: number, id: string) =>
