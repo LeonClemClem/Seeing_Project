@@ -292,11 +292,13 @@ def _shear(z, T, U, V, P, nv):
 
 def v2bd_integrals(
     z: np.ndarray, T: np.ndarray, U: np.ndarray, V: np.ndarray, P: np.ndarray, E: np.ndarray,
-    h_coulim: np.ndarray, w_theta0: np.ndarray,
+    h_coulim: np.ndarray, w_theta0: np.ndarray, z0: np.ndarray | None = None,
 ) -> np.ndarray:
     """(n, 6): integrals I_tke, I_conv, I_cis of the V2bd terms at K = 1, already weighted by the soft
     transition, so that  integral(Cn2 dz) = K_TKE * I_tke + K_conv * I_conv + K_CIS * I_cis, then their
     first moments in altitude Z_x = integral(z * term dz) (heights of the turbulence, for the fisheye).
+    With z0 (ground altitude above sea level of each column): (n, 6 + 3 * len(BANDS_ASL)), then the same three
+    integrals from the ground up to each altitude of BANDS_ASL (above sea level, not above the ground).
 
     Rows are columns, levels sorted by altitude, NaN-padded at the end (z NaN beyond the last level).
     """
@@ -339,12 +341,25 @@ def v2bd_integrals(
 
     w = 0.5 * (1.0 - np.tanh((zf - h) / V2BD_TRANSITION_M))
     terms = (w * tke1 * valid, w * conv1, (1.0 - w) * shear1)
-    out = np.stack(
-        [np.trapezoid(c, zf, axis=1) for c in terms] + [np.trapezoid(zf * c, zf, axis=1) for c in terms],
-        axis=1,
-    )
+    cols = [np.trapezoid(c, zf, axis=1) for c in terms] + [np.trapezoid(zf * c, zf, axis=1) for c in terms]
+    if z0 is not None:
+        for b in BANDS_ASL:
+            top = b - np.asarray(z0, dtype=np.float64)  # the altitude b, above the ground of each column
+            cols += [_trapezoid_to(c, zf, top) for c in terms]
+    out = np.stack(cols, axis=1)
     out[(nv < 2) | ~np.isfinite(h_coulim)] = np.nan
     return out
+
+
+def _trapezoid_to(c: np.ndarray, z: np.ndarray, top: np.ndarray) -> np.ndarray:
+    """Trapezoidal integral of c(z) from the first level up to `top` (per row; c linear between levels), 0 when
+    top is below the first level, the whole integral when it is above the last one."""
+    z_lo, z_hi, c_lo, c_hi = z[:, :-1], z[:, 1:], c[:, :-1], c[:, 1:]
+    zt = np.clip(top[:, None], z_lo, np.maximum(z_lo, z_hi))
+    dz = z_hi - z_lo
+    with np.errstate(all="ignore"):
+        c_t = np.where(dz > 0, c_lo + (c_hi - c_lo) * (zt - z_lo) / dz, c_lo)
+    return np.sum(np.nan_to_num(0.5 * (c_lo + c_t) * (zt - z_lo)), axis=1)
 
 
 def seeing_from_integrals(integrals: np.ndarray, k: tuple[float, float, float] = MAP_K) -> np.ndarray:
@@ -418,12 +433,14 @@ def map_integrals(
     fields: Fields, sshf_now: np.ndarray | None, sshf_prev: np.ndarray | None, surface_h: np.ndarray,
     chunk: int = 20000,
 ) -> np.ndarray:
-    """(npoints, 6) V2bd integrals and moments of every grid point, computed by chunks of columns."""
-    n = np.asarray(surface_h).size
-    out = np.full((n, 6), np.nan)
+    """(npoints, 6 + 3 * len(BANDS_ASL)) V2bd integrals and moments of every grid point, then the integrals up to
+    the altitudes BANDS_ASL (see v2bd_integrals), computed by chunks of columns."""
+    oro = np.asarray(surface_h, dtype=np.float64).reshape(-1)
+    n = oro.size
+    out = np.full((n, 6 + 3 * len(BANDS_ASL)), np.nan)
     for a in range(0, n, chunk):
         sl = slice(a, min(n, a + chunk))
-        out[sl] = v2bd_integrals(*columns_from_fields(fields, sshf_now, sshf_prev, surface_h, sl))
+        out[sl] = v2bd_integrals(*columns_from_fields(fields, sshf_now, sshf_prev, surface_h, sl), z0=oro[sl])
     return out
 
 
@@ -463,6 +480,28 @@ H_LOW_STEP, H_HIGH_STEP = 20.0, 100.0  # m per code: low 0-5080 m, high 0-25 400
 # in the fisheye (assumed, as research/ciel_seeing.py).
 CLOUDS = ("lcc", "mcc", "hcc")
 CLOUD_HEIGHTS = (1500.0, 4500.0, 8000.0)
+# Altitude bands of the map (above sea level, not above the ground): below 3 km, 3-7 km, above 7 km. Their
+# shares of the Cn2 integral are 3 more planes of MapFrame.extra, after the cloud planes (04/11/2026).
+BANDS_ASL = (3000.0, 7000.0)
+
+
+def band_shares(integrals: np.ndarray, k: tuple[float, float, float] = MAP_K) -> np.ndarray | None:
+    """(len(BANDS_ASL) + 1, ...) shares of the Cn2 integral in each altitude band (below BANDS_ASL[0], between
+    them, above the last one) for K, or None when the integrals have no band columns."""
+    i = np.asarray(integrals, dtype=np.float64)
+    nb = len(BANDS_ASL)
+    if i.shape[-1] < 6 + 3 * nb:
+        return None
+
+    def j(a):  # J = K_TKE * I_tke + K_conv * I_conv + K_CIS * I_cis of the 3 columns from a
+        return k[0] * i[..., a] + k[2] * i[..., a + 1] + k[1] * i[..., a + 2]
+
+    total = j(0)
+    with np.errstate(all="ignore"):
+        cum = [np.clip(j(6 + 3 * b) / total, 0.0, 1.0) for b in range(nb)]
+    cum = [np.zeros_like(total)] + [np.maximum.accumulate(np.stack(cum), axis=0)[b] for b in range(nb)] + [np.ones_like(total)]
+    out = np.stack([cum[b + 1] - cum[b] for b in range(nb + 1)])
+    return np.where(np.isfinite(total) & (total > 0), out, np.nan)
 
 
 def split(integrals: np.ndarray, k: tuple[float, float, float] = MAP_K) -> tuple[np.ndarray, ...]:
@@ -481,8 +520,10 @@ def encode_split(
     integrals: np.ndarray, k: tuple[float, float, float], shape: tuple[int, ...], clouds: dict[str, np.ndarray] | None = None
 ) -> bytes:
     """3 planes (share, low height, high height), then, when the three cloud layers are given, 3 planes of
-    cloud cover in % (low, medium, high; see CLOUDS)."""
+    cloud cover in % (low, medium, high; see CLOUDS), then, when the integrals have the altitude band columns,
+    3 planes of the band shares (band_shares, code / 254; the cloud planes are then 255 when not given)."""
     share, h_low, h_high = split(integrals, k)
+    bands = band_shares(integrals, k)
 
     def code(v, scale, top=254):
         q = np.round(np.asarray(v) * scale)
@@ -491,6 +532,10 @@ def encode_split(
     planes = [code(share, 254.0), code(h_low, 1 / H_LOW_STEP), code(h_high, 1 / H_HIGH_STEP)]
     if clouds and all(c in clouds for c in CLOUDS):
         planes += [code(clouds[c], 100.0, 100) for c in CLOUDS]
+    elif bands is not None:
+        planes += [np.full(shape, 255, np.uint8) for _ in CLOUDS]
+    if bands is not None:
+        planes += [code(b, 254.0) for b in bands]
     return zlib.compress(np.concatenate([a.reshape(-1) for a in planes]).tobytes(), 6)
 
 
@@ -506,10 +551,20 @@ def decode_clouds(data: bytes, shape: tuple[int, int]) -> np.ndarray | None:
     """Cloud cover [0-1] (3, ny, nx) low / medium / high, or None for frames stored without clouds."""
     n = shape[0] * shape[1]
     raw = np.frombuffer(zlib.decompress(data), dtype=np.uint8)
-    if raw.size < 6 * n:
+    if raw.size < 6 * n or np.all(raw[3 * n : 6 * n] == 255):
         return None
     a = raw[3 * n : 6 * n].reshape(3, *shape).astype(np.float64)
     return np.where(a == 255, np.nan, a / 100.0)
+
+
+def decode_bands(data: bytes, shape: tuple[int, int]) -> np.ndarray | None:
+    """Shares [0-1] of the Cn2 integral in the altitude bands (3, ny, nx), or None for frames stored without them."""
+    n = shape[0] * shape[1]
+    raw = np.frombuffer(zlib.decompress(data), dtype=np.uint8)
+    if raw.size < 9 * n:
+        return None
+    a = raw[6 * n : 9 * n].reshape(3, *shape).astype(np.float64)
+    return np.where(a == 255, np.nan, a / 254.0)
 
 
 # Model orography of the map grid (contour lines of the website map): uint16 = altitude + 500 m, 65535 = none.

@@ -154,7 +154,7 @@ def fisheye(
         h_low = _sampler(ext, n, f.ny, f.nx, lambda c: c * H_LOW_STEP)
         h_high = _sampler(ext, 2 * n, f.ny, f.nx, lambda c: c * H_HIGH_STEP)
         layers = (
-            [_sampler(ext, (3 + k) * n, f.ny, f.nx, lambda c: c / 100.0) for k in range(3)] if len(ext) >= 6 * n else None
+            [_sampler(ext, (3 + k) * n, f.ny, f.nx, lambda c: c / 100.0) for k in range(3)] if len(ext) >= 6 * n and ext[3 * n : 6 * n].count(255) < 3 * n else None
         )
 
         def rc(la: float, lo: float, f=f) -> tuple[float, float]:

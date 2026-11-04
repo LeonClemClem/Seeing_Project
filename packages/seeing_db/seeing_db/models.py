@@ -104,7 +104,8 @@ class MapFrame(Base):
     data: Mapped[bytes] = mapped_column(LargeBinary)
     # zlib(3 uint8 planes): share of the low (boundary-layer) turbulence, heights of the low and high
     # parts (seeing_core.grid.encode_split), for the fisheye; then, since the cloud option, 3 planes of
-    # low / medium / high cloud cover in %. NULL for older frames.
+    # low / medium / high cloud cover in % (all 255 when absent); then, since 04/11/2026, 3 planes of the shares
+    # of the Cn2 integral below 3 km, 3-7 km and above 7 km above sea level (code / 254). NULL for older frames.
     extra: Mapped[bytes | None] = mapped_column(LargeBinary)
 
     run: Mapped[ModelRun] = relationship(back_populates="map_frames")

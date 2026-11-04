@@ -322,5 +322,10 @@
 "clique pour voir sa prévision": "click to see its forecast",
 "en attente de sa publication par Météo-France": "waiting for Météo-France to publish it",
 "Partager ce lieu avec la communauté": "Share this place with the community",
-"Rendre ce lieu privé": "Make this place private"
+"Rendre ce lieu privé": "Make this place private",
+"sous 3 km d'altitude seule": "below 3 km altitude only",
+"entre 3 et 7 km d'altitude seule": "3–7 km altitude only",
+"au-dessus de 7 km d'altitude seule": "above 7 km altitude only",
+"disponible à partir du prochain run": "available from the next run",
+"altitude au-dessus du niveau de la mer": "altitude above sea level"
 }

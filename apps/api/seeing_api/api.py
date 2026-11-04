@@ -6,7 +6,7 @@ from datetime import timedelta
 import os
 import zlib
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import func, or_, select
@@ -323,18 +323,29 @@ def global_map_relief(session: SessionDep, run: RunParam = "latest") -> Response
                     headers={"Cache-Control": "public, max-age=86400"})
 
 
+MAP_SHARE_PLANE = {"bl": 0, "z0": 6, "z1": 7, "z2": 8}
+
+
 @router.get("/map/share")
-def global_map_share(session: SessionDep, lead: int, run: RunParam = "latest") -> Response:
-    """Share of the boundary-layer turbulence (TKE + convection) in the integral of the map's Cn2 at each cell of a
-    frame: ny * nx uint8 codes, share = code / 254, 255 = none (first plane of MapFrame.extra). The map can show the
-    boundary-layer or the free-atmosphere turbulence alone (seeing x share^0.6 or x (1 - share)^0.6)."""
+def global_map_share(
+    session: SessionDep, lead: int, run: RunParam = "latest", part: Literal["bl", "z0", "z1", "z2"] = "bl"
+) -> Response:
+    """Share of a part of the turbulence in the integral of the map's Cn2 at each cell of a frame: ny * nx uint8
+    codes, share = code / 254, 255 = none. part "bl": the boundary-layer turbulence (TKE + convection; first plane of
+    MapFrame.extra), the free atmosphere being 1 - share; "z0" / "z1" / "z2": the altitude bands below 3 km, 3-7 km,
+    above 7 km above sea level (planes 7-9, frames computed since 04/11/2026). The map shows a part alone as
+    seeing x share^0.6."""
     model_run = _map_run(session, run)
     row = session.execute(
         select(MapFrame.extra, MapFrame.ny, MapFrame.nx).where(MapFrame.run_id == model_run.id, MapFrame.lead_hour == lead)
     ).first()
     if row is None or row.extra is None:
         raise HTTPException(404, f"No turbulence split at H+{lead}")
-    return Response(zlib.decompress(row.extra)[: row.ny * row.nx], media_type="application/octet-stream",
+    n, raw = row.ny * row.nx, zlib.decompress(row.extra)
+    a = MAP_SHARE_PLANE[part] * n
+    if len(raw) < a + n:
+        raise HTTPException(404, f"No {part} share at H+{lead}")
+    return Response(raw[a : a + n], media_type="application/octet-stream",
                     headers={"Cache-Control": "public, max-age=86400"})
 
 
