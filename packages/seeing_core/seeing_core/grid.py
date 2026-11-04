@@ -27,7 +27,7 @@ from seeing_core.constants import (
     C_FC,
     CP_AIR,
     G,
-    HAG_TOP_M,
+    ISO_START_M,
     HEIGHTS,
     LAMBDA,
     P0_HPA,
@@ -389,7 +389,7 @@ def columns_from_fields(
         V_i = np.stack([f(("IP1", "v", p)) for p in levels], axis=1)
         E_i = np.stack([f(("IP4", "tke", p)) for p in levels], axis=1)
         P_i = np.broadcast_to(np.asarray(levels, dtype=np.float64), (n, len(levels)))
-        ok = np.isfinite(z_i) & np.isfinite(T_i) & np.isfinite(U_i) & np.isfinite(V_i) & (z_i > HAG_TOP_M)
+        ok = np.isfinite(z_i) & np.isfinite(T_i) & np.isfinite(U_i) & np.isfinite(V_i) & (z_i > ISO_START_M)
         z_i = np.where(ok, z_i, np.nan)
     else:
         z_i = T_i = U_i = V_i = E_i = P_i = np.empty((n, 0))

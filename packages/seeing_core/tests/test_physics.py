@@ -225,3 +225,16 @@ def test_lead0_without_tke_takes_it_from_lead1():
     # same TKE everywhere in the synthetic run: identical to a lead 0 that had it
     np.testing.assert_allclose(hours[0].cn2, full[0].cn2, rtol=1e-12, equal_nan=True)
     assert hours[0].seeing_arcsec == pytest.approx(full[0].seeing_arcsec)
+
+
+def test_isobaric_level_too_close_to_hag_top_is_skipped():
+    """An isobaric level less than ISO_MIN_GAP_M above the last HAG level (3000 m) is not used: the shear over
+    that thin layer between two AROME products made one-cell spikes. Levels further up are kept."""
+    from seeing_core.constants import HAG_TOP_M, ISO_MIN_GAP_M
+    from seeing_core.profiles import free_atmosphere_profile, full_profile
+
+    hag = {k: np.array([2750.0, 3000.0]) if k == "z" else np.ones(2) for k in ("z", "T", "U", "V", "P", "TKE")}
+    z_iso = np.array([2500.0, HAG_TOP_M + 0.5 * ISO_MIN_GAP_M, HAG_TOP_M + 2 * ISO_MIN_GAP_M, 4000.0])
+    iso = {k: z_iso if k == "z" else np.ones(4) for k in ("z", "T", "U", "V", "P", "TKE")}
+    assert list(full_profile(hag, iso)["z"]) == [2750.0, 3000.0, z_iso[2], 4000.0]
+    assert list(free_atmosphere_profile(hag, iso, 1000.0)["z"]) == [2750.0, 3000.0, z_iso[2], 4000.0]
