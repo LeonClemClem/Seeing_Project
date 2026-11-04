@@ -1082,19 +1082,29 @@ export default function Carte() {
               <span className="small muted" style={{ minWidth: 52 }}>
                 {tr("Turbulence")}
               </span>
-              <Seg
-                label={tr("Turbulence affichée")}
-                value={layer}
-                onChange={setLayer}
-                options={[
-                  ["tot", tr("Toute la turbulence")],
-                  ["bl", tr("Couche limite")],
-                  ["haut", tr("Au-dessus de la couche limite")],
-                  ["z0", tr("< 3 km")],
-                  ["z1", tr("3–7 km")],
-                  ["z2", tr("> 7 km")],
-                ]}
-              />
+              {/* two rows of the same choice: the layers, then the altitude bands below them */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <Seg
+                  label={tr("Turbulence affichée")}
+                  value={layer}
+                  onChange={setLayer}
+                  options={[
+                    ["tot", tr("Toute la turbulence")],
+                    ["bl", tr("Couche limite")],
+                    ["haut", tr("Au-dessus de la couche limite")],
+                  ]}
+                />
+                <Seg
+                  label={tr("Turbulence par tranche d'altitude")}
+                  value={layer}
+                  onChange={setLayer}
+                  options={[
+                    ["z0", tr("< 3 km")],
+                    ["z1", tr("3–7 km")],
+                    ["z2", tr("> 7 km")],
+                  ]}
+                />
+              </div>
               {layer !== "tot" && !shares && <span className="small muted">{tr("chargement…")}</span>}
               {layer !== "tot" && shares && shares.size === 0 && (
                 <span className="small muted">{tr("disponible à partir du prochain run")}</span>
