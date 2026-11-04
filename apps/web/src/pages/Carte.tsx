@@ -689,14 +689,15 @@ export default function Carte() {
           h = 24;
         zh.push([x - w / 2, y - h / 2, w, h, i]);
         if (MZH !== i) return;
-        cx.fillStyle = "rgba(242,193,78,.95)";
-        cx.strokeStyle = "#000";
+        // same look as the labels always shown before (dark, white text), not yellow
+        cx.fillStyle = "rgba(10,15,29,.78)";
+        cx.strokeStyle = "rgba(255,255,255,.75)";
         cx.lineWidth = 1.2;
         cx.beginPath();
         cx.roundRect(x - w / 2, y - h / 2, w, h, 12);
         cx.fill();
         cx.stroke();
-        cx.fillStyle = "#000";
+        cx.fillStyle = "#fff";
         cx.textAlign = "center";
         cx.fillText(name, x, y + 4.5);
         cx.textAlign = "left";
