@@ -276,29 +276,14 @@ export default function Fisheye() {
         // relief in dark brown; below ELMIN (or no value) grey
         let col: number[] =
           alt < horizonAt(az) ? [62, 52, 42] : isNaN(s) ? [55, 62, 80] : seeingRgb(Math.min(Math.max(s, 0), 10) / 10);
-        const lay = opt.nua && vis(alt, az) ? cloudLayers(fcur, alt, az) : null;
-        if (lay) {
-          // each layer as seen from below, the highest first: high clouds (cirrus) a thin bluish-white veil, never
-          // opaque; medium clouds light grey; low clouds grey, darker and opaque when overcast
-          for (const [k, cv] of [
-            [2, lay[2]],
-            [1, lay[1]],
-            [0, lay[0]],
-          ] as const) {
-            const c = Math.min(Math.max(cv, 0), 1);
-            if (!(c > 0)) continue;
-            const a = k === 2 ? 0.55 * c : k === 1 ? 0.85 * Math.pow(c, 0.8) : Math.pow(c, 0.7),
-              tone = k === 2 ? [236, 241, 250] : k === 1 ? [212 - 30 * c, 215 - 30 * c, 224 - 28 * c] : [196 - 86 * c, 198 - 86 * c, 204 - 82 * c];
-            col = col.map((v, j) => v * (1 - a) + tone[j]! * a);
-          }
-        } else if (opt.nua && vis(alt, az)) {
-          // runs without the layers: one veil from the total cover (cover^0.6: 25 % -> 0.44, 50 % -> 0.66, 100 % ->
-          // opaque), light grey for thin cover, darker grey when overcast
+        if (opt.nua && vis(alt, az)) {
+          // cloud veil in shades of neutral grey: the more cover, the darker the grey (245 at 0 % -> 75 at 100 %) and the
+          // more opaque (cover^0.5: 10 % -> 0.32, 25 % -> 0.5, 50 % -> 0.71, 100 % -> opaque, the seeing hidden)
           const cc = Math.min(Math.max(cloudSky(fcur, alt, az), 0), 1);
           if (cc > 0) {
-            const a = Math.pow(cc, 0.6),
-              grey = [222 - 92 * cc, 224 - 92 * cc, 230 - 88 * cc];
-            col = col.map((v, k) => v * (1 - a) + grey[k]! * a);
+            const a = Math.sqrt(cc),
+              g = 245 - 170 * cc;
+            col = col.map((v) => v * (1 - a) + g * a);
           }
         }
         D[p] = col[0]!;
