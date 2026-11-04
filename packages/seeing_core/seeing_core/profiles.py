@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from seeing_core.constants import CP_AIR, G, HAG_TOP_M, HEIGHTS, R_D, SSHF_SIGN
+from seeing_core.constants import CP_AIR, G, HAG_TOP_M, HEIGHTS, ISO_START_M, R_D, SSHF_SIGN
 from seeing_core.grib import SitePoints
 
 Profile = dict[str, np.ndarray]
@@ -107,7 +107,7 @@ def boundary_layer_profile(hag: Profile, iso: Profile, h_coulim: float) -> Profi
     """Levels of the TKE model: HAG levels up to H_COULIM, then (if H_COULIM > 3000 m)
     isobaric levels between 3000 m and H_COULIM. Already sorted by altitude."""
     mask_hag = hag["z"] <= h_coulim
-    mask_iso = (iso["z"] > HAG_TOP_M) & (iso["z"] <= h_coulim)
+    mask_iso = (iso["z"] > ISO_START_M) & (iso["z"] <= h_coulim)
     return {
         k: np.concatenate([hag[k][mask_hag], iso[k][mask_iso]])
         for k in ("z", "T", "U", "V", "P", "TKE")
@@ -118,7 +118,7 @@ def free_atmosphere_profile(hag: Profile, iso: Profile, h_coulim: float) -> Prof
     """Levels of the shear model above H_COULIM. HAG levels have priority up to 3000 m (so when
     H_COULIM < 3000 m the shear model uses the HAG levels above H_COULIM), then IP1 above."""
     mask_hag = np.isfinite(hag["z"]) & (hag["z"] > h_coulim) & (hag["z"] <= HAG_TOP_M)
-    mask_iso = np.isfinite(iso["z"]) & (iso["z"] > max(float(h_coulim), HAG_TOP_M))
+    mask_iso = np.isfinite(iso["z"]) & (iso["z"] > max(float(h_coulim), ISO_START_M))
     return {
         k: np.concatenate([np.asarray(hag[k])[mask_hag], np.asarray(iso[k])[mask_iso]])
         for k in ("z", "T", "U", "V", "P")
@@ -129,7 +129,7 @@ def full_profile(hag: Profile, iso: Profile) -> Profile:
     """Whole meteorological profile: HAG levels up to 3000 m, then isobaric levels above, sorted.
     Its levels at or below H_COULIM are boundary_layer_profile(), those above free_atmosphere_profile()."""
     mask_hag = np.isfinite(hag["z"]) & (hag["z"] <= HAG_TOP_M)
-    mask_iso = np.isfinite(iso["z"]) & (iso["z"] > HAG_TOP_M)
+    mask_iso = np.isfinite(iso["z"]) & (iso["z"] > ISO_START_M)
     out = {
         k: np.concatenate([np.asarray(hag[k])[mask_hag], np.asarray(iso[k])[mask_iso]])
         for k in ("z", "T", "U", "V", "P", "TKE")
@@ -143,7 +143,7 @@ def display_profile_heights(hag: Profile, iso: Profile) -> np.ndarray:
     independent of H_COULIM, sorted."""
     z = np.concatenate([
         np.asarray(hag["z"])[np.isfinite(hag["z"]) & (hag["z"] <= HAG_TOP_M)],
-        np.asarray(iso["z"])[np.isfinite(iso["z"]) & (iso["z"] > HAG_TOP_M)],
+        np.asarray(iso["z"])[np.isfinite(iso["z"]) & (iso["z"] > ISO_START_M)],
     ])
     return z[np.argsort(z)]
 
