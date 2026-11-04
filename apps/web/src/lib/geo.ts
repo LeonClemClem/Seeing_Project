@@ -92,8 +92,9 @@ export function parseCoord(s: string, lat: boolean): number | null {
 }
 
 /** Cities: those of the research map (research/carte_seeing.py VILLES), then the main cities of the other
- * countries of the AROME domain. White dots, small names; a 4th value 1 = shown only once zoomed in. */
-export const VILLES: [string, number, number, 1?][] = [
+ * countries of the AROME domain. White dots, small names; a 4th value 1 = shown only once zoomed in, 2 = only in the
+ * fine view (map height <= 4 degrees). */
+export const VILLES: [string, number, number, (1 | 2)?][] = [
   ["Paris", 48.8566, 2.3522], ["Marseille", 43.2965, 5.3698], ["Lyon", 45.764, 4.8357], ["Toulouse", 43.6047, 1.4442],
   ["Nice", 43.7102, 7.262], ["Nantes", 47.2184, -1.5536], ["Montpellier", 43.6108, 3.8767], ["Strasbourg", 48.5734, 7.7521],
   ["Bordeaux", 44.8378, -0.5792], ["Lille", 50.6292, 3.0573], ["Rennes", 48.1173, -1.6778], ["Reims", 49.2583, 4.0317],
@@ -130,4 +131,42 @@ export const VILLES: [string, number, number, 1?][] = [
   ["Valladolid", 41.6523, -4.7245, 1], ["Oviedo", 43.3619, -5.8494, 1], ["Saint-Jacques-de-Compostelle", 42.8782, -8.5448, 1],
   ["Salamanque", 40.9701, -5.6635, 1], ["Tolède", 39.8628, -4.0273, 1], ["Cordoue", 37.8882, -4.7794, 1],
   ["Alicante", 38.3452, -0.481, 1], ["Murcie", 37.9922, -1.1307, 1], ["Coimbra", 40.2033, -8.4103, 1],
+  // smaller towns, shown only in the fine view (4th value 2)
+  ["Le Havre", 49.4944, 0.1079, 2], ["Caen", 49.1829, -0.3707, 2], ["Amiens", 49.8941, 2.2958, 2],
+  ["Orléans", 47.903, 1.9093, 2], ["Le Mans", 48.0061, 0.1996, 2], ["Angers", 47.4784, -0.5632, 2],
+  ["Nancy", 48.6921, 6.1844, 2], ["Mulhouse", 47.7508, 7.3359, 2], ["Colmar", 48.0794, 7.3585, 2],
+  ["Troyes", 48.2973, 4.0744, 2], ["Saint-Étienne", 45.4397, 4.3872, 2], ["Annecy", 45.8992, 6.1294, 2],
+  ["Chambéry", 45.5646, 5.9178, 2], ["Valence (Drôme)", 44.9334, 4.8924, 2], ["Montélimar", 44.5581, 4.7509, 2],
+  ["Gap", 44.5594, 6.0786, 2], ["Briançon", 44.8992, 6.6439, 2], ["Digne-les-Bains", 44.0925, 6.2356, 2],
+  ["Manosque", 43.8283, 5.7869, 2], ["Forcalquier", 43.9597, 5.7803, 2], ["Aix-en-Provence", 43.5297, 5.4474, 2],
+  ["Arles", 43.6766, 4.6278, 2], ["Orange", 44.1381, 4.8075, 2], ["Carpentras", 44.0556, 5.0481, 2],
+  ["Draguignan", 43.5367, 6.4647, 2], ["Cannes", 43.5528, 7.0174, 2], ["Menton", 43.7747, 7.4975, 2],
+  ["Barcelonnette", 44.3869, 6.6519, 2], ["Die", 44.7536, 5.3703, 2], ["Nyons", 44.3606, 5.1406, 2],
+  ["Privas", 44.7353, 4.5992, 2], ["Le Puy-en-Velay", 45.0434, 3.8858, 2], ["Mende", 44.5181, 3.5006, 2],
+  ["Millau", 44.0981, 3.0778, 2], ["Rodez", 44.3506, 2.575, 2], ["Aurillac", 44.9264, 2.4397, 2],
+  ["Albi", 43.9289, 2.1464, 2], ["Carcassonne", 43.213, 2.3491, 2], ["Béziers", 43.3442, 3.2158, 2],
+  ["Narbonne", 43.1839, 3.0042, 2], ["Foix", 42.9653, 1.6069, 2], ["Tarbes", 43.2328, 0.0781, 2],
+  ["Bayonne", 43.4929, -1.4748, 2], ["Biarritz", 43.4832, -1.5586, 2], ["Mont-de-Marsan", 43.8902, -0.4997, 2],
+  ["Agen", 44.2033, 0.6163, 2], ["Montauban", 44.0176, 1.355, 2], ["Cahors", 44.4475, 1.4419, 2],
+  ["Périgueux", 45.1847, 0.7214, 2], ["Brive-la-Gaillarde", 45.1589, 1.5331, 2], ["Angoulême", 45.6484, 0.1562, 2],
+  ["La Rochelle", 46.1603, -1.1511, 2], ["Niort", 46.3237, -0.4588, 2], ["Vannes", 47.6582, -2.7608, 2],
+  ["Lorient", 47.7483, -3.37, 2], ["Quimper", 47.996, -4.1024, 2], ["Saint-Brieuc", 48.5136, -2.7653, 2],
+  ["Saint-Malo", 48.6493, -2.0257, 2], ["Cherbourg", 49.6337, -1.6222, 2], ["Laval", 48.0707, -0.7734, 2],
+  ["Bourges", 47.081, 2.3988, 2], ["Nevers", 46.991, 3.159, 2], ["Moulins", 46.5646, 3.3326, 2],
+  ["Vichy", 46.1275, 3.4258, 2], ["Mâcon", 46.3069, 4.8287, 2], ["Bourg-en-Bresse", 46.2052, 5.2255, 2],
+  ["Chalon-sur-Saône", 46.7806, 4.8539, 2], ["Auxerre", 47.7982, 3.5673, 2], ["Belfort", 47.638, 6.8628, 2],
+  ["Épinal", 48.1724, 6.4496, 2], ["Châlons-en-Champagne", 48.9566, 4.3631, 2],
+  ["Charleville-Mézières", 49.7621, 4.7262, 2], ["Beauvais", 49.4295, 2.0807, 2], ["Dunkerque", 51.0343, 2.3768, 2],
+  ["Calais", 50.9513, 1.8587, 2], ["Arras", 50.291, 2.7775, 2], ["Pontarlier", 46.9036, 6.355, 2],
+  ["Lons-le-Saunier", 46.6744, 5.5547, 2], ["Albertville", 45.6755, 6.3925, 2],
+  ["Bourg-Saint-Maurice", 45.6186, 6.7692, 2], ["Chamonix", 45.9237, 6.8694, 2], ["Modane", 45.2003, 6.6714, 2],
+  ["Embrun", 44.5639, 6.4953, 2], ["Sisteron", 44.195, 5.9436, 2], ["Porto-Vecchio", 41.5911, 9.2794, 2],
+  ["Calvi", 42.5679, 8.7575, 2], ["Corte", 42.3061, 9.15, 2], ["Sion", 46.2331, 7.3606, 2],
+  ["Lugano", 46.0037, 8.9511, 2], ["Neuchâtel", 46.99, 6.9293, 2], ["Aoste", 45.737, 7.3201, 2],
+  ["Cuneo", 44.3845, 7.5427, 2], ["Sanremo", 43.8159, 7.7761, 2], ["Bolzano", 46.4983, 11.3548, 2],
+  ["Trente", 46.0748, 11.1217, 2], ["Andorre-la-Vieille", 42.5063, 1.5218, 2], ["Gérone", 41.9794, 2.8214, 2],
+  ["Lleida", 41.6176, 0.62, 2], ["Huesca", 42.1401, -0.4089, 2], ["Pampelune", 42.8125, -1.6458, 2],
+  ["Saint-Sébastien", 43.3183, -1.9812, 2], ["Namur", 50.4674, 4.872, 2], ["Charleroi", 50.4108, 4.4446, 2],
+  ["Gand", 51.0543, 3.7174, 2], ["Sarrebruck", 49.2402, 6.9969, 2], ["Fribourg-en-Brisgau", 47.999, 7.8421, 2],
+  ["Karlsruhe", 49.0069, 8.4037, 2],
 ];

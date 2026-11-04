@@ -326,7 +326,12 @@ export default function Carte() {
   const role = useUi((s) => s.role);
   const lang = useUi((s) => s.lang);
   const place = useCurrentPlace();
-  const { pub, sh, mine } = usePlaces();
+  const { pub: allPub, sh: allSh, mine: allMine } = usePlaces();
+  /** Pins of the places drawn on the map (option "Afficher les lieux"); hidden pins are not clickable either. */
+  const [showPl, setShowPl] = useState(true);
+  const pub = useMemo(() => (showPl ? allPub : []), [showPl, allPub]);
+  const sh = useMemo(() => (showPl ? allSh : []), [showPl, allSh]);
+  const mine = useMemo(() => (showPl ? allMine : []), [showPl, allMine]);
   const nav = useNavigate();
   const user = useUser();
   const { create: createPlace } = usePlaceActions();
@@ -354,7 +359,7 @@ export default function Carte() {
    * seeing follows the hour shown during the animation. */
   const [hoverXY, setHoverXY] = useState<[number, number] | null>(null);
   /** Animation speed: x1 = one hour every 900 ms. */
-  const [speed, setSpeed] = useState<1 | 2 | 3>(1);
+  const [speed, setSpeed] = useState<1 | 2 | 3 | 5>(1);
   const loc = useLocation();
   // "Enregistrer ce point comme lieu" (Prévision, Calibrer for a point of the map) brings the coordinates
   const st0 = loc.state as { newPlace?: boolean; lat?: number; lon?: number } | null;
@@ -627,10 +632,6 @@ export default function Carte() {
       cx.textAlign = "left";
     }
     // Places shared by the community (the API blurs other members' positions by 5-11 km).
-    sh.forEach(({ lat: la, lon: lo }) => {
-      const [x, y] = toXY(la, lo);
-      pin(cx, x, y, big ? 8 : 6, "sh");
-    });
     cx.font = "500 12px 'IBM Plex Sans',sans-serif";
     const label = (t: string, x: number, y: number) => {
       cx.lineWidth = 3;
@@ -639,6 +640,11 @@ export default function Carte() {
       cx.fillStyle = "#fff";
       cx.fillText(t, x, y);
     };
+    sh.forEach((p) => {
+      const [x, y] = toXY(p.lat, p.lon);
+      pin(cx, x, y, big ? 8 : 6, "sh");
+      if (big) label(tr(p.nom), x + 9, y - 12);
+    });
     pub.forEach((s) => {
       const [x, y] = toXY(s.lat, s.lon);
       pin(cx, x, y, big ? 9 : 7, "pub");
@@ -648,7 +654,7 @@ export default function Carte() {
     cx.font = `${big ? 11 : 9}px 'IBM Plex Sans',sans-serif`;
     const domView = VW.la1 - VW.la0 > 12;
     VILLES.forEach(([nom, la, lo, minor]) => {
-      if (minor && domView) return;
+      if ((minor && domView) || (minor === 2 && !fineView)) return;
       const [x, y] = toXY(la, lo);
       if (x < -20 || x > CW + 20 || y < -20 || y > CH + 20) return;
       cx.beginPath();
@@ -904,7 +910,7 @@ export default function Carte() {
     if (!n) return setNlMsg({ ok: false, t: tr("Donne un nom au lieu.") });
     if (!user) return setNlMsg({ ok: false, t: tr("Connecte-toi (onglet Compte) pour enregistrer tes lieux.") });
     if (!inDomain(newPt[0], newPt[1])) return setNlMsg({ ok: false, t: tr("Hors du domaine AROME : pas encore possible.") });
-    if (role !== "admin" && mine.length >= MAX_PLACES) return setNlMsg({ ok: false, t: tr(`${MAX_PLACES} lieux au maximum par compte.`) });
+    if (role !== "admin" && allMine.length >= MAX_PLACES) return setNlMsg({ ok: false, t: tr(`${MAX_PLACES} lieux au maximum par compte.`) });
     createPlace.mutate(
       { name: n, lat: newPt[0], lon: newPt[1], shared: nl.share },
       {
@@ -1118,6 +1124,7 @@ export default function Carte() {
                   [1, "×1"],
                   [2, "×2"],
                   [3, "×3"],
+                  [5, "×5"],
                 ]}
               />
               <input
@@ -1142,6 +1149,10 @@ export default function Carte() {
           </div>
           <div className="panel">
             <h2>{tr("Ce que montre la carte")}</h2>
+            <label className="small" style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+              <input type="checkbox" checked={showPl} onChange={(e) => setShowPl(e.target.checked)} />
+              {tr("Afficher les lieux")}
+            </label>
             <div className="legend" style={{ flexDirection: "column", gap: 6 }}>
               <span>
                 <PinIcon kind="pub" />
