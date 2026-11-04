@@ -678,28 +678,29 @@ export default function Carte() {
       if (big) label(tr(p.nom), x + 12, y - (big ? 16 : 12));
     });
     const zh: ZoneHit[] = [];
-    // clickable zone labels of the domain view: not in the exported PNG / GIF
+    // clickable zone labels of the domain view, drawn only under the mouse (their place stays clickable): not in the
+    // exported PNG / GIF
     if (VW.la1 - VW.la0 > 12 && !gifBusy && !pngBusy) {
       cx.font = "600 13px 'IBM Plex Sans',sans-serif";
       ZONES.forEach((z, i) => {
         const [x, y] = toXY(z[1], z[2]),
           name = tr(z[0]),
           w = cx.measureText(name).width + 18,
-          h = 24,
-          on = MZH === i;
-        cx.fillStyle = on ? "rgba(242,193,78,.95)" : "rgba(10,15,29,.78)";
-        cx.strokeStyle = on ? "#000" : "rgba(255,255,255,.75)";
+          h = 24;
+        zh.push([x - w / 2, y - h / 2, w, h, i]);
+        if (MZH !== i) return;
+        cx.fillStyle = "rgba(242,193,78,.95)";
+        cx.strokeStyle = "#000";
         cx.lineWidth = 1.2;
         cx.beginPath();
         cx.roundRect(x - w / 2, y - h / 2, w, h, 12);
         cx.fill();
         cx.stroke();
-        cx.fillStyle = on ? "#000" : "#fff";
+        cx.fillStyle = "#000";
         cx.textAlign = "center";
         cx.fillText(name, x, y + 4.5);
         cx.textAlign = "left";
-        zh.push([x - w / 2, y - h / 2, w, h, i]);
-        if (on) {
+        {
           const b = z[3],
             [x0, y0] = toXY(b.la1, b.lo0),
             [x1, y1] = toXY(b.la0, b.lo1);
