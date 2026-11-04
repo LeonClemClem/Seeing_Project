@@ -175,10 +175,18 @@ export default function Fisheye() {
     return fe && fr?.cloud ? dirSampler(fe, alt, az)(fr.cloud) : NaN;
   };
   const hasClouds = !!fe?.frames.some((f) => f.cloud);
+  /** Cover 0-1 of the low, medium and high layers seen in a direction (null: run stored without them). */
+  const cloudLayers = (i: number, alt: number, az: number): [number, number, number] | null => {
+    const fr = frameAt(i);
+    if (!fe || !fr?.cloud_layers) return null;
+    const bil = dirSampler(fe, alt, az);
+    return [bil(fr.cloud_layers[0]!), bil(fr.cloud_layers[1]!), bil(fr.cloud_layers[2]!)];
+  };
   // seeing and clouds of the direction under the cursor, at the hour shown (follows the animation)
   const hovOn = !!hov && vis(hov.alt, hov.az),
     hovS = hovOn ? seeSky(fcur, hov!.alt, hov!.az) : NaN,
-    hovC = hovOn && opt.nua ? cloudSky(fcur, hov!.alt, hov!.az) : NaN;
+    hovC = hovOn && opt.nua ? cloudSky(fcur, hov!.alt, hov!.az) : NaN,
+    hovL = hovOn && opt.nua ? cloudLayers(fcur, hov!.alt, hov!.az) : null;
   const best = (o: CatObj) => {
     let b: [number, number] | null = null;
     for (let k = 0; k <= 10; k++) {
@@ -268,9 +276,24 @@ export default function Fisheye() {
         // relief in dark brown; below ELMIN (or no value) grey
         let col: number[] =
           alt < horizonAt(az) ? [62, 52, 42] : isNaN(s) ? [55, 62, 80] : seeingRgb(Math.min(Math.max(s, 0), 10) / 10);
-        if (opt.nua && vis(alt, az)) {
-          // cloud veil: the more cover, the more opaque (cover^0.6: 25 % -> 0.44, 50 % -> 0.66, 100 % -> opaque, the
-          // seeing hidden), light grey for thin cover, darker grey when overcast
+        const lay = opt.nua && vis(alt, az) ? cloudLayers(fcur, alt, az) : null;
+        if (lay) {
+          // each layer as seen from below, the highest first: high clouds (cirrus) a thin bluish-white veil, never
+          // opaque; medium clouds light grey; low clouds grey, darker and opaque when overcast
+          for (const [k, cv] of [
+            [2, lay[2]],
+            [1, lay[1]],
+            [0, lay[0]],
+          ] as const) {
+            const c = Math.min(Math.max(cv, 0), 1);
+            if (!(c > 0)) continue;
+            const a = k === 2 ? 0.55 * c : k === 1 ? 0.85 * Math.pow(c, 0.8) : Math.pow(c, 0.7),
+              tone = k === 2 ? [236, 241, 250] : k === 1 ? [212 - 30 * c, 215 - 30 * c, 224 - 28 * c] : [196 - 86 * c, 198 - 86 * c, 204 - 82 * c];
+            col = col.map((v, j) => v * (1 - a) + tone[j]! * a);
+          }
+        } else if (opt.nua && vis(alt, az)) {
+          // runs without the layers: one veil from the total cover (cover^0.6: 25 % -> 0.44, 50 % -> 0.66, 100 % ->
+          // opaque), light grey for thin cover, darker grey when overcast
           const cc = Math.min(Math.max(cloudSky(fcur, alt, az), 0), 1);
           if (cc > 0) {
             const a = Math.pow(cc, 0.6),
@@ -523,6 +546,9 @@ export default function Fisheye() {
                 <div>{`${tr("élév.")} ${Math.round(hov.alt)}°`}</div>
                 <div>{`az ${Math.round(hov.az)}° ${dir8(hov.az)}`}</div>
                 {!isNaN(hovC) && <div>{`${tr("nuages")} ${Math.round(hovC * 100)} %`}</div>}
+                {hovL && hovL.every((v) => !isNaN(v)) && (
+                  <div className="small">{`${tr("bas")} ${Math.round(hovL[0] * 100)} · ${tr("moyens")} ${Math.round(hovL[1] * 100)} · ${tr("hauts")} ${Math.round(hovL[2] * 100)} %`}</div>
+                )}
               </div>
             )}
           </div>
