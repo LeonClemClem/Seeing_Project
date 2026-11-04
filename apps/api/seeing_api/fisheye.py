@@ -56,6 +56,8 @@ class FisheyeFrame(BaseModel):
     j_high: list[list[float | None]]
     #: cloud cover 0-1 seen in each direction [elevation][azimuth]; None for frames stored without clouds
     cloud: list[list[float | None]] | None = None
+    #: cover 0-1 of each layer (low, medium, high) seen in each direction [layer][elevation][azimuth]
+    cloud_layers: list[list[list[float | None]]] | None = None
 
 
 class FisheyeOut(BaseModel):
@@ -166,19 +168,22 @@ def fisheye(
             raise HTTPException(404, "Point outside the AROME map")
         coslat = math.cos(math.radians(lat))
         jl_rows, jh_rows, cl_rows = [], [], []
+        ly_rows: list[list[list[float | None]]] = [[], [], []]
         for el in ELEVATIONS:
             se, te = math.sin(math.radians(el)), math.tan(math.radians(el))
             jl_row, jh_row, cl_row = [], [], []
+            ly_row: list[list[float | None]] = [[], [], []]
             for az in AZIMUTHS:
                 ca, sa = math.cos(math.radians(az)), math.sin(math.radians(az))
                 if layers is not None:
                     clear, seen = 1.0, False
-                    for layer, hc in zip(layers, CLOUD_HEIGHTS, strict=True):
+                    for li, (layer, hc) in enumerate(zip(layers, CLOUD_HEIGHTS, strict=True)):
                         d = hc / te if el < 90 else 0.0
                         cov = layer(*rc(lat + d * ca / 111200.0, lon + d * sa / (111320.0 * coslat)))
                         if math.isfinite(cov):
                             clear *= 1.0 - min(max(cov, 0.0), 1.0)
                             seen = True
+                        ly_row[li].append(round(min(max(cov, 0.0), 1.0), 2) if math.isfinite(cov) else None)
                     cl_row.append(round(1.0 - clear, 3) if seen else None)
                 out = []
                 for h, low in ((hl, True), (hh, False)):
@@ -191,10 +196,13 @@ def fisheye(
             jl_rows.append(jl_row)
             jh_rows.append(jh_row)
             cl_rows.append(cl_row)
+            for li in range(3):
+                ly_rows[li].append(ly_row[li])
         frames.append(
             FisheyeFrame(
                 lead_hour=f.lead_hour, valid_time=utc(f.valid_time).isoformat(), j_low=jl_rows, j_high=jh_rows,
                 cloud=cl_rows if layers is not None else None,
+                cloud_layers=ly_rows if layers is not None else None,
             )
         )
     k = rows[0]

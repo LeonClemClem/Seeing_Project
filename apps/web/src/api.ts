@@ -44,6 +44,8 @@ export interface Fisheye {
     j_high: (number | null)[][];
     /** cloud cover 0-1 seen in each direction; null for runs stored without clouds */
     cloud?: (number | null)[][] | null;
+    /** cover 0-1 of the low, medium and high layers seen in each direction ([layer][elevation][azimuth]) */
+    cloud_layers?: (number | null)[][][] | null;
   }[];
 }
 

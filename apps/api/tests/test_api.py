@@ -180,6 +180,7 @@ def test_fisheye_from_the_map(client, session):
     el = body["elevations"].index(30)
     assert f["j_high"][el][9] == pytest.approx(j / 2 / math.sin(math.radians(30)), rel=1e-3)
     assert f["cloud"] is None  # frame stored without cloud cover
+    assert f["cloud_layers"] is None
     assert client.get("/api/fisheye", params={"lat": 30.0, "lon": 5.5}).status_code == 404
 
 
@@ -222,6 +223,8 @@ def test_fisheye_cloud_cover(client, session):
     f = client.get("/api/fisheye", params={"lat": 45.0, "lon": 5.5}).json()["frames"][0]
     # clear sky = (1 - 0.5) * (1 - 0) * (1 - 0.2) = 0.4 in every direction
     assert {v for row in f["cloud"] for v in row} == {0.6}
+    # and each layer on its own (low, medium, high)
+    assert [{v for row in layer for v in row} for layer in f["cloud_layers"]] == [{0.5}, {0.0}, {0.2}]
 
 
 def test_week_view_stitches_main_runs(client, session):
