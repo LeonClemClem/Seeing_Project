@@ -22,7 +22,8 @@ type Sel = { t: "lx"; id: string };
 
 export default function Lieux() {
   const { pub, sh, mine } = usePlaces();
-  const { archive, restore } = usePlaceActions();
+  const { archive, restore, update } = usePlaceActions();
+  const role = useUi((s) => s.role);
   // archived places (nothing is deleted): listed under the table, restorable
   const archived = useQuery({ queryKey: ["archived"], queryFn: () => api.archivedPlaces(), retry: false });
   const current = useUi((s) => s.place);
@@ -90,11 +91,36 @@ export default function Lieux() {
                     </div>
                   </td>
                   <td>
-                    <span className={"pill " + (p.vis === "privé" ? "p-mut" : "p-acc")}>{tr(p.vis ?? "")}</span>
+                    {p.real && p.slug ? (
+                      <button
+                        className={"pill " + (p.vis === "privé" ? "p-mut" : "p-acc")}
+                        style={{ cursor: "pointer", border: "none" }}
+                        title={tr(p.vis === "privé" ? "Partager ce lieu avec la communauté" : "Rendre ce lieu privé")}
+                        disabled={update.isPending}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const share = p.vis === "privé";
+                          if (
+                            window.confirm(
+                              tr(
+                                share
+                                  ? `Partager « ${p.nom} » ? Les autres le verront sur la carte à 5–11 km de sa vraie position, sans son nom.`
+                                  : `Rendre « ${p.nom} » privé ? Il disparaît de la carte des autres.`,
+                              ),
+                            )
+                          )
+                            update.mutate({ slug: p.slug!, shared: share });
+                        }}
+                      >
+                        {tr(p.vis ?? "")} ⇄
+                      </button>
+                    ) : (
+                      <span className={"pill " + (p.vis === "privé" ? "p-mut" : "p-acc")}>{tr(p.vis ?? "")}</span>
+                    )}
                   </td>
                   <td className={p.mesures ? undefined : "muted"}>{p.mesures ? tr(p.mesures) : tr("aucune")}</td>
                   <td className="mono">
-                    {fmt(p.K[0])} / {fmt(p.K[1])}{" "}
+                    {kSecret(p, role) ? "•••" : `${fmt(p.K[0])} / ${fmt(p.K[1])}`}{" "}
                     <span
                       className={"pill " + (p.kSrc === "indépendants" ? "p-pro" : p.kSrc === "facteur" ? "p-acc" : "p-mut")}
                       style={{ fontFamily: "var(--f-body)" }}
