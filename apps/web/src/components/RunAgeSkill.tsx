@@ -14,7 +14,7 @@ import { Seg, Sw, SvgChart } from "./ui";
  * every run that forecast the hour recomputed with the place's current K (hours with integrals only). Default width:
  * the correlation panel's; the corner handle resizes it, the button restores the default. `K` (Calibrer): the K being
  * set, so that the panel follows every new calibration. */
-export function RunAgeSkill({ place, K }: { place: Place; K?: K3 }) {
+export function RunAgeSkill({ place, K, flush }: { place: Place; K?: K3; flush?: boolean }) {
   const slug = place.slug ?? "";
   const q = useQuery({
     queryKey: ["skill", slug, K ? `${K[0]}|${K[1]}` : "site"],
@@ -31,7 +31,7 @@ export function RunAgeSkill({ place, K }: { place: Place; K?: K3 }) {
   const hourly = mode !== "nuit",
     nightly = mode !== "horaire";
   return (
-    <div ref={box} className="panel" style={{ width: "100%", minWidth: 220, maxWidth: "100%", marginTop: 12, resize: "horizontal", overflow: "hidden" }}>
+    <div ref={box} className="panel" style={{ width: "100%", minWidth: 220, maxWidth: "100%", marginTop: flush ? 0 : 12, resize: "horizontal", overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
         <h2 style={{ fontSize: 14 }}>{tr("Erreur selon l'âge du run (prévu − mesuré)")}</h2>
         <button type="button" className="chip" onClick={() => box.current && (box.current.style.width = "100%")}>
