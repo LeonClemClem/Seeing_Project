@@ -411,6 +411,8 @@ function Calibrer() {
   const selKey = editable ? selR : st.sel;
   const lastNight = [...nights.keys()].sort().pop() ?? null;
   const night = selKey && nights.has(selKey) ? selKey : editable ? lastNight : null;
+  /** Night chosen by the user (none by default): the only one highlighted in the correlation. */
+  const picked = selKey && nights.has(selKey) ? selKey : null;
   // a night clicked in the history becomes the night of the top panel
   useEffect(() => {
     if (!selNight || selNight === night || !nights.has(selNight)) return;
@@ -488,12 +490,12 @@ function Calibrer() {
             if (isFinite(v) && v > 0 && p.v > 0) raw.push([v, p.v]);
           }),
         );
-      return calCorr(cal.P as CalPair<Terms>[], cal.R as CalPair<Terms>[], K, seeTerms, corrf, night, raw, {
+      return calCorr(cal.P as CalPair<Terms>[], cal.R as CalPair<Terms>[], K, seeTerms, corrf, picked, raw, {
         pct: filters.top,
         keys: cal.F.topRm,
       });
     },
-    [editable, realModel, cal, K, corrf, night, nightsKey, filters.top],
+    [editable, realModel, cal, K, corrf, picked, nightsKey, filters.top],
   );
   // same forecast as the history: recomputed with the K in service, hours without integrals left out
   const corrR = useLangMemo(() => (hist ? corrChart(hist, corrf, selNight, cal.F.rm) : null), [hist, corrf, selNight, cal]);
@@ -796,62 +798,39 @@ function Calibrer() {
               <SvgChart html={p2c} viewBox="0 0 900 270" label="Panneau Cn2 de calibration" />
             )}
           </div>
-          <div className="panel grid2" style={{ gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr)" }}>
-            <div>
-              <h2>{tr("Corrélation prévu / mesuré")}</h2>
+          {/* correlation (as in Prévision) and error with the age of the run side by side; one under the other on a phone */}
+          <div className="grid2 eq">
+            <div className="panel">
+              <h2>{tr("Corrélation prévu / mesuré (nuit)")}</h2>
               {calC ? (
                 <>
-                  <p className="small muted mono">{calC.ct}</p>
-                  <SvgChart html={calC.svg} viewBox="0 0 340 320" label="Corrélation du calage" />
+                  <p className="small muted mono" style={{ margin: "0 0 2px" }}>
+                    {calC.ct}
+                  </p>
+                  <SvgChart html={calC.svg} viewBox="0 0 340 320" label="Corrélation du calage" style={{ maxWidth: 520 }} />
                 </>
               ) : place.real && corrR ? (
                 <>
-                  <p className="small muted mono">{corrR.ct}</p>
-                  <SvgChart html={corrR.svg} viewBox="0 0 340 320" label="Corrélation" />
+                  <p className="small muted mono" style={{ margin: "0 0 2px" }}>
+                    {corrR.ct}
+                  </p>
+                  <SvgChart html={corrR.svg} viewBox="0 0 340 320" label="Corrélation" style={{ maxWidth: 520 }} />
                 </>
               ) : place.real ? (
-                <SvgChart
-                  html={`<text x="170" y="150" text-anchor="middle" font-size="12" fill="${C_TXT}">${tr("Corrélation : choisis un lieu avec seeing monitor.")}</text>`}
-                  viewBox="0 0 340 300"
-                  label="Corrélation"
-                />
+                <p className="muted" style={{ textAlign: "center", padding: "40px 0" }}>
+                  {tr("Corrélation : choisis un lieu avec seeing monitor.")}
+                </p>
               ) : (
                 <>
-                  <p className="small muted mono">{corr.ct}</p>
-                  <SvgChart html={corr.svg} viewBox="0 0 340 300" label="Corrélation" />
+                  <p className="small muted mono" style={{ margin: "0 0 2px" }}>
+                    {corr.ct}
+                  </p>
+                  <SvgChart html={corr.svg} viewBox="0 0 340 300" label="Corrélation" style={{ maxWidth: 520 }} />
                 </>
               )}
             </div>
-            <div className="stack" style={{ alignContent: "start", paddingTop: 26 }}>
-              <div className="legend" style={{ flexDirection: "column", gap: 5 }}>
-                <span>
-                  <Sw style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--night)", border: "1px solid #fff" }} />
-                  {tr("médiane horaire (nuit)")}
-                </span>
-                <span>
-                  <Sw style={{ width: 12, height: 12, borderRadius: "50%", border: "2px solid var(--night)" }} />
-                  {tr("☾ médiane d'une nuit")}
-                </span>
-                <span>
-                  <Sw style={{ width: 16, borderTop: "1px dashed var(--muted)" }} />
-                  {tr("Prévu = mesuré")}
-                </span>
-              </div>
-              <div className="tiles">
-                <div className="tile">
-                  <div className="l">{tr("r nuit")}</div>
-                  <div className="v">{calC ? calC.tiles.rn : place.real ? (corrR?.tiles.rn ?? "–") : corr.rDayNight}</div>
-                </div>
-                <div className="tile">
-                  <div className="l">{tr("Biais · écart moyen")}</div>
-                  <div className="v" style={{ fontSize: 16 }}>
-                    {calC ? calC.tiles.rj : place.real ? (corrR?.tiles.rj ?? "–") : corr.bias}
-                  </div>
-                </div>
-              </div>
-            </div>
+            {place.real && <RunAgeSkill place={place} K={editable ? K : undefined} flush />}
           </div>
-          {place.real && <RunAgeSkill place={place} K={editable ? K : undefined} />}
         </div>
         <div className="stack side">
           <KPanel
