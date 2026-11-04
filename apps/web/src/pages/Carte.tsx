@@ -552,7 +552,7 @@ export default function Carte() {
     haut: tr("au-dessus de la couche limite seule"),
     z0: tr("sous 3 km d'altitude seule"),
     z1: tr("entre 3 et 7 km d'altitude seule"),
-    z2: tr("au-dessus de 7 km d'altitude seule"),
+    z2: tr("jet stream (au-dessus de 7 km d'altitude) seul"),
   };
   const layerTxt = LAYER_TXT[layer] ? ` · ${LAYER_TXT[layer]}` : "";
   const hourSub = (d: Date) => `${ddmm(d)}/${d.getUTCFullYear()} · Seeing AROME V2bd${layerTxt} · run ${runL}`;
@@ -1101,7 +1101,7 @@ export default function Carte() {
                   options={[
                     ["z0", tr("< 3 km")],
                     ["z1", tr("3–7 km")],
-                    ["z2", tr("> 7 km")],
+                    ["z2", tr("Jet stream")],
                   ]}
                 />
               </div>
