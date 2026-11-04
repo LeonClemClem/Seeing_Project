@@ -146,6 +146,14 @@ def test_global_map(client, session):
     session.commit()
     r = client.get("/api/map/share", params={"lead": 21})
     assert r.status_code == 200 and r.content == share
+    assert client.get("/api/map/share", params={"lead": 21, "part": "z1"}).status_code == 404  # frame without bands
+    bands = bytes(range(18))
+    f.extra = zlib.compress(share + bytes(30) + bands)  # share, 2 heights, 3 cloud planes, then 3 altitude bands
+    session.commit()
+    for k, part in enumerate(("z0", "z1", "z2")):
+        r = client.get("/api/map/share", params={"lead": 21, "part": part})
+        assert r.status_code == 200 and r.content == bands[6 * k : 6 * k + 6]
+    assert client.get("/api/map/share", params={"lead": 21, "part": "x"}).status_code == 422
 
 
 def test_fisheye_from_the_map(client, session):

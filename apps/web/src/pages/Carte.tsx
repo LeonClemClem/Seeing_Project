@@ -345,7 +345,7 @@ export default function Carte() {
   const [reg, setReg] = useState("");
   const [mode, setMode] = useState<"m" | "h">("m");
   /** Turbulence shown: all of it (the map as computed, default), the boundary layer only, or above it only. */
-  const [layer, setLayer] = useState<"tot" | "bl" | "haut">("tot");
+  const [layer, setLayer] = useState<"tot" | "bl" | "haut" | "z0" | "z1" | "z2">("tot");
   const [MI, setMI] = useState(0);
   const [MNI, setMNI] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -448,14 +448,15 @@ export default function Carte() {
   /* Real map: the frame of the chosen hour, or the mean seeing of the night's frames. Hours the run
      does not cover are left out (no interpolation, no fictitious field): no value at all for a
      missing hour, and the mean says which hours it really uses. */
-  const shares = useMapShares(gmap?.meta, layer !== "tot");
+  /** Altitude bands (above sea level): their own planes; "bl" and "haut" both come from the boundary-layer share. */
+  const shares = useMapShares(gmap?.meta, layer !== "tot", layer === "z0" || layer === "z1" || layer === "z2" ? layer : "bl");
   /** Frames of the boundary layer / free atmosphere alone (seeing ~ integral^0.6: the part alone is the seeing x
    * share^0.6 or x (1 - share)^0.6); the map as computed for "tot", untouched. null while the shares load. */
   const layerFrames = useMemo(() => {
     if (!gmap || layer === "tot") return gmap?.frames ?? null;
     if (!shares) return null;
     const fac = new Float32Array(256).fill(NaN);
-    for (let c = 0; c < 255; c++) fac[c] = Math.pow(layer === "bl" ? c / 254 : 1 - c / 254, 0.6);
+    for (let c = 0; c < 255; c++) fac[c] = Math.pow(layer === "haut" ? 1 - c / 254 : c / 254, 0.6);
     return new Map(
       [...gmap.frames].flatMap(([lead, s]) => {
         const sh = shares.get(lead);
@@ -541,7 +542,14 @@ export default function Carte() {
   const nightStart = frameT(night.i0),
     nightNext = new Date(nightStart.getTime() + 24 * 3600000);
   const hourTitle = (d: Date) => `${dayName(d)} ${pad2(d.getUTCHours())}h00 TU`;
-  const layerTxt = layer === "bl" ? ` · ${tr("couche limite seule")}` : layer === "haut" ? ` · ${tr("au-dessus de la couche limite seule")}` : "";
+  const LAYER_TXT: Record<string, string> = {
+    bl: tr("couche limite seule"),
+    haut: tr("au-dessus de la couche limite seule"),
+    z0: tr("sous 3 km d'altitude seule"),
+    z1: tr("entre 3 et 7 km d'altitude seule"),
+    z2: tr("au-dessus de 7 km d'altitude seule"),
+  };
+  const layerTxt = LAYER_TXT[layer] ? ` · ${LAYER_TXT[layer]}` : "";
   const hourSub = (d: Date) => `${ddmm(d)}/${d.getUTCFullYear()} · Seeing AROME V2bd${layerTxt} · run ${runL}`;
   const lastI = NIGHTS[NIGHTS.length - 1]?.i1 ?? 0;
   const exportTitle =
@@ -1076,9 +1084,18 @@ export default function Carte() {
                   ["tot", tr("Toute la turbulence")],
                   ["bl", tr("Couche limite")],
                   ["haut", tr("Au-dessus de la couche limite")],
+                  ["z0", tr("< 3 km")],
+                  ["z1", tr("3–7 km")],
+                  ["z2", tr("> 7 km")],
                 ]}
               />
               {layer !== "tot" && !shares && <span className="small muted">{tr("chargement…")}</span>}
+              {layer !== "tot" && shares && shares.size === 0 && (
+                <span className="small muted">{tr("disponible à partir du prochain run")}</span>
+              )}
+              {(layer === "z0" || layer === "z1" || layer === "z2") && (
+                <span className="small muted">{tr("altitude au-dessus du niveau de la mer")}</span>
+              )}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <span className="small muted" style={{ minWidth: 52 }}>

@@ -27,14 +27,18 @@ export function decodeFrame(codes: Uint8Array, meta: MapMeta): Float32Array {
   return out;
 }
 
-/** Share of the boundary-layer turbulence of every frame of the map (loaded only when asked: the map's
- * "Couche limite" / "Au-dessus" options), by lead hour; a frame without it is absent. */
-export function useMapShares(meta: MapMeta | undefined, enabled: boolean): Map<number, Uint8Array> | undefined {
+/** Share of a part of the turbulence (boundary layer, or an altitude band above sea level) of every frame of the
+ * map (loaded only when asked: the map's turbulence options), by lead hour; a frame without it is absent. */
+export function useMapShares(
+  meta: MapMeta | undefined,
+  enabled: boolean,
+  part: "bl" | "z0" | "z1" | "z2" = "bl",
+): Map<number, Uint8Array> | undefined {
   const q = useQuery({
-    queryKey: ["map-share", meta?.run_time ?? ""],
+    queryKey: ["map-share", meta?.run_time ?? "", part],
     queryFn: async () => {
       const m = meta!;
-      const got = await Promise.all(m.frames.map((f) => api.mapShare(m.run_time, f.lead_hour).catch(() => null)));
+      const got = await Promise.all(m.frames.map((f) => api.mapShare(m.run_time, f.lead_hour, part).catch(() => null)));
       return new Map(m.frames.flatMap((f, i) => (got[i] ? [[f.lead_hour, got[i]!] as const] : [])));
     },
     enabled: enabled && !!meta,

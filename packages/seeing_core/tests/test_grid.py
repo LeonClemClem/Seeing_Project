@@ -126,3 +126,32 @@ def test_clouds_roundtrip_and_frames_without_clouds():
     np.testing.assert_allclose(c[2], 1.0)
     assert decode_split(blob, shape)[0].shape == shape  # the split planes are unchanged
     assert decode_clouds(encode_split(i, MAP_K, shape), shape) is None  # older frames: no clouds
+
+
+def test_altitude_band_shares(extracted):
+    """Shares of the Cn2 integral below 3 km, 3-7 km and above 7 km above sea level: they sum to 1, the band
+    columns are consistent with the whole integral, and they survive the encoding (after placeholder cloud planes)."""
+    from seeing_core.grid import BANDS_ASL, band_shares, decode_bands, decode_clouds, encode_split, map_integrals
+
+    slugs = [s.slug for s in FIXTURE_SITES]
+    fields, now, prev, oro = fields_of_sites(extracted, slugs, 22)
+    i = map_integrals(fields, now, prev, oro)
+    assert i.shape[-1] == 6 + 3 * len(BANDS_ASL)
+    assert np.all(i[..., 9:12] >= i[..., 6:9] - 1e-30)  # up to 7 km >= up to 3 km
+    assert np.all(i[..., 9:12] <= i[..., 0:3] * (1 + 1e-9) + 1e-30)  # never more than the whole column
+    b = band_shares(i, MAP_K)
+    np.testing.assert_allclose(b.sum(axis=0), 1.0, atol=1e-9)
+    assert np.all((b >= 0) & (b <= 1))
+    blob = encode_split(i, MAP_K, oro.shape)
+    assert decode_clouds(blob, oro.shape) is None  # placeholder cloud planes
+    np.testing.assert_allclose(decode_bands(blob, oro.shape), b.reshape(3, *oro.shape), atol=0.003)
+    assert decode_bands(encode_split(i[..., :6], MAP_K, oro.shape), oro.shape) is None  # older frames
+
+
+def test_trapezoid_to():
+    from seeing_core.grid import _trapezoid_to
+
+    z = np.array([[0.0, 1000.0, 2000.0, 2000.0]])  # last level repeated (padding)
+    c = np.array([[1.0, 1.0, 3.0, 3.0]])
+    for top, want in ((-5.0, 0.0), (500.0, 500.0), (1500.0, 1000.0 + 500 * 1.5), (9000.0, 3000.0)):
+        assert _trapezoid_to(c, z, np.array([top]))[0] == pytest.approx(want)

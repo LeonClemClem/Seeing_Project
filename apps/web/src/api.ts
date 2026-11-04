@@ -326,9 +326,12 @@ export const api = {
     for (let i = 0; i < q.length; i++) out[i] = q[i] === 65535 ? NaN : q[i]! - 500;
     return out;
   },
-  /** Share of the boundary-layer turbulence of one map frame (uint8, share = code / 254, 255 = none). */
-  mapShare: async (run: string, lead: number): Promise<Uint8Array> => {
-    const res = await fetch(`/api/map/share?run=${encodeURIComponent(run)}&lead=${lead}`, { credentials: "same-origin" });
+  /** Share of a part of the turbulence in one map frame (uint8, share = code / 254, 255 = none): the boundary layer
+   * ("bl"), or the altitude bands below 3 km, 3-7 km, above 7 km above sea level ("z0", "z1", "z2"). */
+  mapShare: async (run: string, lead: number, part: "bl" | "z0" | "z1" | "z2" = "bl"): Promise<Uint8Array> => {
+    const res = await fetch(`/api/map/share?run=${encodeURIComponent(run)}&lead=${lead}&part=${part}`, {
+      credentials: "same-origin",
+    });
     if (!res.ok) throw new ApiError(res.status, res.statusText);
     return new Uint8Array(await res.arrayBuffer());
   },
