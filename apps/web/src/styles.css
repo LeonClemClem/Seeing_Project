@@ -36,7 +36,7 @@ h2{font-family:var(--f-display);font-weight:500;font-size:17px;margin:0 0 6px}
 .title-logo{display:flex;align-items:flex-start;gap:18px;margin-bottom:16px}
 .title-logo>div{flex:0 1 auto;min-width:0}
 .title-logo>div>:last-child{margin-bottom:0}
-.title-logo>img{flex:none;width:0;height:0;border-radius:50%}
+.title-logo>img{flex:none;width:0;height:0;margin-left:auto;border-radius:50%}
 @media (max-width:600px){.title-logo>img{display:none}}
 .grid2{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;align-items:start}
 .grid2.eq{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
