@@ -348,5 +348,6 @@
 "Aucun lieu.": "No place.",
 "membre": "member",
 "équipe": "team",
-"administrateur": "administrator"
+"administrateur": "administrator",
+"Lieu privé d'un membre (visible par l'administrateur seulement, position exacte)": "A member's private place (seen by the administrator only, exact position)"
 }
