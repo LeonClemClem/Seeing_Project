@@ -333,5 +333,6 @@
 "bas": "low",
 "moyens": "medium",
 "hauts": "high",
-"Turbulence par tranche d'altitude": "Turbulence by altitude band"
+"Turbulence par tranche d'altitude": "Turbulence by altitude band",
+"pour sa bibliothèque Python": "for the Python library"
 }

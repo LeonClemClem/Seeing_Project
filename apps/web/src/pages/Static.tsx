@@ -65,6 +65,12 @@ export function APropos() {
               <li>Christian Viladrich</li>
               <li>Tom Williams</li>
               <li>Thomas Hossler</li>
+              <li>
+                Cyril Joly, {tr("pour sa bibliothèque Python")}{" "}
+                <a href="https://github.com/CyrilJl/MeteoFetch" target="_blank" rel="noopener noreferrer">
+                  MeteoFetch
+                </a>
+              </li>
             </ul>
           </div>
           <div className="panel">
