@@ -40,7 +40,7 @@ export default function Header() {
   useSyncRole();
   const user = me.data?.user ?? null;
   const { runTime } = useLatestRunTime();
-  const { updated, next } = useRunUpdates();
+  const { updated, next, fresh } = useRunUpdates();
   const loc = useLocation();
 
   const runMs = runTime ? Date.parse(runTime) : null;
@@ -155,7 +155,9 @@ export default function Header() {
           {updated != null && (
             <>
               {" · "}
-              {tr("mis à jour le")} <b className="mono">{`${ddmm(new Date(updated))} ${hhmm(updated)} TU`}</b>
+              <span className={fresh ? "upd-ok" : undefined} title={fresh ? tr("À jour") : undefined}>
+                {tr("mis à jour le")} <b className="mono">{`${ddmm(new Date(updated))} ${hhmm(updated)} TU`}</b>
+              </span>
             </>
           )}
         </span>
