@@ -55,7 +55,18 @@ export function PointSeeing({ lat, lon }: { lat: number; lon: number }) {
 /** Panel above the map: coordinates, "Voir la prévision", the forecast, and "Enregistrer comme lieu". `pick`: the
  * point last clicked on the map, written into the coordinate fields. */
 /** `saveForm`: the form to save the point as a place (name, sharing), shown in the panel once asked for. */
-export function PointForm({ onSave, pick, saveForm }: { onSave: (lat: number, lon: number) => void; pick?: [number, number] | null; saveForm?: ReactNode }) {
+/** `canSave` false (no account): "Enregistrer comme lieu" cannot be clicked and says why. */
+export function PointForm({
+  onSave,
+  pick,
+  saveForm,
+  canSave = true,
+}: {
+  onSave: (lat: number, lon: number) => void;
+  pick?: [number, number] | null;
+  saveForm?: ReactNode;
+  canSave?: boolean;
+}) {
   const point = useUi((s) => s.point);
   const [txt, setTxt] = useState(() => ({ lat: point ? point.lat.toFixed(4) : "", lon: point ? point.lon.toFixed(4) : "" }));
   const [err, setErr] = useState("");
@@ -88,9 +99,20 @@ export function PointForm({ onSave, pick, saveForm }: { onSave: (lat: number, lo
           {tr("Voir la prévision")}
         </button>
         {point && (
-          <button type="button" className="small" onClick={() => onSave(point.lat, point.lon)}>
+          <button
+            type="button"
+            className="small"
+            disabled={!canSave}
+            title={canSave ? undefined : tr("Un compte est obligatoire pour enregistrer un lieu.")}
+            onClick={() => onSave(point.lat, point.lon)}
+          >
             {tr("Enregistrer comme lieu")}
           </button>
+        )}
+        {point && !canSave && (
+          <span className="small" style={{ color: "#f2c14e" }}>
+            {tr("Un compte est obligatoire pour enregistrer un lieu :")} <Link to="/compte">{tr("créer un compte ou se connecter")}</Link>
+          </span>
         )}
       </form>
       {err && <p className="err">{tr(err)}</p>}

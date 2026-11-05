@@ -985,6 +985,7 @@ export default function Carte() {
       </div>
       <PointForm
         pick={newPt}
+        canSave={!!user}
         onSave={(la, lo) => {
           setNewPt([la, lo]);
           setShowNew(true);
@@ -1007,6 +1008,19 @@ export default function Carte() {
                   )}
                 </p>
               )}
+              {!user ? (
+                // no account: saving a place needs one; say so before any field
+                <div className="acc-needed">
+                  <p style={{ margin: "0 0 8px" }}>
+                    <b>{tr("Un compte est obligatoire pour enregistrer un lieu.")}</b>{" "}
+                    {tr("Il est gratuit : il sert à garder tes lieux, importer tes mesures et calibrer tes K. La prévision ponctuelle reste disponible sans compte.")}
+                  </p>
+                  <button className="primary" onClick={() => nav("/compte")}>
+                    {tr("Créer un compte ou se connecter")}
+                  </button>
+                </div>
+              ) : (
+                <>
           <label className="small muted" htmlFor="nlname">
             {tr("Nom du lieu")} <b style={{ color: "#f2c14e" }}>*</b> <span className="small">({tr("obligatoire")})</span>
           </label>
@@ -1050,6 +1064,8 @@ export default function Carte() {
             {tr("Créer le lieu")}
           </button>
           <p className={nlMsg?.ok ? "okmsg" : "err"}>{nlMsg?.t ?? ""}</p>
+                </>
+              )}
             </div>
           ) : null
         }

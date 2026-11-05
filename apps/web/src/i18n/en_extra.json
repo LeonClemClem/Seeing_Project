@@ -386,5 +386,10 @@
 "Humidité (10 m)": "Humidity (10 m)",
 "Nom du lieu": "Place name",
 "obligatoire": "required",
-"ex. : Observatoire du jardin": "e.g. Garden observatory"
+"ex. : Observatoire du jardin": "e.g. Garden observatory",
+"Un compte est obligatoire pour enregistrer un lieu.": "An account is required to save a place.",
+"Il est gratuit : il sert à garder tes lieux, importer tes mesures et calibrer tes K. La prévision ponctuelle reste disponible sans compte.": "It is free: it keeps your places, imports your measurements and calibrates your K. The one-off forecast stays available without an account.",
+"Créer un compte ou se connecter": "Create an account or sign in",
+"Un compte est obligatoire pour enregistrer un lieu :": "An account is required to save a place:",
+"créer un compte ou se connecter": "create an account or sign in"
 }
