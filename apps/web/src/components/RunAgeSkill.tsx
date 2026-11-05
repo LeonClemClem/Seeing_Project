@@ -9,6 +9,7 @@ import { tr } from "../i18n";
 import { C_AR } from "../lib/util";
 import { useLangMemo, type K3 } from "../store";
 import { Seg, Sw, SvgChart } from "./ui";
+import { useLoading } from "../lib/useLoading";
 
 /** Panel under the correlation: signed error (forecast - measured) with the age of the run, hourly and/or by night,
  * every run that forecast the hour recomputed with the place's current K (hours with integrals only). Default width:
@@ -26,6 +27,14 @@ export function RunAgeSkill({ place, K, flush }: { place: Place; K?: K3; flush?:
   });
   const [mode, setMode] = useState<SkillMode>("deux");
   const svg = useLangMemo(() => (q.data?.bins.length ? skillSvg(q.data.bins, q.data.nights, mode) : ""), [q.data, mode]);
+  const ld = useLoading(place.real && !!slug && q.isLoading);
+  if (ld.show)
+    return (
+      <div className="panel" style={{ width: "100%", marginTop: flush ? 0 : 12 }}>
+        <h2 style={{ fontSize: 14 }}>{tr("Erreur selon l'âge du run (prévu − mesuré)")}</h2>
+        {ld.spinner}
+      </div>
+    );
   if (!svg) return null;
   const hourly = mode !== "nuit",
     nightly = mode !== "horaire";
