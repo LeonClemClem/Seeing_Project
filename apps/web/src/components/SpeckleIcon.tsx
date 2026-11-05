@@ -173,10 +173,12 @@ function draw(dr0: number, fade: number, targets: Iterable<HTMLCanvasElement>) {
     const cr = Math.min(1, v * v * v),
       cg = Math.min(1, Math.pow(v, 1.25)),
       cb = Math.min(1, 1.5 * Math.pow(v, 0.75)),
-      al = Math.max(cr, cg, cb);
-    d[4 * i] = al > 0 ? (255 * cr) / al : 0;
-    d[4 * i + 1] = al > 0 ? (255 * cg) / al : 0;
-    d[4 * i + 2] = al > 0 ? (255 * cb) / al : 0;
+      mc = Math.max(cr, cg, cb),
+      t = Math.min(1, Math.max(0, (v - 0.1) / 0.3)), // the dark blue halo fades out too: only the light stays
+      al = mc * t * t * (3 - 2 * t);
+    d[4 * i] = mc > 0 ? (255 * cr) / mc : 0;
+    d[4 * i + 1] = mc > 0 ? (255 * cg) / mc : 0;
+    d[4 * i + 2] = mc > 0 ? (255 * cb) / mc : 0;
     d[4 * i + 3] = 255 * al;
   }
   for (const c of targets) c.getContext("2d")!.putImageData(pixels, 0, 0);
