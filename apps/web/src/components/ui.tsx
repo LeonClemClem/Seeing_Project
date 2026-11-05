@@ -60,15 +60,16 @@ export function SvgChart(props: { html: string; viewBox: string; label: string; 
 }
 
 /* ---------- legend swatches ---------- */
-/** Turning ring while a panel's data loads. */
-export function Spinner({ label = "Chargement…", style }: { label?: string; style?: CSSProperties }) {
+/** Loading icon (star in speckles) while a panel's data loads; `done` / `onDone`: see lib/useLoading. */
+export function Spinner({ label = "Chargement…", style, done, onDone }: { label?: string; style?: CSSProperties; done?: boolean; onDone?: () => void }) {
   return (
     <div className="spin-wrap" role="status" aria-live="polite" style={style}>
-      <SpeckleIcon />
+      <SpeckleIcon done={done} onDone={onDone} />
       {tr(label)}
     </div>
   );
 }
+
 
 export const Sw = ({ style }: { style: CSSProperties }) => <span className="sw" style={style} />;
 

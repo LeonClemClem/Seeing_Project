@@ -137,8 +137,8 @@ const fre = new Float64Array(N * N),
   fim = new Float64Array(N * N);
 let pixels: ImageData | null = null;
 
-/** Draw the star for D/r0 = dr0 (fade 0-1) on every registered canvas. */
-function draw(dr0: number, fade: number) {
+/** Draw the star for D/r0 = dr0 (fade 0-1) on the given canvases. */
+function draw(dr0: number, fade: number, targets: Iterable<HTMLCanvasElement>) {
   const e = (engine ??= makeEngine());
   const [ph] = pupilPhase(e, ox, oy),
     amp = (Math.sqrt(0.134) * Math.pow(dr0, 5 / 6)) / e.norm; // tilt-removed phase rms = sqrt(0.134) (D/r0)^(5/6)
@@ -161,8 +161,7 @@ function draw(dr0: number, fade: number) {
       I[y * W + x] = v;
       if (v > mx) mx = v;
     }
-  const first = canvases.values().next().value as HTMLCanvasElement;
-  pixels ??= first.getContext("2d")!.createImageData(W, W);
+  pixels ??= new ImageData(W, W);
   const d = pixels.data,
     C = W / 2;
   for (let i = 0; i < W * W; i++) {
@@ -174,11 +173,19 @@ function draw(dr0: number, fade: number) {
     d[4 * i + 2] = Math.min(255, 255 * 1.5 * Math.pow(v, 0.75));
     d[4 * i + 3] = 255 * Math.min(1, v * 2.5);
   }
-  canvases.forEach((c) => c.getContext("2d")!.putImageData(pixels!, 0, 0));
+  for (const c of targets) c.getContext("2d")!.putImageData(pixels, 0, 0);
 }
 
+/** Icons asked to finish (their data is ready): each goes quickly from where the cycle was to the Airy pattern,
+ * holds it a moment, then calls its callback. */
+const FINISH_MS = 550,
+  HOLD_MS = 250;
+const finishing = new Map<HTMLCanvasElement, { start: number; d0: number; f0: number; done: () => void }>();
+let curDr0 = DR0_MAX,
+  curFade = 1;
+
 function frame(now: number) {
-  if (!canvases.size) {
+  if (!canvases.size && !finishing.size) {
     raf = 0;
     return;
   }
@@ -186,23 +193,49 @@ function frame(now: number) {
   const u = ((now - t0) % CYCLE_MS) / CYCLE_MS;
   ox += 0.9;
   oy += 0.35;
-  draw(DR0_MAX * (1 - ease((u - 0.12) / 0.5)), u > 0.93 ? 1 - (u - 0.93) / 0.07 : u < 0.04 ? u / 0.04 : 1);
+  curDr0 = DR0_MAX * (1 - ease((u - 0.12) / 0.5));
+  curFade = u > 0.93 ? 1 - (u - 0.93) / 0.07 : u < 0.04 ? u / 0.04 : 1;
+  if (canvases.size) draw(curDr0, curFade, canvases);
+  finishing.forEach((f, c) => {
+    const k = ease((now - f.start) / FINISH_MS);
+    draw(f.d0 * (1 - k), f.f0 + (1 - f.f0) * k, [c]);
+    if (now - f.start >= FINISH_MS + HOLD_MS) {
+      finishing.delete(c);
+      f.done();
+    }
+  });
   raf = requestAnimationFrame(frame);
 }
 
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-export function SpeckleIcon({ size = 40 }: { size?: number }) {
+/** `done`: the data is ready; the icon ends its cycle on the Airy pattern, then calls `onDone` (at once without a
+ * canvas or with reduced motion). */
+export function SpeckleIcon({ size = 40, done = false, onDone }: { size?: number; done?: boolean; onDone?: () => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const cb = useRef(onDone);
+  cb.current = onDone;
   useEffect(() => {
     const c = ref.current;
     if (!c || !c.getContext("2d")) return; // no canvas (tests): nothing drawn
     canvases.add(c);
-    if (reducedMotion()) draw(0, 1);
+    if (reducedMotion()) draw(0, 1, [c]);
     else if (!raf) raf = requestAnimationFrame(frame);
     return () => {
       canvases.delete(c);
+      finishing.delete(c);
     };
   }, []);
+  useEffect(() => {
+    if (!done) return;
+    const c = ref.current;
+    if (!c || !c.getContext("2d") || reducedMotion()) {
+      cb.current?.();
+      return;
+    }
+    canvases.delete(c);
+    finishing.set(c, { start: performance.now(), d0: curDr0, f0: curFade, done: () => cb.current?.() });
+    if (!raf) raf = requestAnimationFrame(frame);
+  }, [done]);
   return <canvas ref={ref} width={W} height={W} aria-hidden="true" style={{ width: size, height: size, flex: "none" }} />;
 }

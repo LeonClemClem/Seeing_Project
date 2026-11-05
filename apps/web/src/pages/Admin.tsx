@@ -3,10 +3,10 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "../api";
-import { Spinner } from "../components/ui";
 import { useUser } from "../data/auth";
 import { tr } from "../i18n";
 import { fmt } from "../lib/util";
+import { useLoading } from "../lib/useLoading";
 
 const when = (t: string | null) => (t ? new Date(t).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" }) : "–");
 
@@ -14,6 +14,7 @@ export default function Admin() {
   const user = useUser();
   const isAdmin = user?.role === "admin";
   const q = useQuery({ queryKey: ["admin-overview"], queryFn: () => api.adminOverview(), enabled: isAdmin, retry: false });
+  const ld = useLoading(q.isLoading);
   if (!isAdmin)
     return (
       <section className="wrap">
@@ -22,7 +23,7 @@ export default function Admin() {
         </div>
       </section>
     );
-  if (q.isLoading) return <Spinner />;
+  if (ld.show) return ld.spinner;
   if (!q.data) return <p className="muted">{q.error?.message ?? ""}</p>;
   const name = new Map(q.data.sites.map((s) => [s.slug, s.name]));
   return (

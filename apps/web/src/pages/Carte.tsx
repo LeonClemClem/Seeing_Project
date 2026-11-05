@@ -14,7 +14,8 @@ import { useUser } from "../data/auth";
 import { MAX_PLACES, selectPlace, siteToPlace, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, parseCoord, SARD, VILLES, ZONES, type Box } from "../lib/geo";
-import { useGlobalMap, useLatestRunTime, useMapShares, useRunUpdates } from "../lib/hooks";
+import { useGlobalMap, useGlobalMapLoading, useLatestRunTime, useMapShares, useRunUpdates } from "../lib/hooks";
+import { useLoading } from "../lib/useLoading";
 import type { MapGrid } from "../api";
 import { BAND, banded, canvasToPng, downloadBlob, encodeGif, nextPaint as paint } from "../lib/export";
 import { D2R, esc, fmt, hhmm, JOURS, pad2, runLabel, seeingGradient, seeingRgb } from "../lib/util";
@@ -338,6 +339,9 @@ export default function Carte() {
   const { runTime } = useLatestRunTime();
   const { updated, next: nextAt } = useRunUpdates();
   const gmap = useGlobalMap();
+  /** Loading icon over the map while it loads (ends on its Airy pattern once the map is there). */
+  const mapFetching = useGlobalMapLoading();
+  const mapLd = useLoading(!gmap && mapFetching);
   const RUN0 = gmap ? Date.parse(gmap.meta.run_time) : runTime ? Date.parse(runTime) : REF + 12 * 3600000;
 
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -624,7 +628,7 @@ export default function Carte() {
       cx.fillStyle = "#000";
       cx.fillText(txt, x + 2, y - 2);
     });
-    if (!gmap) {
+    if (!gmap && !mapLd.show) {
       cx.font = "500 14px 'IBM Plex Sans',sans-serif";
       cx.fillStyle = "#e6ebf6";
       cx.textAlign = "center";
@@ -735,7 +739,7 @@ export default function Carte() {
     const hkm = Math.round((VW.la1 - VW.la0) * 111.2),
       zmax = VW.la1 - VW.la0 <= ZMIN + 1e-6;
     label(tr(`${hkm} × ${km} km${zmax ? " · zoom maximal" : ""} · isolignes ${VW.la1 - VW.la0 <= FINE_VIEW_DEG ? "250" : "1000 / 2000"} m`), CW - (zmax ? 300 : 200), CH - 12);
-  }, [VW, sample, contours, geo, gmap, toXY, pub, sh, mine, MZH, newPt, role, lang, gifBusy, pngBusy]);
+  }, [VW, sample, contours, geo, gmap, toXY, pub, sh, mine, MZH, newPt, role, lang, gifBusy, pngBusy, mapLd.show]);
 
   /* ---------- animation ---------- */
   const last = NIGHTS[NIGHTS.length - 1]?.i1 ?? NH - 1;
@@ -1009,6 +1013,11 @@ export default function Carte() {
               onPointerCancel={() => (drag.current = null)}
               onPointerLeave={() => setHoverXY(null)}
             />
+            {mapLd.show && (
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+                {mapLd.spinner}
+              </div>
+            )}
             {hoverXY && !isNaN(tipSee) && (
               <div className="maptip" style={{ left: `${(hoverXY[0] / CW) * 100}%`, top: `${(hoverXY[1] / CH) * 100}%` }}>
                 {tipSee.toFixed(1)}″

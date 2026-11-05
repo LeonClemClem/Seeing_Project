@@ -10,13 +10,14 @@ import { corrChart, histSvg, mailleSvg, roseBest, seeHist, windRoseSvg, type Ros
 import { cn2Svg } from "../charts/mockCharts";
 import { Cn2RealPanel, HistPanel } from "../components/panels";
 import { api, queryKeys } from "../api";
-import { Chip, Cn2Legend, ColorBar, LegBreak, LegDay, LegMed, LegMes, Seg, Spinner, Sw, SvgChart } from "../components/ui";
+import { Chip, Cn2Legend, ColorBar, LegBreak, LegDay, LegMed, LegMes, Seg, Sw, SvgChart } from "../components/ui";
 import { usePlaceLoading, useSiteHistory } from "../data/forecast";
 import { kHidden, kSecret, kTxt, MAX_PLACES, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { C_TXT, ddmm, fmt, pd, turboGradient } from "../lib/util";
 import { lieuData, type LieuData } from "../mock/engine";
 import { setState, useLangMemo, useUi } from "../store";
+import { useLoading } from "../lib/useLoading";
 
 type Sel = { t: "lx"; id: string };
 
@@ -273,6 +274,7 @@ function PlaceDetail({ l }: { l: Place }) {
   const real = useSiteHistory(l);
   const placeLoading = usePlaceLoading(l);
   const loading = l.real && !real && placeLoading;
+  const ld = useLoading(loading);
   const data = useLangMemo(() => (l.real ? (real ?? null) : lieuData(l.nom, l.f, l.K, l.K)), [l, real]);
   const histo = useLangMemo(() => {
     const v = data ? seeHist(data) : [];
@@ -303,10 +305,10 @@ function PlaceDetail({ l }: { l: Place }) {
                 ? ""
                 : tr("Pas de mesure de nuit.")}
           </p>
-          {histo.n ? (
+          {ld.show ? (
+            ld.spinner
+          ) : histo.n ? (
             <SvgChart html={histo.svg} viewBox="0 0 460 220" label="Histogramme du seeing enregistré" />
-          ) : loading ? (
-            <Spinner />
           ) : (
             none("Pas de mesure de nuit.", "0 0 460 220", 230, 110)
           )}
@@ -341,7 +343,7 @@ function PlaceDetail({ l }: { l: Place }) {
           <LegDay />
           <LegBreak />
         </div>
-        {data ? <HistPanel data={data} OB={true} inset={false} /> : loading ? <Spinner /> : none("Pas de période avec prévision et mesures pour ce lieu.", "0 0 1100 240", 550, 120)}
+        {ld.show ? ld.spinner : data ? <HistPanel data={data} OB={true} inset={false} /> : none("Pas de période avec prévision et mesures pour ce lieu.", "0 0 1100 240", 550, 120)}
       </div>
       {/* wind roses: full width, under the history */}
       {l.real && data && <WindRoses place={l} data={data} />}
@@ -363,7 +365,7 @@ function PlaceDetail({ l }: { l: Place }) {
               {tr("données brutes")}
             </Chip>
           </div>
-          {corr ? <SvgChart html={corr.svg} viewBox="0 0 340 320" label="Corrélation du lieu" /> : loading ? <Spinner /> : none("Pas d'heure de nuit comparée.", "0 0 340 320", 170, 160)}
+          {ld.show ? ld.spinner : corr ? <SvgChart html={corr.svg} viewBox="0 0 340 320" label="Corrélation du lieu" /> : none("Pas d'heure de nuit comparée.", "0 0 340 320", 170, 160)}
           <div className="legend">
             <span>
               <Sw style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--night)", border: "1px solid #fff" }} />
@@ -422,6 +424,7 @@ function WindRoses({ place, data }: { place: Place; data: LieuData }) {
     retry: false,
     staleTime: 10 * 60 * 1000,
   });
+  const fld = useLoading(fq.isLoading);
   const [levels, setLevels] = useState(["10", "700h", "250h"]);
   const [colour, setColour] = useState<RoseColour>("mes");
   // night hours with a measured median and the AROME wind of that hour
@@ -471,8 +474,8 @@ function WindRoses({ place, data }: { place: Place; data: LieuData }) {
           ]}
         />
       </div>
-      {fq.isLoading ? (
-        <Spinner />
+      {fld.show ? (
+        fld.spinner
       ) : (
         <>
           {/* the three roses are always drawn, empty until the nights with measurement and wind add up */}

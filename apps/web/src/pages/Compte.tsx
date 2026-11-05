@@ -4,18 +4,20 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { ApiError, type UserRole } from "../api";
-import { Seg, Spinner } from "../components/ui";
+import { Seg } from "../components/ui";
 import { useAuthActions, useMe } from "../data/auth";
 import { tr } from "../i18n";
 import { authErrorMessage } from "../lib/authErrors";
 import { checkRules, MIN_LENGTH, strength } from "../lib/passwordRules";
 import { setState, useUi, type Role } from "../store";
+import { useLoading } from "../lib/useLoading";
 
 const ROLE_LABEL: Record<UserRole, string> = { user: "Utilisateur", team: "Équipe CosmoDrôme", admin: "Administrateur" };
 
 export default function Compte() {
   const role = useUi((s) => s.role);
   const me = useMe();
+  const ld = useLoading(me.isLoading);
   const user = me.data?.user ?? null;
   const verifMsg = useVerifyLink();
   const resetToken = useResetToken();
@@ -76,8 +78,8 @@ export default function Compte() {
           )}
           {resetToken.token ? (
             <ResetForm token={resetToken.token} done={resetToken.clear} />
-          ) : me.isLoading ? (
-            <Spinner />
+          ) : ld.show ? (
+            ld.spinner
           ) : user ? (
             <Account />
           ) : (

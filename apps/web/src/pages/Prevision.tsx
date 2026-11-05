@@ -13,13 +13,14 @@ import { Cn2RealPanel, DataChips, HistPanel } from "../components/panels";
 import { PendingForecast } from "../components/PendingForecast";
 import { PointNotice, PointSeeing } from "../components/PointForecast";
 import { hourlyMedians, useHourlyMedians, useRawMeasurements, usePlaceLoading, useRealForecast, useSiteHistory, type View } from "../data/forecast";
-import { Cn2Legend, LegArome, LegBreak, LegDay, LegMed, LegMes, Seg, Spinner, Sw, SvgChart } from "../components/ui";
+import { Cn2Legend, LegArome, LegBreak, LegDay, LegMed, LegMes, Seg, Sw, SvgChart } from "../components/ui";
 import { kHidden, kSecret, kTxt, useCurrentPlace, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { exportSvgIn, fileSafe } from "../lib/export";
 import { fmt } from "../lib/util";
 import { lieuData } from "../mock/engine";
 import { useLangMemo, useUi } from "../store";
+import { useLoading } from "../lib/useLoading";
 
 export default function Prevision() {
   const place = useCurrentPlace();
@@ -127,11 +128,12 @@ function PointPrevision({ place }: { place: Place }) {
 function RealHistory({ place, OB, head }: { place: Place; OB: boolean; head: ReactNode }) {
   const data = useSiteHistory(place);
   const loading = usePlaceLoading(place);
-  if ((!data || !data.episodes.length) && loading)
+  const ld = useLoading((!data || !data.episodes.length) && loading);
+  if (ld.show)
     return (
       <>
         {head}
-        <Spinner />
+        {ld.spinner}
       </>
     );
   if (!data || !data.episodes.length)
@@ -150,7 +152,8 @@ function RealCorr({ place }: { place: Place }) {
   const sel = useUi((s) => s.selNight);
   const c = useLangMemo(() => (data && data.paires.length ? corrChart(data, corrf, sel) : null), [data, corrf, sel]);
   const loading = usePlaceLoading(place);
-  if (!c && loading) return <Spinner />;
+  const ld = useLoading(!c && loading);
+  if (ld.show) return ld.spinner;
   if (!c) return <NoData text="Corrélation : choisis un lieu avec seeing monitor." />;
   return (
     <>
@@ -202,6 +205,7 @@ function RealSeeing({ place }: { place: Place }) {
   const role = useUi((s) => s.role);
   const showObs = useUi((s) => s.showObs);
   const { forecast } = useRealForecast(place);
+  const ld = useLoading(forecast.isLoading);
   const histMed = useHourlyMedians(place);
   const raw = useRawMeasurements(place);
   const mesf = useUi((s) => s.mesf);
@@ -213,7 +217,7 @@ function RealSeeing({ place }: { place: Place }) {
         : "",
     [forecast.data, place, role, obs, raw, showObs, mesf],
   );
-  if (forecast.isLoading) return <Spinner />;
+  if (ld.show) return ld.spinner;
   if (forecast.isError || !forecast.data) return <NoData text="Pas de prévision enregistrée pour ce lieu." />;
   if (!forecast.data.points.length) return <PendingForecast />;
   const run = forecast.data.run_time.slice(0, 13).replace(/[-T]/g, "");

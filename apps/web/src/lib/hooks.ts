@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useIsFetching } from "@tanstack/react-query";
 
 import { api, queryKeys, type MapMeta } from "../api";
 
@@ -46,6 +46,12 @@ export function useMapShares(
     retry: false,
   });
   return q.data;
+}
+
+/** True while the global map (or the latest run it depends on) is being loaded and none is shown yet. */
+export function useGlobalMapLoading(): boolean {
+  const n = useIsFetching({ predicate: (q) => q.queryKey[0] === "map" || (q.queryKey[0] === "runs" && q.queryKey[1] === "latest") });
+  return n > 0;
 }
 
 /** Latest global seeing map with all its frames, or undefined while loading / when there is none. */
