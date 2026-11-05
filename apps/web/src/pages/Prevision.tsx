@@ -281,8 +281,8 @@ function MockCorr({ place }: { place: Place }) {
 
 /** Variables shown as one compact row in the list (label, then one checkbox per option). */
 const PVCOMPACT: { label: string; ids: string[]; opts: string[] }[] = [
-  { label: "Vent (m) :", ids: ["u10", "u100", "u500"], opts: ["10", "100", "500"] },
-  { label: "Cisaillement :", ids: ["shl", "shj"], opts: ["10–500 m", "jet stream"] },
+  { label: "Vent (m)", ids: ["u10", "u100", "u500"], opts: ["10", "100", "500"] },
+  { label: "Cisaillement", ids: ["shl", "shj"], opts: ["10–500 m", "jet stream"] },
 ];
 
 function ModelVars({ place }: { place: Place }) {
