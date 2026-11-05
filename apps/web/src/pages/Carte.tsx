@@ -1264,39 +1264,45 @@ export default function Carte() {
             </div>
           </div>
           <div className="panel">
-            <h2>{tr("Ce que montre la carte")}</h2>
-            <label className="small" style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-              <input type="checkbox" checked={showPl} onChange={(e) => setShowPl(e.target.checked)} />
-              {tr("Afficher les lieux")}
-            </label>
-            <div className="legend" style={{ flexDirection: "column", gap: 6 }}>
-              <span>
+            {/* title, and the places option on its right */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+              <h2 style={{ margin: 0 }}>{tr("Ce que montre la carte")}</h2>
+              <label className="small" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input type="checkbox" checked={showPl} onChange={(e) => setShowPl(e.target.checked)} />
+                {tr("Afficher les lieux")}
+              </label>
+            </div>
+            {/* one row per item: the symbol in a fixed column, its text on its right (wrapped lines stay aligned) */}
+            <div className="legend-rows">
+              <div>
                 <PinIcon kind="pub" />
-                {tr("Seeing monitor public (position exacte)")}
-              </span>
-              <span>
+                <span>{tr("Seeing monitor public (position exacte)")}</span>
+              </div>
+              <div>
                 <PinIcon kind="sh" />
-                {tr("Lieu partagé (")}
-                <b>{tr("position floutée à 5–11 km")}</b>)
-              </span>
-              <span>
-                <PinIcon kind="mine" />
-                {tr("Mes lieux")}
-              </span>
-              {role0 === "admin" && (
                 <span>
-                  <PinIcon kind="priv" />
-                  {tr("Lieu privé d'un membre (visible par l'administrateur seulement, position exacte)")}
+                  {tr("Lieu partagé (")}
+                  <b>{tr("position floutée à 5–11 km")}</b>)
                 </span>
+              </div>
+              <div>
+                <PinIcon kind="mine" />
+                <span>{tr("Mes lieux")}</span>
+              </div>
+              {role0 === "admin" && (
+                <div>
+                  <PinIcon kind="priv" />
+                  <span>{tr("Lieu privé d'un membre (visible par l'administrateur seulement, position exacte)")}</span>
+                </div>
               )}
-              <span>
+              <div>
                 <span className="sw" style={{ width: 14, borderTop: "1px solid #000" }} />
-                {tr("Côtes et frontières (pointillés) : Natural Earth ; relief AROME : isolignes 1000 et 2000 m (tous les 250 m en zoom)")}
-              </span>
-              <span>
+                <span>{tr("Côtes et frontières (pointillés) : Natural Earth ; relief AROME : isolignes 1000 et 2000 m (tous les 250 m en zoom)")}</span>
+              </div>
+              <div>
                 <span className="sw" style={{ width: 14, height: 12, background: "rgb(60,66,80)" }} />
-                {tr("Pas de prévision à cette heure (run incomplet)")}
-              </span>
+                <span>{tr("Pas de prévision à cette heure (run incomplet)")}</span>
+              </div>
             </div>
           </div>
           <div className="panel">
