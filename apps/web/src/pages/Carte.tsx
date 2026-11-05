@@ -339,6 +339,16 @@ export default function Carte() {
   const { runTime } = useLatestRunTime();
   const { updated, next: nextAt } = useRunUpdates();
   const gmap = useGlobalMap();
+  /** Height of the title + introduction, given to the logo on their right. */
+  const titleBox = useRef<HTMLDivElement>(null);
+  const [titleH, setTitleH] = useState(0);
+  useEffect(() => {
+    const el = titleBox.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setTitleH(Math.round(el.getBoundingClientRect().height)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   /** Loading icon over the map while it loads (ends on its Airy pattern once the map is there). */
   const mapFetching = useGlobalMapLoading();
   const mapLd = useLoading(!gmap && mapFetching);
@@ -938,12 +948,18 @@ export default function Carte() {
 
   return (
     <section>
-      <h1>{tr("Carte globale du seeing")}</h1>
-      <p className="lead">
-        {tr(
-          "Seeing V2bd sur tout le domaine AROME (France, îles Britanniques, péninsule Ibérique, Benelux, Allemagne, Alpes, Italie), recalculé toutes les 6 heures, à chaque run principal d'AROME (00Z, 06Z, 12Z, 18Z). Sur la vue du domaine, clique n'importe où dans une zone (France, Royaume-Uni…) pour zoomer dessus ; une fois zoomé, survole la carte pour lire une maille et clique pour créer un lieu.",
-        )}
-      </p>
+      {/* title and introduction, the logo on their right, as high as the whole text */}
+      <div className="title-logo">
+        <div ref={titleBox}>
+          <h1>{tr("Carte globale du seeing")}</h1>
+          <p className="lead">
+            {tr(
+              "Seeing V2bd sur tout le domaine AROME (France, îles Britanniques, péninsule Ibérique, Benelux, Allemagne, Alpes, Italie), recalculé toutes les 6 heures, à chaque run principal d'AROME (00Z, 06Z, 12Z, 18Z). Sur la vue du domaine, clique n'importe où dans une zone (France, Royaume-Uni…) pour zoomer dessus ; une fois zoomé, survole la carte pour lire une maille et clique pour créer un lieu.",
+            )}
+          </p>
+        </div>
+        <img src="/img/logo-astrarome.png" alt="" style={{ height: titleH || undefined, width: titleH || undefined }} />
+      </div>
       <PointForm
         pick={newPt}
         onSave={(la, lo) => {
