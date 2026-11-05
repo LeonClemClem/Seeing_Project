@@ -4,7 +4,7 @@
  * another place is chosen; it can then be saved as a place.
  */
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { api, type Forecast } from "../api";
@@ -54,7 +54,8 @@ export function PointSeeing({ lat, lon }: { lat: number; lon: number }) {
 
 /** Panel above the map: coordinates, "Voir la prévision", the forecast, and "Enregistrer comme lieu". `pick`: the
  * point last clicked on the map, written into the coordinate fields. */
-export function PointForm({ onSave, pick }: { onSave: (lat: number, lon: number) => void; pick?: [number, number] | null }) {
+/** `saveForm`: the form to save the point as a place (name, sharing), shown in the panel once asked for. */
+export function PointForm({ onSave, pick, saveForm }: { onSave: (lat: number, lon: number) => void; pick?: [number, number] | null; saveForm?: ReactNode }) {
   const point = useUi((s) => s.point);
   const [txt, setTxt] = useState(() => ({ lat: point ? point.lat.toFixed(4) : "", lon: point ? point.lon.toFixed(4) : "" }));
   const [err, setErr] = useState("");
@@ -93,6 +94,7 @@ export function PointForm({ onSave, pick }: { onSave: (lat: number, lon: number)
         )}
       </form>
       {err && <p className="err">{tr(err)}</p>}
+      {saveForm}
       {point && (
         <>
           <PointSeeing lat={point.lat} lon={point.lon} />
