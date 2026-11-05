@@ -948,7 +948,7 @@ export default function Carte() {
 
   return (
     <section>
-      {/* title and introduction, the logo on their right, as high as the whole text */}
+      {/* the logo on the left of the title and introduction, as high as the whole text */}
       <div className="title-logo">
         <img src="/img/logo-astrarome.png" alt="" style={{ height: titleH || undefined, width: titleH || undefined }} />
         <div ref={titleBox}>
@@ -959,7 +959,6 @@ export default function Carte() {
             )}
           </p>
         </div>
-        <img src="/img/logo-astrarome.png" alt="" style={{ height: titleH || undefined, width: titleH || undefined }} />
       </div>
       <PointForm
         pick={newPt}
