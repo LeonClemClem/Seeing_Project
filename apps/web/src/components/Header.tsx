@@ -69,11 +69,7 @@ export default function Header() {
     <header>
       <div className="bar">
         <div className="brand">
-          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="10" fill="none" stroke="#4f9be8" strokeWidth="1.6" />
-            <path d="M4 14c3-2 5 2 8 0s5 2 8 0" fill="none" stroke="#f2a23a" strokeWidth="1.6" />
-            <circle cx="12" cy="8" r="1.6" fill="#e6ebf6" />
-          </svg>
+          <img src="/img/logo-astrarome.png" width={36} height={36} alt="" style={{ borderRadius: "50%", flex: "none" }} />
           AstrArome
         </div>
         <nav role="tablist" aria-label={tr("Pages")}>
