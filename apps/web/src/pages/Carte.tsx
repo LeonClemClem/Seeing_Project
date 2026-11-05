@@ -13,7 +13,7 @@ import { ColorBar, DateBand, Seg } from "../components/ui";
 import { useUser } from "../data/auth";
 import { MAX_PLACES, selectPlace, siteToPlace, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
 import { tr } from "../i18n";
-import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, parseCoord, SARD, VILLES, ZONES, type Box } from "../lib/geo";
+import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, SARD, VILLES, ZONES, type Box } from "../lib/geo";
 import { useGlobalMap, useGlobalMapLoading, useLatestRunTime, useMapShares, useRunUpdates } from "../lib/hooks";
 import { useLoading } from "../lib/useLoading";
 import { api, type MapGrid } from "../api";
@@ -391,7 +391,7 @@ export default function Carte() {
   const [nl, setNl] = useState(() => ({
     lat: st0?.lat != null ? st0.lat.toFixed(5) : "",
     lon: st0?.lon != null ? st0.lon.toFixed(5) : "",
-    name: "Nouveau lieu",
+    name: "", // the name is required: no default
     share: false,
   }));
   const [nlMsg, setNlMsg] = useState<{ ok: boolean; t: string } | null>(null);
@@ -939,20 +939,10 @@ export default function Carte() {
     setShowNew(true);
     setNlMsg(null);
     setNl((s) => ({ ...s, lat: pt[0].toFixed(4), lon: pt[1].toFixed(4) }));
+    // the form to name the place is in the one-off forecast panel, above the map: bring it into view
+    requestAnimationFrame(() => document.getElementById("nlname")?.focus());
   };
 
-  const fromInputs = (lat: string, lon: string) => {
-    setNl((s) => ({ ...s, lat, lon }));
-    const la = parseCoord(lat, true),
-      lo = parseCoord(lon, false);
-    if (la == null || lo == null) return setNewPt(null);
-    setNewPt([la, lo]);
-    if (inDomain(la, lo) && (la < VW.la0 || la > VW.la1 || lo < VW.lo0 || lo > VW.lo1)) {
-      const hl = (VW.la1 - VW.la0) / 2,
-        ho = (VW.lo1 - VW.lo0) / 2;
-      setView({ la0: la - hl, la1: la + hl, lo0: lo - ho, lo1: lo + ho });
-    }
-  };
   const create = () => {
     const n = nl.name.trim();
     if (!newPt) return setNlMsg({ ok: false, t: tr("Clique sur la carte ou saisis des coordonnées GPS valides.") });
@@ -998,8 +988,71 @@ export default function Carte() {
         onSave={(la, lo) => {
           setNewPt([la, lo]);
           setShowNew(true);
+          setNlMsg(null);
           setNl((n) => ({ ...n, lat: la.toFixed(5), lon: lo.toFixed(5) }));
         }}
+        saveForm={
+          showNew ? (
+            <div className="savelieu">
+              <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>
+                {tr("Enregistrer comme lieu")}
+                {newPt && <span className="small muted mono"> · {newPt[0].toFixed(4)} N · {newPt[1].toFixed(4)} E</span>}
+              </h3>
+              {newPt && (
+                <p className="small muted" style={{ margin: "0 0 8px" }}>
+                  {tr(
+                    nlInDomain
+                      ? "dans le domaine AROME : prévision dès le prochain run principal"
+                      : "hors du domaine AROME : prévision via la file d'attente",
+                  )}
+                </p>
+              )}
+          <label className="small muted" htmlFor="nlname">
+            {tr("Nom du lieu")} <b style={{ color: "#f2c14e" }}>*</b> <span className="small">({tr("obligatoire")})</span>
+          </label>
+          <input
+            id="nlname"
+            required
+            aria-required="true"
+            maxLength={80}
+            placeholder={tr("ex. : Observatoire du jardin")}
+            style={{ width: "100%", maxWidth: 420, margin: "2px 0 8px", display: "block" }}
+            value={nl.name}
+            onChange={(e) => {
+              setNl({ ...nl, name: e.target.value });
+              if (nlMsg && !nlMsg.ok) setNlMsg(null);
+            }}
+          />
+          <label className="small" style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 8 }}>
+            <input type="checkbox" checked={nl.share} onChange={(e) => setNl({ ...nl, share: e.target.checked })} />{" "}
+            {tr("Partager avec la communauté")}
+          </label>
+          <p style={{ margin: "-4px 0 10px", fontSize: 15, fontWeight: 700, color: "#f2c14e" }}>
+            <span
+              style={{
+                display: "inline-flex",
+                width: 20,
+                height: 20,
+                borderRadius: "50%",
+                background: "#f2c14e",
+                color: "#000",
+                justifyContent: "center",
+                alignItems: "center",
+                marginRight: 6,
+                fontWeight: 800,
+              }}
+            >
+              !
+            </span>
+            {tr("Position floutée à 5–11 km")}
+          </p>
+          <button className="primary" onClick={create}>
+            {tr("Créer le lieu")}
+          </button>
+          <p className={nlMsg?.ok ? "okmsg" : "err"}>{nlMsg?.t ?? ""}</p>
+            </div>
+          ) : null
+        }
       />
       <div className="grid2">
         <div className="panel">
@@ -1277,89 +1330,6 @@ export default function Carte() {
               )}
             </p>
           </div>
-          {showNew && (
-            <div className="panel">
-              <h2>{tr("Nouveau lieu")}</h2>
-              <p className="small muted" style={{ margin: "0 0 8px" }}>
-                {tr(
-                  "Clique sur la carte ou saisis les coordonnées GPS (degrés décimaux : 44.1234 et 5.6789, ou degrés minutes secondes : 44°07'24\" N et 5°40'44\" E).",
-                )}
-              </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 6 }}>
-                <div>
-                  <label className="small muted" htmlFor="nllat">
-                    {tr("Latitude")}
-                  </label>
-                  <input
-                    id="nllat"
-                    className="mono"
-                    style={{ width: "100%", marginTop: 2 }}
-                    placeholder={tr("44.1234 ou 44°07'24\" N")}
-                    autoComplete="off"
-                    value={nl.lat}
-                    onChange={(e) => fromInputs(e.target.value, nl.lon)}
-                  />
-                </div>
-                <div>
-                  <label className="small muted" htmlFor="nllon">
-                    {tr("Longitude")}
-                  </label>
-                  <input
-                    id="nllon"
-                    className="mono"
-                    style={{ width: "100%", marginTop: 2 }}
-                    placeholder={tr("5.6789 ou 5°40'44\" E")}
-                    autoComplete="off"
-                    value={nl.lon}
-                    onChange={(e) => fromInputs(nl.lat, e.target.value)}
-                  />
-                </div>
-              </div>
-              <p className="small muted" style={{ margin: "0 0 8px" }}>
-                {newPt
-                  ? `${newPt[0].toFixed(4)} N · ${newPt[1].toFixed(4)} E · ` +
-                    tr(
-                      nlInDomain
-                        ? "dans le domaine AROME : prévision dès le prochain run principal"
-                        : "hors du domaine AROME : prévision via la file d'attente",
-                    )
-                  : nl.lat || nl.lon
-                    ? tr("Coordonnées non reconnues.")
-                    : ""}
-              </p>
-              <label className="small muted" htmlFor="nlname">
-                {tr("Nom")}
-              </label>
-              <input id="nlname" style={{ width: "100%", margin: "2px 0 8px" }} value={nl.name} onChange={(e) => setNl({ ...nl, name: e.target.value })} />
-              <label className="small" style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 8 }}>
-                <input type="checkbox" checked={nl.share} onChange={(e) => setNl({ ...nl, share: e.target.checked })} />{" "}
-                {tr("Partager avec la communauté")}
-              </label>
-              <p style={{ margin: "-4px 0 10px", fontSize: 15, fontWeight: 700, color: "#f2c14e" }}>
-                <span
-                  style={{
-                    display: "inline-flex",
-                    width: 20,
-                    height: 20,
-                    borderRadius: "50%",
-                    background: "#f2c14e",
-                    color: "#000",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    marginRight: 6,
-                    fontWeight: 800,
-                  }}
-                >
-                  !
-                </span>
-                {tr("Position floutée à 5–11 km")}
-              </p>
-              <button className="primary" onClick={create}>
-                {tr("Créer le lieu")}
-              </button>
-              <p className={nlMsg?.ok ? "okmsg" : "err"}>{nlMsg?.t ?? ""}</p>
-            </div>
-          )}
         </div>
       </div>
     </section>
