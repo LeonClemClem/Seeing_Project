@@ -391,7 +391,7 @@ export default function Carte() {
   const [nl, setNl] = useState(() => ({
     lat: st0?.lat != null ? st0.lat.toFixed(5) : "",
     lon: st0?.lon != null ? st0.lon.toFixed(5) : "",
-    name: "Nouveau lieu",
+    name: "", // the name is required: no default
     share: false,
   }));
   const [nlMsg, setNlMsg] = useState<{ ok: boolean; t: string } | null>(null);
