@@ -387,6 +387,10 @@
 "obligatoire": "required",
 "ex. : Observatoire du jardin": "e.g. Garden observatory",
 "La position sera floutée de 5 à 11 km": "Position will be blurred by 5–11 km",
+"10–500 m": "10–500 m",
+"jet stream": "jet stream",
+"Vent (m)": "Wind (m)",
+"Cisaillement": "Shear",
 "Calcul global sur tout le domaine AROME, terre et mer, toutes les 6 heures, à chaque run principal : 00Z, 06Z, 12Z, 18Z ; les runs secondaires ne sont pas utilisés. La carte a sa propre calibration, réglée par l'administrateur et affinée avec les mesures : elle ne change pas avec la calibration des lieux.": "Global computation over the whole AROME domain, land and sea, every 6 hours, at each main run: 00Z, 06Z, 12Z, 18Z; secondary runs are not used. The map has its own calibration, set by the administrator and refined with the measurements: it does not change with the calibration of places.",
 "À jour": "Up to date"
 }
