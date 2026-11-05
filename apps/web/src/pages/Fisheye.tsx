@@ -29,6 +29,7 @@ import { KDEF, REF } from "../mock/engine";
 import { useUi, type K3 } from "../store";
 import { useLoading } from "../lib/useLoading";
 
+
 /** Compass point of an azimuth (8 directions, French). */
 const dir8 = (az: number) => ["N", "NE", "E", "SE", "S", "SO", "O", "NO"][Math.round(az / 45) % 8]!;
 
@@ -280,8 +281,11 @@ export default function Fisheye() {
           alt < horizonAt(az) ? [62, 52, 42] : isNaN(s) ? [55, 62, 80] : seeingRgb(Math.min(Math.max(s, 0), 10) / 10);
         if (opt.nua && vis(alt, az)) {
           // cloud veil in shades of neutral grey: the more cover, the darker the grey (245 at 0 % -> 75 at 100 %) and the
-          // more opaque (cover^0.5: 10 % -> 0.32, 25 % -> 0.5, 50 % -> 0.71, 100 % -> opaque, the seeing hidden)
-          const cc = Math.min(Math.max(cloudSky(fcur, alt, az), 0), 1);
+          // more opaque (cover^0.5); towards the horizon the line of sight crosses more of the cloud layer, so the cover
+          // seen grows (cloud sides): 1 - (1 - c)^sqrt(m), m = 1 / sin(elevation), at most 6
+          const c0 = Math.min(Math.max(cloudSky(fcur, alt, az), 0), 1),
+            m = Math.min(6, 1 / Math.sin(Math.max(alt, 6) * D2R)),
+            cc = 1 - Math.pow(1 - c0, Math.sqrt(m));
           if (cc > 0) {
             const a = Math.sqrt(cc),
               g = 245 - 170 * cc;
