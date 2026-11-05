@@ -350,8 +350,8 @@ function ModelVars({ place }: { place: Place }) {
                 )}
                 {sel[k]!.has(id) && (
                   <span className="rg">
-                    {dg(p.ranges[id]![0])}–{dg(p.ranges[id]![1])}
-                    {u.trim()}
+                    {dg(p.ranges[id]![0])} – {dg(p.ranges[id]![1])}
+                    {u.trim() === '"' ? "″" : ` ${u.trim()}`}
                   </span>
                 )}
               </label>
