@@ -29,6 +29,11 @@ import { KDEF, REF } from "../mock/engine";
 import { useUi, type K3 } from "../store";
 import { useLoading } from "../lib/useLoading";
 
+/** Opacity of a fully covered AROME cloud layer seen at the zenith (low, medium, high): cirrus stay translucent. */
+const CLOUD_OPACITY = [1.0, 0.85, 0.45];
+/** Grey of each layer (low clouds darker, high clouds lighter). */
+const CLOUD_GREY = [175, 205, 235];
+
 /** Compass point of an azimuth (8 directions, French). */
 const dir8 = (az: number) => ["N", "NE", "E", "SE", "S", "SO", "O", "NO"][Math.round(az / 45) % 8]!;
 
@@ -278,9 +283,25 @@ export default function Fisheye() {
         // relief in dark brown; below ELMIN (or no value) grey
         let col: number[] =
           alt < horizonAt(az) ? [62, 52, 42] : isNaN(s) ? [55, 62, 80] : seeingRgb(Math.min(Math.max(s, 0), 10) / 10);
-        if (opt.nua && vis(alt, az)) {
-          // cloud veil in shades of neutral grey: the more cover, the darker the grey (245 at 0 % -> 75 at 100 %) and the
-          // more opaque (cover^0.5: 10 % -> 0.32, 25 % -> 0.5, 50 % -> 0.71, 100 % -> opaque, the seeing hidden)
+        const lay = opt.nua && vis(alt, az) ? cloudLayers(fcur, alt, az) : null;
+        if (lay) {
+          // each AROME layer as seen from below, the highest first, in shades of grey:
+          // - its own opacity when fully covered: high clouds (cirrus) stay translucent, medium ones nearly opaque,
+          //   low ones opaque (CLOUD_OPACITY);
+          // - towards the horizon the line of sight crosses more of the layer: the cover seen grows (cloud sides,
+          //   1 - (1 - c)^sqrt(m)) and a covered part gets more opaque (Beer-Lambert, 1 - (1 - a)^m), m = 1 / sin(el)
+          const m = Math.min(6, 1 / Math.sin(Math.max(alt, 6) * D2R));
+          for (let k = 2; k >= 0; k--) {
+            const c = Math.min(Math.max(lay[k]!, 0), 1);
+            if (!(c > 0)) continue;
+            const seen = 1 - Math.pow(1 - c, Math.sqrt(m)),
+              thick = 1 - Math.pow(1 - CLOUD_OPACITY[k]!, m),
+              a = seen * thick,
+              g = CLOUD_GREY[k]! - 40 * a;
+            col = col.map((v) => v * (1 - a) + g * a);
+          }
+        } else if (opt.nua && vis(alt, az)) {
+          // runs without the layers: one veil from the total cover
           const cc = Math.min(Math.max(cloudSky(fcur, alt, az), 0), 1);
           if (cc > 0) {
             const a = Math.sqrt(cc),
