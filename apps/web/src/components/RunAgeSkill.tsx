@@ -39,7 +39,15 @@ export function RunAgeSkill({ place, K, flush }: { place: Place; K?: K3; flush?:
   const hourly = mode !== "nuit",
     nightly = mode !== "horaire";
   return (
-    <div className="panel" style={{ width: "100%", minWidth: 220, maxWidth: "100%", marginTop: flush ? 0 : 12, resize: "horizontal", overflow: "hidden" }}>
+    <div
+      className="panel"
+      style={
+        flush
+          ? // beside the correlation (Calibrer): exactly its height, the chart filling what the header leaves
+            { width: "100%", minWidth: 220, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }
+          : { width: "100%", minWidth: 220, maxWidth: "100%", marginTop: 12, resize: "horizontal", overflow: "hidden" }
+      }
+    >
       <h2 style={{ fontSize: 14 }}>{tr("Erreur selon l'âge du run (prévu − mesuré)")}</h2>
       <Seg<SkillMode>
         value={mode}
@@ -71,7 +79,13 @@ export function RunAgeSkill({ place, K, flush }: { place: Place; K?: K3; flush?:
           {tr("± 1 écart type")}
         </span>
       </div>
-      <SvgChart html={svg} viewBox="0 0 200 200" label="Erreur selon l'âge du run" style={{ width: "100%", display: "block" }} />
+      {flush ? (
+        <div style={{ flex: "1 1 0", minHeight: 180, position: "relative" }}>
+          <SvgChart html={svg} viewBox="0 0 200 200" label="Erreur selon l'âge du run" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+        </div>
+      ) : (
+        <SvgChart html={svg} viewBox="0 0 200 200" label="Erreur selon l'âge du run" style={{ width: "100%", display: "block" }} />
+      )}
     </div>
   );
 }
