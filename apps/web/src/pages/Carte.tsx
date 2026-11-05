@@ -652,10 +652,11 @@ export default function Carte() {
     });
     // Cities, as research/carte_seeing.py (ajoute_villes): white dots ringed in black, small translucent names.
     cx.font = `${big ? 11 : 9}px 'IBM Plex Sans',sans-serif`;
-    // tier 1 once out of the domain view, tier 2 from a map ~8 degrees high, tier 3 in the fine view (<= 4 degrees);
+    // tier 1 once out of the domain view, tier 2 from a map ~8 degrees high, tier 3 in the fine view (<= 4 degrees),
+    // tier 4 close to the maximum zoom (<= 2 degrees);
     // a city whose name would overlap one already written is left out (the list is in order of importance)
     const vh = VW.la1 - VW.la0,
-      shownTier = vh > 12 ? 0 : vh > 8 ? 1 : vh > FINE_VIEW_DEG ? 2 : 3,
+      shownTier = vh > 12 ? 0 : vh > 8 ? 1 : vh > FINE_VIEW_DEG ? 2 : vh > 2 ? 3 : 4,
       boxes: [number, number, number, number][] = [];
     VILLES.forEach(([nom, la, lo, tier = 0]) => {
       if (tier > shownTier) return;
