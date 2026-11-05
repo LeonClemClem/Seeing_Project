@@ -2,6 +2,7 @@
 import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 
 import { tr } from "../i18n";
+import { SpeckleIcon } from "./SpeckleIcon";
 
 export function Chip(props: { on: boolean; onToggle: () => void; children: ReactNode; title?: string; style?: CSSProperties }) {
   const key = (e: KeyboardEvent) => {
@@ -63,7 +64,7 @@ export function SvgChart(props: { html: string; viewBox: string; label: string; 
 export function Spinner({ label = "Chargement…", style }: { label?: string; style?: CSSProperties }) {
   return (
     <div className="spin-wrap" role="status" aria-live="polite" style={style}>
-      <span className="spinner" aria-hidden="true" />
+      <SpeckleIcon />
       {tr(label)}
     </div>
   );
