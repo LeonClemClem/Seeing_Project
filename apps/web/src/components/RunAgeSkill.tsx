@@ -1,9 +1,9 @@
 /** "Error with the age of the run" panel (Prévision, under the correlation; Calibrer, with the K being set). */
 import { useQuery } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useState } from "react";
 
 import { api } from "../api";
-import { SKILL_FEW_HOURS, SKILL_FEW_NIGHTS, skillSvg, type SkillMode } from "../charts/lieuCharts";
+import { skillSvg, type SkillMode } from "../charts/lieuCharts";
 import type { Place } from "../data/places";
 import { tr } from "../i18n";
 import { C_AR } from "../lib/util";
@@ -12,7 +12,7 @@ import { Seg, Sw, SvgChart } from "./ui";
 
 /** Panel under the correlation: signed error (forecast - measured) with the age of the run, hourly and/or by night,
  * every run that forecast the hour recomputed with the place's current K (hours with integrals only). Default width:
- * the correlation panel's; the corner handle resizes it, the button restores the default. `K` (Calibrer): the K being
+ * the correlation panel's; the corner handle resizes it. `K` (Calibrer): the K being
  * set, so that the panel follows every new calibration. */
 export function RunAgeSkill({ place, K, flush }: { place: Place; K?: K3; flush?: boolean }) {
   const slug = place.slug ?? "";
@@ -26,18 +26,12 @@ export function RunAgeSkill({ place, K, flush }: { place: Place; K?: K3; flush?:
   });
   const [mode, setMode] = useState<SkillMode>("deux");
   const svg = useLangMemo(() => (q.data?.bins.length ? skillSvg(q.data.bins, q.data.nights, mode) : ""), [q.data, mode]);
-  const box = useRef<HTMLDivElement>(null);
   if (!svg) return null;
   const hourly = mode !== "nuit",
     nightly = mode !== "horaire";
   return (
-    <div ref={box} className="panel" style={{ width: "100%", minWidth: 220, maxWidth: "100%", marginTop: flush ? 0 : 12, resize: "horizontal", overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-        <h2 style={{ fontSize: 14 }}>{tr("Erreur selon l'âge du run (prévu − mesuré)")}</h2>
-        <button type="button" className="chip" onClick={() => box.current && (box.current.style.width = "100%")}>
-          {tr("taille par défaut")}
-        </button>
-      </div>
+    <div className="panel" style={{ width: "100%", minWidth: 220, maxWidth: "100%", marginTop: flush ? 0 : 12, resize: "horizontal", overflow: "hidden" }}>
+      <h2 style={{ fontSize: 14 }}>{tr("Erreur selon l'âge du run (prévu − mesuré)")}</h2>
       <Seg<SkillMode>
         value={mode}
         onChange={setMode}
@@ -49,7 +43,7 @@ export function RunAgeSkill({ place, K, flush }: { place: Place; K?: K3; flush?:
           ["deux", tr("les deux")],
         ]}
       />
-      <div className="legend">
+      <div className="legend" style={{ gap: "2px 8px" }}>
         {hourly && (
           <span>
             <Sw style={{ width: 16, borderTop: `2px solid ${C_AR}` }} />
@@ -69,11 +63,6 @@ export function RunAgeSkill({ place, K, flush }: { place: Place; K?: K3; flush?:
         </span>
       </div>
       <SvgChart html={svg} viewBox="0 0 200 200" label="Erreur selon l'âge du run" style={{ width: "100%", display: "block" }} />
-      <p className="small muted" style={{ margin: "4px 0 0" }}>
-        {tr(
-          `Points pâles : moins de ${SKILL_FEW_HOURS} heures (horaire) ou ${SKILL_FEW_NIGHTS} nuits (nocturne) comparées. Heures de nuit avec intégrales, recalculées avec les K actuels du lieu.`,
-        )}
-      </p>
     </div>
   );
 }
