@@ -168,10 +168,16 @@ function draw(dr0: number, fade: number, targets: Iterable<HTMLCanvasElement>) {
     let v = Math.pow(I[i]! / mx, 0.27) * fade;
     const r = Math.hypot((i % W) + 0.5 - C, Math.floor(i / W) + 0.5 - C) / C;
     if (r > 0.94) v *= Math.max(0, (1 - r) / 0.06);
-    d[4 * i] = Math.min(255, 255 * v * v * v);
-    d[4 * i + 1] = Math.min(255, 255 * Math.pow(v, 1.25));
-    d[4 * i + 2] = Math.min(255, 255 * 1.5 * Math.pow(v, 0.75));
-    d[4 * i + 3] = 255 * Math.min(1, v * 2.5);
+    // colour as seen on black, written as light: alpha = its brightest channel, so the dark parts are transparent
+    // (nothing laid over the page) and the icon looks the same on the dark background
+    const cr = Math.min(1, v * v * v),
+      cg = Math.min(1, Math.pow(v, 1.25)),
+      cb = Math.min(1, 1.5 * Math.pow(v, 0.75)),
+      al = Math.max(cr, cg, cb);
+    d[4 * i] = al > 0 ? (255 * cr) / al : 0;
+    d[4 * i + 1] = al > 0 ? (255 * cg) / al : 0;
+    d[4 * i + 2] = al > 0 ? (255 * cb) / al : 0;
+    d[4 * i + 3] = 255 * al;
   }
   for (const c of targets) c.getContext("2d")!.putImageData(pixels, 0, 0);
 }
