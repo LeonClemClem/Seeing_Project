@@ -74,7 +74,7 @@ export function PointForm({ onSave, pick, saveForm }: { onSave: (lat: number, lo
     setState({ point: { lat: la, lon: lo }, ...selectPlace(pointPlace(la, lo)) });
   };
   return (
-    <div className="panel" style={{ marginBottom: 16 }}>
+    <div className="panel" id="pointform" style={{ marginBottom: 16 }}>
       <h2 style={{ margin: 0 }}>{tr("Prévision ponctuelle à des coordonnées")}</h2>
       <p className="small muted" style={{ margin: "6px 0" }}>
         {tr(

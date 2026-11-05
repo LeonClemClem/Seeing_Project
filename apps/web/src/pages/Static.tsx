@@ -88,7 +88,7 @@ const TUTO: [string, ReactNode][] = [
   [
     "Calibrer son lieu, pas à pas",
     <ol key="e">
-      <li>{tr("Crée ton lieu depuis la carte (zoome, puis clique à l'endroit voulu) ou avec « Ajouter un lieu » dans Lieux.")}</li>
+      <li>{tr("Choisis le point (coordonnées dans « Prévision ponctuelle », ou clic sur la carte zoomée), puis clique sur « Enregistrer comme lieu » et donne-lui un nom.")}</li>
       <li>{tr("Importe les mesures de ton seeing monitor dans Calibrer.")}</li>
       <li>{tr("Lance le calage : K1 et K2 sont calculés avec tes nuits.")}</li>
       <li>{tr("Regarde la corrélation prévu / mesuré et l'erreur selon l'âge du run ; retire les nuits douteuses si besoin.")}</li>

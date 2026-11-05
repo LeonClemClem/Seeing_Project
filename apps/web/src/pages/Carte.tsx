@@ -11,7 +11,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { PointForm } from "../components/PointForecast";
 import { ColorBar, DateBand, Seg } from "../components/ui";
 import { useUser } from "../data/auth";
-import { MAX_PLACES, selectPlace, siteToPlace, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
+import { MAX_PLACES, pointPlace, selectPlace, siteToPlace, useCurrentPlace, usePlaceActions, usePlaces, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, SARD, VILLES, ZONES, type Box } from "../lib/geo";
 import { useGlobalMap, useGlobalMapLoading, useLatestRunTime, useMapShares, useRunUpdates } from "../lib/hooks";
@@ -934,13 +934,14 @@ export default function Carte() {
       setReg(String(zz[4]));
       return setView(fitBox(ZONES[zz[4]]![3]), "reg");
     }
+    // a click shows the one-off forecast of the point (panel above the map); saving it as a place is asked for
+    // there, with "Enregistrer comme lieu"
     const pt: [number, number] = [LA(y), LO(x)];
     setNewPt(pt);
-    setShowNew(true);
     setNlMsg(null);
     setNl((s) => ({ ...s, lat: pt[0].toFixed(4), lon: pt[1].toFixed(4) }));
-    // the form to name the place is in the one-off forecast panel, above the map: bring it into view
-    requestAnimationFrame(() => document.getElementById("nlname")?.focus());
+    setState({ point: { lat: pt[0], lon: pt[1] }, ...selectPlace(pointPlace(pt[0], pt[1])) });
+    requestAnimationFrame(() => document.getElementById("pointform")?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
   };
 
   const create = () => {
@@ -978,7 +979,7 @@ export default function Carte() {
           <h1>{tr("Carte globale du seeing")}</h1>
           <p className="lead">
             {tr(
-              "Seeing V2bd sur tout le domaine AROME (France, îles Britanniques, péninsule Ibérique, Benelux, Allemagne, Alpes, Italie), recalculé toutes les 6 heures, à chaque run principal d'AROME (00Z, 06Z, 12Z, 18Z). Sur la vue du domaine, clique n'importe où dans une zone (France, Royaume-Uni…) pour zoomer dessus ; une fois zoomé, survole la carte pour lire une maille et clique pour créer un lieu.",
+              "Seeing V2bd sur tout le domaine AROME (France, îles Britanniques, péninsule Ibérique, Benelux, Allemagne, Alpes, Italie), recalculé toutes les 6 heures, à chaque run principal d'AROME (00Z, 06Z, 12Z, 18Z). Sur la vue du domaine, clique n'importe où dans une zone (France, Royaume-Uni…) pour zoomer dessus ; une fois zoomé, survole la carte pour lire une maille et clique pour voir la prévision du point, que tu peux ensuite enregistrer comme lieu.",
             )}
           </p>
         </div>
@@ -1044,7 +1045,7 @@ export default function Carte() {
             >
               !
             </span>
-            {tr("Position floutée à 5–11 km")}
+            {tr("La position sera floutée de 5 à 11 km")}
           </p>
           <button className="primary" onClick={create}>
             {tr("Créer le lieu")}
@@ -1143,7 +1144,7 @@ export default function Carte() {
           ) : (
             <p className="tip">
               {tr(
-                "Molette ou boutons + et − pour zoomer, glisser pour se déplacer, clic pour créer un lieu. Le zoom affiche la carte déjà calculée, sans calcul supplémentaire, jusqu'à 100 km de côté.",
+                "Molette ou boutons + et − pour zoomer, glisser pour se déplacer, clic pour voir la prévision du point. Le zoom affiche la carte déjà calculée, sans calcul supplémentaire, jusqu'à 100 km de côté.",
               )}
             </p>
           )}

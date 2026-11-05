@@ -371,7 +371,7 @@
 "K2, pour la turbulence au-dessus (cisaillement, jet stream).": "K2, for the turbulence above it (shear, jet stream).",
 "Les nuits aberrantes (instrument en défaut, nuages) peuvent être retirées. Plus il y a de nuits mesurées, et des nuits variées, plus le calage est fiable. La carte utilise une calibration commune ; chaque lieu calibré a la sienne.": "Outlier nights (faulty instrument, clouds) can be removed. The more measured nights, and the more varied, the more reliable the calibration. The map uses a common calibration; each calibrated place has its own.",
 "Calibrer son lieu, pas à pas": "Calibrating your place, step by step",
-"Crée ton lieu depuis la carte (zoome, puis clique à l'endroit voulu) ou avec « Ajouter un lieu » dans Lieux.": "Create your place from the map (zoom in, then click on the spot) or with “Add a place” in Places.",
+"Choisis le point (coordonnées dans « Prévision ponctuelle », ou clic sur la carte zoomée), puis clique sur « Enregistrer comme lieu » et donne-lui un nom.": "Choose the point (coordinates in “One-off forecast”, or a click on the zoomed map), then click “Save as a place” and give it a name.",
 "Importe les mesures de ton seeing monitor dans Calibrer.": "Import your seeing monitor's measurements in Calibrate.",
 "Lance le calage : K1 et K2 sont calculés avec tes nuits.": "Run the calibration: K1 and K2 are computed from your nights.",
 "Regarde la corrélation prévu / mesuré et l'erreur selon l'âge du run ; retire les nuits douteuses si besoin.": "Look at the forecast / measured correlation and the error with the age of the run; remove doubtful nights if needed.",
@@ -386,5 +386,6 @@
 "Humidité (10 m)": "Humidity (10 m)",
 "Nom du lieu": "Place name",
 "obligatoire": "required",
-"ex. : Observatoire du jardin": "e.g. Garden observatory"
+"ex. : Observatoire du jardin": "e.g. Garden observatory",
+"La position sera floutée de 5 à 11 km": "Position will be blurred by 5–11 km"
 }
