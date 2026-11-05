@@ -122,8 +122,8 @@ a{color:#9cc7ff}
 .legend-rows>div>:first-child{justify-self:center;margin:0}
 .pvcompact{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:2px 0 4px}.pvcompact>span{flex-basis:100%}.pvcompact label{display:flex;gap:4px;align-items:center;cursor:pointer;white-space:nowrap}
 .upd-ok,.upd-ok b{color:#6fd486}
-.pvgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 18px}
-.pvgrid .pvrow{flex-direction:column-reverse;gap:4px;margin:0}
+.pvgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 20px}
+.pvgrid .pvrow{flex-direction:column-reverse;gap:6px;margin:0;padding:10px 12px 8px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.015)}
 .pvgrid .pvlist{flex:none;flex-direction:row;flex-wrap:wrap;gap:2px 14px;max-height:none;overflow:visible;width:100%}
 .pvgrid .pvlist .rg{display:none}
 .pvgrid .pvrow>div:first-child{width:100%;align-self:stretch}
