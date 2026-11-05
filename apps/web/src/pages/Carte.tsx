@@ -16,7 +16,7 @@ import { tr } from "../i18n";
 import { CORSE, DOM, FRA, inDomain, inPoly, LANDS, parseCoord, SARD, VILLES, ZONES, type Box } from "../lib/geo";
 import { useGlobalMap, useGlobalMapLoading, useLatestRunTime, useMapShares, useRunUpdates } from "../lib/hooks";
 import { useLoading } from "../lib/useLoading";
-import type { MapGrid } from "../api";
+import { api, type MapGrid } from "../api";
 import { BAND, banded, canvasToPng, downloadBlob, encodeGif, nextPaint as paint } from "../lib/export";
 import { D2R, esc, fmt, hhmm, JOURS, pad2, runLabel, seeingGradient, seeingRgb } from "../lib/util";
 import { REF } from "../mock/engine";
@@ -208,8 +208,9 @@ function landOf(g: MapGrid, med: Float32Array, raw: Float32Array): Uint8Array {
   return land;
 }
 
-type PinKind = "pub" | "sh" | "mine";
-const PIN_FILL: Record<PinKind, string> = { pub: "#fff", sh: "#9cc7ff", mine: "#f2a23a" };
+type PinKind = "pub" | "sh" | "mine" | "priv";
+/** "priv": another member's private place, seen by the administrator only. */
+const PIN_FILL: Record<PinKind, string> = { pub: "#fff", sh: "#9cc7ff", mine: "#f2a23a", priv: "#c4a5f5" };
 /** Path of a map pin: tip on (x, y), round head of radius r centred 2.1 r above. */
 function pinPath(r: number) {
   const d = 2.1 * r,
@@ -225,7 +226,7 @@ function pinGlyph(r: number, kind: PinKind) {
       dr = 0.55 * r;
     return `M${-dr},${b} A${dr},${dr} 0 0 1 ${dr},${b} Z M${-0.72 * r},${b} h${1.44 * r} v${0.2 * r} h${-1.44 * r} Z`;
   }
-  if (kind === "sh") return `M${-0.36 * r},${cy} a${0.36 * r},${0.36 * r} 0 1 0 ${0.72 * r},0 a${0.36 * r},${0.36 * r} 0 1 0 ${-0.72 * r},0 Z`;
+  if (kind === "sh" || kind === "priv") return `M${-0.36 * r},${cy} a${0.36 * r},${0.36 * r} 0 1 0 ${0.72 * r},0 a${0.36 * r},${0.36 * r} 0 1 0 ${-0.72 * r},0 Z`;
   let s = "";
   for (let k = 0; k < 10; k++) {
     const a = -Math.PI / 2 + (k * Math.PI) / 5,
@@ -331,6 +332,14 @@ export default function Carte() {
   /** Pins of the places drawn on the map (option "Afficher les lieux"); hidden pins are not clickable either. */
   const [showPl, setShowPl] = useState(true);
   const pub = useMemo(() => (showPl ? allPub : []), [showPl, allPub]);
+  /** Administrator: the other members' private places too (exact position and name, with their account number). */
+  const role0 = useUi((s) => s.role);
+  const admQ = useQuery({ queryKey: ["admin-overview"], queryFn: () => api.adminOverview(), enabled: role0 === "admin", retry: false });
+  const priv = useMemo(() => {
+    if (!showPl || role0 !== "admin" || !admQ.data) return [];
+    const known = new Set([...allPub, ...allSh, ...allMine].map((p) => p.slug));
+    return admQ.data.sites.filter((s) => s.active && s.owner && !known.has(s.slug));
+  }, [showPl, role0, admQ.data, allPub, allSh, allMine]);
   const sh = useMemo(() => (showPl ? allSh : []), [showPl, allSh]);
   const mine = useMemo(() => (showPl ? allMine : []), [showPl, allMine]);
   const nav = useNavigate();
@@ -469,6 +478,8 @@ export default function Carte() {
      missing hour, and the mean says which hours it really uses. */
   /** Altitude bands (above sea level): their own planes; "bl" and "haut" both come from the boundary-layer share. */
   const shares = useMapShares(gmap?.meta, layer !== "tot", layer === "z0" || layer === "z1" || layer === "z2" ? layer : "bl");
+  /** Loading icon in the date band while the turbulence part of another map option loads. */
+  const layLd = useLoading(!!gmap && layer !== "tot" && !shares, { padding: 0, color: "#c9d3e6", fontSize: 14 }, 60);
   /** Frames of the boundary layer / free atmosphere alone (seeing ~ integral^0.6: the part alone is the seeing x
    * share^0.6 or x (1 - share)^0.6); the map as computed for "tot", untouched. null while the shares load. */
   const layerFrames = useMemo(() => {
@@ -654,6 +665,11 @@ export default function Carte() {
       cx.fillStyle = "#fff";
       cx.fillText(t, x, y);
     };
+    priv.forEach((s) => {
+      const [x, y] = toXY(s.lat, s.lon);
+      pin(cx, x, y, big ? 8 : 6, "priv");
+      if (big) label(s.name, x + 9, y - 12);
+    });
     sh.forEach((p) => {
       const [x, y] = toXY(p.lat, p.lon);
       pin(cx, x, y, big ? 8 : 6, "sh");
@@ -749,7 +765,7 @@ export default function Carte() {
     const hkm = Math.round((VW.la1 - VW.la0) * 111.2),
       zmax = VW.la1 - VW.la0 <= ZMIN + 1e-6;
     label(tr(`${hkm} × ${km} km${zmax ? " · zoom maximal" : ""} · isolignes ${VW.la1 - VW.la0 <= FINE_VIEW_DEG ? "250" : "1000 / 2000"} m`), CW - (zmax ? 300 : 200), CH - 12);
-  }, [VW, sample, contours, geo, gmap, toXY, pub, sh, mine, MZH, newPt, role, lang, gifBusy, pngBusy, mapLd.show]);
+  }, [VW, sample, contours, geo, gmap, toXY, pub, sh, mine, priv, MZH, newPt, role, lang, gifBusy, pngBusy, mapLd.show]);
 
   /* ---------- animation ---------- */
   const last = NIGHTS[NIGHTS.length - 1]?.i1 ?? NH - 1;
@@ -870,6 +886,13 @@ export default function Carte() {
       see = isNaN(sv) ? "" : `${tr("seeing")} <b class="mono">${sv.toFixed(1)}″</b> · `;
     const pl = placeAt(x, y);
     if (pl) return `<b>${esc(tr(pl.nom))}</b> · ${tr("clique pour voir sa prévision")}`;
+    const big = VW.la1 - VW.la0 < 3.2,
+      pv = priv.find((s) => {
+        const [px, py] = toXY(s.lat, s.lon),
+          r = big ? 8 : 6;
+        return Math.hypot(x - px, y - (py - 2.1 * r)) <= r + 3;
+      });
+    if (pv) return `<b>${esc(pv.name)}</b> · ${esc(pv.owner ?? "")} · ${tr("privé")}`;
     if (zz) return `${see}${tr("Clique pour zoomer sur")} <b>${esc(tr(ZONES[zz[4]]![0]))}</b>`;
     return relReal || onLand(x, y)
       ? see +
@@ -1018,7 +1041,7 @@ export default function Carte() {
           {/* loading icon at the top right, in the date band */}
           <div style={{ position: "relative" }}>
             <DateBand title={exportTitle} sub={exportSub} progress={mode === "h" && lastI > 0 ? MI / lastI : null} />
-            {mapLd.show && <div className="band-load">{mapLd.spinner}</div>}
+            {(mapLd.show || layLd.show) && <div className="band-load">{mapLd.show ? mapLd.spinner : layLd.spinner}</div>}
           </div>
           <div style={{ position: "relative" }}>
             <canvas
@@ -1126,7 +1149,6 @@ export default function Carte() {
                   </button>
                 ))}
               </div>
-              {layer !== "tot" && !shares && <span className="small muted">{tr("chargement…")}</span>}
               {layer !== "tot" && shares && shares.size === 0 && (
                 <span className="small muted">{tr("disponible à partir du prochain run")}</span>
               )}
@@ -1198,6 +1220,12 @@ export default function Carte() {
                 <PinIcon kind="mine" />
                 {tr("Mes lieux")}
               </span>
+              {role0 === "admin" && (
+                <span>
+                  <PinIcon kind="priv" />
+                  {tr("Lieu privé d'un membre (visible par l'administrateur seulement, position exacte)")}
+                </span>
+              )}
               <span>
                 <span className="sw" style={{ width: 14, borderTop: "1px solid #000" }} />
                 {tr("Côtes et frontières (pointillés) : Natural Earth ; relief AROME : isolignes 1000 et 2000 m (tous les 250 m en zoom)")}
