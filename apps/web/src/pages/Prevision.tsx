@@ -279,6 +279,12 @@ function MockCorr({ place }: { place: Place }) {
   );
 }
 
+/** Variables shown as one compact row in the list (label, then one checkbox per option). */
+const PVCOMPACT: { label: string; ids: string[]; opts: string[] }[] = [
+  { label: "Vent (m) :", ids: ["u10", "u100", "u500"], opts: ["10", "100", "500"] },
+  { label: "Cisaillement :", ids: ["shl", "shj"], opts: ["10–500 m", "jet stream"] },
+];
+
 function ModelVars({ place }: { place: Place }) {
   // default: latest forecasts, every variable ticked (each sub-panel has its own complementary list)
   const [view, setView] = useState<View>("run");
@@ -340,7 +346,25 @@ function ModelVars({ place }: { place: Place }) {
             </div>
           </div>
           <div className="pvlist">
-            {PVDEF.filter((q) => PVGRP[k]!.includes(q[0])).map(([id, lab, u, col, real]) => (
+            {/* compact rows: the winds and the shears, one checkbox per height / layer on a single line */}
+            {PVCOMPACT.filter((r) => r.ids.every((id) => PVGRP[k]!.includes(id))).map((r) => (
+              <div key={r.label} className="pvcompact">
+                <span>{tr(r.label)}</span>
+                {r.ids.map((id, j) => {
+                  const col = PVDEF.find((q) => q[0] === id)![3];
+                  const rg = p.ranges[id]!,
+                    u = PVDEF.find((q) => q[0] === id)![2].trim();
+                  return (
+                    <label key={id} title={sel[k]!.has(id) ? `${dg(rg[0])} – ${dg(rg[1])} ${u}` : undefined}>
+                      <input type="checkbox" checked={sel[k]!.has(id)} onChange={() => toggle(k, id)} />
+                      <span className="sw" style={{ background: col }} />
+                      {tr(r.opts[j]!)}
+                    </label>
+                  );
+                })}
+              </div>
+            ))}
+            {PVDEF.filter((q) => PVGRP[k]!.includes(q[0]) && !PVCOMPACT.some((r) => r.ids.includes(q[0]))).map(([id, lab, u, col, real]) => (
               <label key={id}>
                 <input type="checkbox" checked={sel[k]!.has(id)} onChange={() => toggle(k, id)} />
                 <span className="sw" style={{ background: col }} />

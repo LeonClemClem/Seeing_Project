@@ -387,5 +387,9 @@
 "Nom du lieu": "Place name",
 "obligatoire": "required",
 "ex. : Observatoire du jardin": "e.g. Garden observatory",
-"La position sera floutée de 5 à 11 km": "Position will be blurred by 5–11 km"
+"La position sera floutée de 5 à 11 km": "Position will be blurred by 5–11 km",
+"Vent (m) :": "Wind (m):",
+"Cisaillement :": "Shear:",
+"10–500 m": "10–500 m",
+"jet stream": "jet stream"
 }
