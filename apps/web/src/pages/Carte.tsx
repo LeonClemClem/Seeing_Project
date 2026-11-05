@@ -950,6 +950,7 @@ export default function Carte() {
     <section>
       {/* title and introduction, the logo on their right, as high as the whole text */}
       <div className="title-logo">
+        <img src="/img/logo-astrarome.png" alt="" style={{ height: titleH || undefined, width: titleH || undefined }} />
         <div ref={titleBox}>
           <h1>{tr("Carte globale du seeing")}</h1>
           <p className="lead">
@@ -1109,28 +1110,23 @@ export default function Carte() {
               <span className="small muted" style={{ minWidth: 52 }}>
                 {tr("Turbulence")}
               </span>
-              {/* two rows of the same choice: the layers, then the altitude bands below them */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <Seg
-                  label={tr("Turbulence affichée")}
-                  value={layer}
-                  onChange={setLayer}
-                  options={[
+              {/* one choice on a 3 x 2 grid: the layers, and below each one an altitude band (< 3 km under all of it,
+                  3-7 km under the boundary layer, jet stream under above the boundary layer) */}
+              <div className="seg" role="group" aria-label={tr("Turbulence affichée")} style={{ display: "inline-grid", gridTemplateColumns: "repeat(3, auto)" }}>
+                {(
+                  [
                     ["tot", tr("Toute la turbulence")],
                     ["bl", tr("Couche limite")],
                     ["haut", tr("Au-dessus de la couche limite")],
-                  ]}
-                />
-                <Seg
-                  label={tr("Turbulence par tranche d'altitude")}
-                  value={layer}
-                  onChange={setLayer}
-                  options={[
                     ["z0", tr("< 3 km")],
                     ["z1", tr("3–7 km")],
                     ["z2", tr("Jet stream")],
-                  ]}
-                />
+                  ] as [typeof layer, string][]
+                ).map(([v, lab], k) => (
+                  <button key={v} className={v === layer ? "on" : undefined} onClick={() => setLayer(v)} style={k >= 3 ? { borderTop: "1px solid var(--line)" } : undefined}>
+                    {lab}
+                  </button>
+                ))}
               </div>
               {layer !== "tot" && !shares && <span className="small muted">{tr("chargement…")}</span>}
               {layer !== "tot" && shares && shares.size === 0 && (
