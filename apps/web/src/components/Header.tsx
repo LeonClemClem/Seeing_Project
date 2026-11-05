@@ -74,7 +74,7 @@ export default function Header() {
             <path d="M4 14c3-2 5 2 8 0s5 2 8 0" fill="none" stroke="#f2a23a" strokeWidth="1.6" />
             <circle cx="12" cy="8" r="1.6" fill="#e6ebf6" />
           </svg>
-          Seeing AROME
+          AstrArome
         </div>
         <nav role="tablist" aria-label={tr("Pages")}>
           {[...TABS, ...(user?.role === "admin" ? ([["/admin", "Administrateur"]] as [string, string][]) : [])].map(([path, label]) => (
