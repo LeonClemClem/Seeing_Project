@@ -108,6 +108,14 @@ a{color:#9cc7ff}
 .acc-sites{padding:6px 10px 10px 28px;background:rgba(255,255,255,.03);animation:accdown .25s ease-out}
 @keyframes accdown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.acc-sites{animation:none}}
+.tuto{display:flex;flex-direction:column;gap:10px}
+.tuto>details>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px}
+.tuto>details>summary::-webkit-details-marker{display:none}
+.tuto>details>summary::before{content:"▸";color:var(--muted);transition:transform .2s}
+.tuto>details[open]>summary::before{transform:rotate(90deg)}
+.tuto>details>summary h2{margin:0}
+.tuto-body{margin-top:10px;line-height:1.65;max-width:80ch;animation:accdown .25s ease-out}
+.tuto-body p{margin:0 0 10px}.tuto-body ul,.tuto-body ol{margin:0 0 10px;padding-left:20px}
 .dateband{background:#0b1220;padding:8px 14px 9px;border-radius:6px 6px 0 0}.dateband .tbar{height:3px;background:rgba(255,255,255,.18);margin-top:7px}.dateband .tbar i{display:block;height:3px;background:#f2c14e}.dateband .t{color:#fff;font-size:22px;font-weight:600;line-height:1.2}.dateband .s{color:#c9d3e6;font-size:12px}
 .wake{display:flex;align-items:center;justify-content:center;gap:10px;padding:8px 16px;background:#173257;color:#9cc7ff;font-size:13px}
 .spinner{width:22px;height:22px;border:3px solid var(--line);border-top-color:#9cc7ff;border-radius:50%;animation:spin .8s linear infinite;flex:none}
