@@ -351,7 +351,7 @@ export default function Carte() {
   }, []);
   /** Loading icon over the map while it loads (ends on its Airy pattern once the map is there). */
   const mapFetching = useGlobalMapLoading();
-  const mapLd = useLoading(!gmap && mapFetching);
+  const mapLd = useLoading(!gmap && mapFetching, { padding: 0, color: "#c9d3e6", fontSize: 14 }, 60);
   const RUN0 = gmap ? Date.parse(gmap.meta.run_time) : runTime ? Date.parse(runTime) : REF + 12 * 3600000;
 
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -1015,7 +1015,11 @@ export default function Carte() {
               </button>
             </div>
           </div>
-          <DateBand title={exportTitle} sub={exportSub} progress={mode === "h" && lastI > 0 ? MI / lastI : null} />
+          {/* loading icon at the top right, in the date band */}
+          <div style={{ position: "relative" }}>
+            <DateBand title={exportTitle} sub={exportSub} progress={mode === "h" && lastI > 0 ? MI / lastI : null} />
+            {mapLd.show && <div className="band-load">{mapLd.spinner}</div>}
+          </div>
           <div style={{ position: "relative" }}>
             <canvas
               ref={canvas}
@@ -1029,11 +1033,6 @@ export default function Carte() {
               onPointerCancel={() => (drag.current = null)}
               onPointerLeave={() => setHoverXY(null)}
             />
-            {mapLd.show && (
-              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-                {mapLd.spinner}
-              </div>
-            )}
             {hoverXY && !isNaN(tipSee) && (
               <div className="maptip" style={{ left: `${(hoverXY[0] / CW) * 100}%`, top: `${(hoverXY[1] / CH) * 100}%` }}>
                 {tipSee.toFixed(1)}″

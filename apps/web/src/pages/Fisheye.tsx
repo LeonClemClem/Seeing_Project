@@ -145,7 +145,7 @@ export default function Fisheye() {
     staleTime: 30 * 60 * 1000,
   });
   const fe = fq.data;
-  const feLd = useLoading(fq.isLoading);
+  const feLd = useLoading(fq.isLoading, { padding: 0, color: "#c9d3e6", fontSize: 14 }, 60);
   // "Calibré": only once the place is calibrated (K saved at least once; curated sites), where its K are visible
   const kSeen = place.real && !kHidden(place, role) && !!place.calibrated;
   const cal = kSeen ? calPick : "carte";
@@ -484,13 +484,12 @@ export default function Fisheye() {
       </p>
       <div className="grid2">
         <div className="panel">
-          <DateBand title={title(t)} sub={sub(t)} progress={(FNI * 11 + fcur) / (nights.length * 11 - 1)} />
+          {/* loading icon at the top right, in the date band */}
+          <div style={{ position: "relative" }}>
+            <DateBand title={title(t)} sub={sub(t)} progress={(FNI * 11 + fcur) / (nights.length * 11 - 1)} />
+            {feLd.show && <div className="band-load">{feLd.spinner}</div>}
+          </div>
           <div style={{ position: "relative" }} onMouseLeave={() => setHov(null)}>
-            {feLd.show && (
-              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 1 }}>
-                {feLd.spinner}
-              </div>
-            )}
             <canvas
               ref={cv}
               width={FN}
