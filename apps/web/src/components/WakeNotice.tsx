@@ -5,6 +5,7 @@ import { useIsFetching } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { tr } from "../i18n";
+import { SpeckleIcon } from "./SpeckleIcon";
 
 const WAKE_MS = 2500;
 const IDLE_MS = 10 * 60 * 1000;
@@ -26,7 +27,7 @@ export default function WakeNotice() {
   if (!show) return null;
   return (
     <div className="wake" role="status" aria-live="polite">
-      <span className="spinner" aria-hidden="true" />
+      <SpeckleIcon />
       {tr("Le serveur se réveille (il s'endort quand personne ne s'en sert) : encore quelques secondes…")}
     </div>
   );
