@@ -652,11 +652,20 @@ export default function Carte() {
     });
     // Cities, as research/carte_seeing.py (ajoute_villes): white dots ringed in black, small translucent names.
     cx.font = `${big ? 11 : 9}px 'IBM Plex Sans',sans-serif`;
-    const domView = VW.la1 - VW.la0 > 12;
-    VILLES.forEach(([nom, la, lo, minor]) => {
-      if ((minor && domView) || (minor === 2 && !fineView)) return;
+    // tier 1 once out of the domain view, tier 2 from a map ~8 degrees high, tier 3 in the fine view (<= 4 degrees);
+    // a city whose name would overlap one already written is left out (the list is in order of importance)
+    const vh = VW.la1 - VW.la0,
+      shownTier = vh > 12 ? 0 : vh > 8 ? 1 : vh > FINE_VIEW_DEG ? 2 : 3,
+      boxes: [number, number, number, number][] = [];
+    VILLES.forEach(([nom, la, lo, tier = 0]) => {
+      if (tier > shownTier) return;
       const [x, y] = toXY(la, lo);
       if (x < -20 || x > CW + 20 || y < -20 || y > CH + 20) return;
+      const bw = cx.measureText(nom).width + 8,
+        bh = big ? 13 : 11,
+        b: [number, number, number, number] = [x - 3, y - 3 - bh, x + 4 + bw, y + 4];
+      if (tier && boxes.some((o) => b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1])) return;
+      boxes.push(b);
       cx.beginPath();
       cx.arc(x, y, big ? 3 : 2.2, 0, 7);
       cx.fillStyle = "#fff";
