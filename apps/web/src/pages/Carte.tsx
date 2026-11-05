@@ -1024,29 +1024,33 @@ export default function Carte() {
               if (nlMsg && !nlMsg.ok) setNlMsg(null);
             }}
           />
-          <label className="small" style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 8 }}>
-            <input type="checkbox" checked={nl.share} onChange={(e) => setNl({ ...nl, share: e.target.checked })} />{" "}
-            {tr("Partager avec la communauté")}
-          </label>
-          <p style={{ margin: "-4px 0 10px", fontSize: 15, fontWeight: 700, color: "#f2c14e" }}>
-            <span
-              style={{
-                display: "inline-flex",
-                width: 20,
-                height: 20,
-                borderRadius: "50%",
-                background: "#f2c14e",
-                color: "#000",
-                justifyContent: "center",
-                alignItems: "center",
-                marginRight: 6,
-                fontWeight: 800,
-              }}
-            >
-              !
+          {/* sharing, and on its right what it means for the position */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginBottom: 10 }}>
+            <label className="small" style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <input type="checkbox" checked={nl.share} onChange={(e) => setNl({ ...nl, share: e.target.checked })} />{" "}
+              {tr("Partager avec la communauté")}
+            </label>
+            <span style={{ display: "inline-flex", alignItems: "center", fontSize: 14, fontWeight: 700, color: "#f2c14e" }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  width: 18,
+                  height: 18,
+                  borderRadius: "50%",
+                  background: "#f2c14e",
+                  color: "#000",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginRight: 6,
+                  fontWeight: 800,
+                  fontSize: 12,
+                }}
+              >
+                !
+              </span>
+              {tr("La position sera floutée de 5 à 11 km")}
             </span>
-            {tr("La position sera floutée de 5 à 11 km")}
-          </p>
+          </div>
           <button className="primary" onClick={create}>
             {tr("Créer le lieu")}
           </button>
