@@ -121,6 +121,7 @@ a{color:#9cc7ff}
 .legend-rows>div{display:grid;grid-template-columns:18px minmax(0,1fr);column-gap:8px;align-items:center}
 .legend-rows>div>:first-child{justify-self:center;margin:0}
 .pvcompact{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:2px 0 4px}.pvcompact>span{flex-basis:100%}.pvcompact label{display:flex;gap:4px;align-items:center;cursor:pointer;white-space:nowrap}
+.upd-ok,.upd-ok b{color:#6fd486}
 .dateband{background:#0b1220;padding:8px 14px 9px;border-radius:6px 6px 0 0}.dateband .tbar{height:3px;background:rgba(255,255,255,.18);margin-top:7px}.dateband .tbar i{display:block;height:3px;background:#f2c14e}.dateband .t{color:#fff;font-size:22px;font-weight:600;line-height:1.2}.dateband .s{color:#c9d3e6;font-size:12px}
 .wake{display:flex;align-items:center;justify-content:center;gap:10px;padding:8px 16px;background:#173257;color:#9cc7ff;font-size:13px}
 .spinner{width:22px;height:22px;border:3px solid var(--line);border-top-color:#9cc7ff;border-radius:50%;animation:spin .8s linear infinite;flex:none}

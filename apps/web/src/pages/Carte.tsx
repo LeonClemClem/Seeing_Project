@@ -346,7 +346,7 @@ export default function Carte() {
   const user = useUser();
   const { create: createPlace } = usePlaceActions();
   const { runTime } = useLatestRunTime();
-  const { updated, next: nextAt } = useRunUpdates();
+  const { updated, next: nextAt, fresh } = useRunUpdates();
   const gmap = useGlobalMap();
   /** Height of the title + introduction, given to the logo on their right. */
   const titleBox = useRef<HTMLDivElement>(null);
@@ -1317,7 +1317,9 @@ export default function Carte() {
               {updated != null && (
                 <>
                   {" · "}
-                  {tr("mis à jour le")} <b className="mono">{`${ddmm(new Date(updated))} ${hhmm(updated)} TU`}</b>
+                  <span className={fresh ? "upd-ok" : undefined} title={fresh ? tr("À jour") : undefined}>
+                    {tr("mis à jour le")} <b className="mono">{`${ddmm(new Date(updated))} ${hhmm(updated)} TU`}</b>
+                  </span>
                 </>
               )}
               {" "}
@@ -1337,7 +1339,7 @@ export default function Carte() {
             </p>
             <p className="note">
               {tr(
-                "Calcul global sur tout le domaine AROME, terre et mer, toutes les 6 heures, à chaque run principal : 00Z, 06Z, 12Z, 18Z ; les runs secondaires ne sont pas utilisés. La carte a sa propre calibration, réglée par l'administrateur et affinée avec les mesures : elle ne change pas avec la calibration des lieux. Hors du domaine AROME, un lieu passe par la file d'attente.",
+                "Calcul global sur tout le domaine AROME, terre et mer, toutes les 6 heures, à chaque run principal : 00Z, 06Z, 12Z, 18Z ; les runs secondaires ne sont pas utilisés. La carte a sa propre calibration, réglée par l'administrateur et affinée avec les mesures : elle ne change pas avec la calibration des lieux.",
               )}
             </p>
           </div>

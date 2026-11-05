@@ -1,4 +1,5 @@
 import { useQuery, useIsFetching } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
 import { api, queryKeys, type MapMeta } from "../api";
 
@@ -84,6 +85,12 @@ const RUN_COMPUTE_MIN = 40;
  * soon as the run is published. */
 export function useRunUpdates() {
   const { query } = useLatestRunTime();
+  // re-evaluated every minute, so that the "up to date" colour goes once the next update is due
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(id);
+  }, []);
   const fin = query.data?.finished_at;
   const run = query.data?.run_time;
   const updated = fin ? Date.parse(fin) : null;
@@ -95,5 +102,7 @@ export function useRunUpdates() {
       firing = hour + 45 * 60000 >= pub ? hour + 45 * 60000 : hour + 105 * 60000;
     next = firing + RUN_COMPUTE_MIN * 60000;
   }
-  return { updated, next: next != null && next > Date.now() ? next : null };
+  // fresh: the map is the latest one expected (the next update is not due yet); false once that time has passed
+  const due = next != null && next > Date.now() ? next : null;
+  return { updated, next: due, fresh: updated != null && due != null };
 }
