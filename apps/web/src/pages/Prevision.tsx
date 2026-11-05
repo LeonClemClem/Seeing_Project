@@ -289,6 +289,8 @@ function ModelVars({ place }: { place: Place }) {
     () => (forecast.data ? PVGRP.map((_, k) => pvPanel(forecast.data!, place.nom, sel[k]!, zoom)) : null),
     [forecast.data, place.nom, sel, zoom],
   );
+  const vld = useLoading(forecast.isLoading);
+  if (vld.show) return vld.spinner;
   if (forecast.data && !forecast.data.points.length) return <PendingForecast pad={16} />;
   if (!forecast.data || !panels) return <p className="muted small">{tr("Pas de variables enregistrées pour ce lieu.")}</p>;
   const dg = (v: number) => (Math.abs(v) >= 20 ? v.toFixed(0) : Math.abs(v) >= 2 ? v.toFixed(1) : v.toFixed(2));

@@ -13,7 +13,7 @@ import { Cn2RealPanel, DataChips, HistPanel } from "../components/panels";
 import { RunAgeSkill } from "../components/RunAgeSkill";
 import { Cn2Legend, LegMed, LegMes, Seg, Sw, SvgChart } from "../components/ui";
 import { useUser } from "../data/auth";
-import { useSiteHistory } from "../data/forecast";
+import { usePlaceLoading, useSiteHistory } from "../data/forecast";
 import { useNavigate } from "react-router-dom";
 
 import { kHidden, kSecret, selectPlace, TEAM_SITE, useCurrentPlace, usePlaces, type Place } from "../data/places";
@@ -25,6 +25,7 @@ import { calib, chourly, comp, cstats, exampleCsv, hourKey, isNx, NO_FILTER, see
 import { nightPointsToIso, nightsFromTimes, seeTerms, termsModel, type Terms } from "../lib/realCalib";
 import { KDEF, lieuData } from "../mock/engine";
 import { getState, setK, setState, useLangMemo, useUi, type K3 } from "../store";
+import { useLoading } from "../lib/useLoading";
 
 const OFFSETS = [-12, -11, -10, -9, -8, -7, -6, -5, -4, -3.5, -3, -2, -1, 0, 1, 2, 3, 3.5, 4, 4.5, 5, 5.5, 5.75, 6, 6.5, 7, 8, 9, 9.5, 10, 10.5, 11, 12, 12.75, 13, 14];
 const offLabel = (o: number) => {
@@ -499,6 +500,9 @@ function Calibrer() {
   );
   // same forecast as the history: recomputed with the K in service, hours without integrals left out
   const corrR = useLangMemo(() => (hist ? corrChart(hist, corrf, selNight, cal.F.rm) : null), [hist, corrf, selNight, cal]);
+  const placeLoading = usePlaceLoading(place);
+  const corrLd = useLoading(place.real && !corrR && placeLoading);
+  const mesLd = useLoading(editable && mq.isLoading, { padding: "4px 0", justifyContent: "flex-start" }, 26);
   useEffect(() => setSaved(""), [K]);
 
   const kb = (k: "L" | 0 | 1, f: number) => {
@@ -701,7 +705,7 @@ function Calibrer() {
                 </>
               )}
               <div style={{ marginTop: 8 }}>
-                {editable && <span className="small muted">{tr(mq.isLoading ? "Chargement des mesures…" : "Mesures enregistrées sur le serveur :")} </span>}
+                {mesLd.show ? mesLd.spinner : editable && <span className="small muted">{tr("Mesures enregistrées sur le serveur :")} </span>}
                 {[...nights.keys()].sort().map((k) => (
                   <span
                     key={k}
@@ -816,6 +820,8 @@ function Calibrer() {
                   </p>
                   <SvgChart html={corrR.svg} viewBox="0 0 340 320" label="Corrélation" style={{ maxWidth: 520 }} />
                 </>
+              ) : corrLd.show ? (
+                corrLd.spinner
               ) : place.real ? (
                 <p className="muted" style={{ textAlign: "center", padding: "40px 0" }}>
                   {tr("Corrélation : choisis un lieu avec seeing monitor.")}
