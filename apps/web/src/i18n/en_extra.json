@@ -334,5 +334,19 @@
 "moyens": "medium",
 "hauts": "high",
 "Turbulence par tranche d'altitude": "Turbulence by altitude band",
-"pour sa bibliothèque Python": "for the Python library"
+"pour sa bibliothèque Python": "for the Python library",
+"Comptes": "Accounts",
+"Clique sur un compte pour voir ses lieux. Jamais d'e-mail : un membre est un numéro de compte.": "Click an account to see its places. Never an e-mail: a member is an account number.",
+"Nom affiché": "Display name",
+"Rôle": "Role",
+"Lieux": "Places",
+"Créé le": "Created",
+"Dernière connexion": "Last sign-in",
+"supprimé": "deleted",
+"e-mail non confirmé": "e-mail not confirmed",
+"archivé(s)": "archived",
+"Aucun lieu.": "No place.",
+"membre": "member",
+"équipe": "team",
+"administrateur": "administrator"
 }

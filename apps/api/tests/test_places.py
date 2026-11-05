@@ -128,6 +128,10 @@ def test_admin_knows_coordinates_never_emails():
     row = next(r for r in ov["sites"] if r["slug"] == pub["slug"])
     assert (row["lat"], row["lon"]) == (45.2, 6.2) and row["owner"].startswith("compte n°")
     assert "example.org" not in str(ov)
+    # every account, by number (its places: the sites whose owner is that number)
+    acc = {a["label"]: a for a in ov["accounts"]}
+    assert row["owner"] in acc and acc[row["owner"]]["role"] == "user" and acc[row["owner"]]["active"]
+    assert any(a["role"] == "admin" for a in ov["accounts"])
 
 
 def test_delete_account_anonymizes_and_keeps_the_data():

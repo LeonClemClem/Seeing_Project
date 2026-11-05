@@ -115,6 +115,16 @@ export interface AdminOverview {
     k_saved_at: string | null;
   }[];
   k_history: (KHistoryItem & { site: string })[];
+  /** Every account, by number (never the e-mail); its places are the sites whose `owner` is its `label`. */
+  accounts?: {
+    label: string;
+    display_name: string | null;
+    role: string;
+    active: boolean;
+    verified: boolean;
+    created_at: string;
+    last_login_at: string | null;
+  }[];
 }
 
 /** V2bd terms at K = 1 of each valid hour (latest run issued before it). */
