@@ -61,10 +61,16 @@ export function SvgChart(props: { html: string; viewBox: string; label: string; 
 
 /* ---------- legend swatches ---------- */
 /** Loading icon (star in speckles) while a panel's data loads; `done` / `onDone`: see lib/useLoading. */
-export function Spinner({ label = "Chargement…", style, done, onDone }: { label?: string; style?: CSSProperties; done?: boolean; onDone?: () => void }) {
+export function Spinner({
+  label = "Chargement…",
+  style,
+  size,
+  done,
+  onDone,
+}: { label?: string; style?: CSSProperties; size?: number; done?: boolean; onDone?: () => void }) {
   return (
     <div className="spin-wrap" role="status" aria-live="polite" style={style}>
-      <SpeckleIcon done={done} onDone={onDone} />
+      <SpeckleIcon size={size} done={done} onDone={onDone} />
       {tr(label)}
     </div>
   );
