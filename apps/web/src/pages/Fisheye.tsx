@@ -145,7 +145,7 @@ export default function Fisheye() {
     staleTime: 30 * 60 * 1000,
   });
   const fe = fq.data;
-  const feLd = useLoading(fq.isLoading, { padding: 0, color: "#c9d3e6", fontSize: 14 }, 60);
+  const feLd = useLoading(fq.isLoading, { padding: 0, color: "#c9d3e6", fontSize: 13 }, 42);
   // "Calibré": only once the place is calibrated (K saved at least once; curated sites), where its K are visible
   const kSeen = place.real && !kHidden(place, role) && !!place.calibrated;
   const cal = kSeen ? calPick : "carte";
