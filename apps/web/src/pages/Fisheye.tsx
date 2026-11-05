@@ -27,6 +27,7 @@ import { BAND, banded, canvasToPng, downloadBlob, encodeGif, nextPaint } from ".
 import { D2R, fmt, JOURS, pad2, runLabel, seeingGradient, seeingRgb } from "../lib/util";
 import { KDEF, REF } from "../mock/engine";
 import { useUi, type K3 } from "../store";
+import { useLoading } from "../lib/useLoading";
 
 /** Compass point of an azimuth (8 directions, French). */
 const dir8 = (az: number) => ["N", "NE", "E", "SE", "S", "SO", "O", "NO"][Math.round(az / 45) % 8]!;
@@ -144,6 +145,7 @@ export default function Fisheye() {
     staleTime: 30 * 60 * 1000,
   });
   const fe = fq.data;
+  const feLd = useLoading(fq.isLoading);
   // "Calibré": only once the place is calibrated (K saved at least once; curated sites), where its K are visible
   const kSeen = place.real && !kHidden(place, role) && !!place.calibrated;
   const cal = kSeen ? calPick : "carte";
@@ -484,6 +486,11 @@ export default function Fisheye() {
         <div className="panel">
           <DateBand title={title(t)} sub={sub(t)} progress={(FNI * 11 + fcur) / (nights.length * 11 - 1)} />
           <div style={{ position: "relative" }} onMouseLeave={() => setHov(null)}>
+            {feLd.show && (
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 1 }}>
+                {feLd.spinner}
+              </div>
+            )}
             <canvas
               ref={cv}
               width={FN}

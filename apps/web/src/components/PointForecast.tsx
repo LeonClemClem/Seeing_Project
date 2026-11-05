@@ -13,7 +13,8 @@ import { pointPlace, selectPlace, type Place } from "../data/places";
 import { tr } from "../i18n";
 import { parseCoord } from "../lib/geo";
 import { setState, useLangMemo, useUi } from "../store";
-import { Spinner, SvgChart } from "./ui";
+import { SvgChart } from "./ui";
+import { useLoading } from "../lib/useLoading";
 
 /** Seeing forecast of the global maps at a point, with its coordinates, AROME ground height and run. */
 export function PointSeeing({ lat, lon }: { lat: number; lon: number }) {
@@ -32,7 +33,8 @@ export function PointSeeing({ lat, lon }: { lat: number; lon: number }) {
     } as unknown as Forecast;
     return prevRealSvg(fc, "", undefined, [], mesf);
   }, [q.data, mesf]);
-  if (q.isLoading) return <Spinner />;
+  const ld = useLoading(q.isLoading);
+  if (ld.show) return ld.spinner;
   if (q.isError || !q.data)
     return (
       <p className="muted" style={{ textAlign: "center", padding: "20px 0" }}>

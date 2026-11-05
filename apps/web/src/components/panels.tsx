@@ -11,7 +11,8 @@ import { setState, useLangMemo, useUi, type UiState } from "../store";
 import { exportSvgIn, fileSafe } from "../lib/export";
 import { pad2 } from "../lib/util";
 import { PendingForecast } from "./PendingForecast";
-import { Chip, Seg, Spinner, SvgChart } from "./ui";
+import { Chip, Seg, SvgChart } from "./ui";
+import { useLoading } from "../lib/useLoading";
 
 /** Measurement display chips ("Données : brutes / médianes horaires / courbe / ☾ médianes nocturnes"). */
 export function DataChips({ id }: { id: string }) {
@@ -223,6 +224,7 @@ export function Cn2RealPanel({
   const [zoom, setZoom] = useState(1);
   const [smooth, setSmooth] = useState(false);
   const { forecast, cn2 } = useRealForecast(place, view);
+  const ld = useLoading(cn2.isLoading);
   const histMed = useHourlyMedians(place);
   const raw = useRawMeasurements(place);
   const showObs = useUi((s) => s.showObs);
@@ -347,11 +349,11 @@ export function Cn2RealPanel({
       {profile && <span className="small muted">{tr("survole le panneau : profil à l'heure choisie")}</span>}
     </div>
   );
-  if (cn2.isLoading)
+  if (ld.show)
     return (
       <div style={style}>
         {controls}
-        <Spinner />
+        {ld.spinner}
       </div>
     );
   if (cn2.data && !cn2.data.valid_times.length)
