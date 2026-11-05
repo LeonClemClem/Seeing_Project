@@ -23,7 +23,7 @@ def get_h_coulim(sp2: SitePoints, hour: int) -> float:
 
 
 def build_hag_profile(hp1_hour: dict, hp2_hour: dict | None) -> Profile:
-    """HP1 (T, U, V, P) + HP2 (TKE) on the fixed heightAboveGround grid HEIGHTS."""
+    """HP1 (T, U, V, P, relative humidity RH in %) + HP2 (TKE) on the fixed heightAboveGround grid HEIGHTS."""
 
     def arr(source, variable):
         out = np.full(len(HEIGHTS), np.nan)
@@ -45,7 +45,7 @@ def build_hag_profile(hp1_hour: dict, hp2_hour: dict | None) -> Profile:
     if finite_p.size and np.nanmedian(finite_p) > 2000:
         P /= 100.0
 
-    return {"z": HEIGHTS.copy(), "T": T, "U": U, "V": V, "P": P, "TKE": TKE}
+    return {"z": HEIGHTS.copy(), "T": T, "U": U, "V": V, "P": P, "TKE": TKE, "RH": arr(hp1_hour, "r")}
 
 
 def build_isobaric_profile(ip1_hour: dict, ip4_hour: dict | None, surface_altitude: float) -> Profile:

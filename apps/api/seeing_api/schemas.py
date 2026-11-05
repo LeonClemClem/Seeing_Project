@@ -38,7 +38,7 @@ class ForecastPoint(BaseModel):
     h_coulim_m: float | None
     # Ground altitude of the AROME grid point [m] (absolute altitudes, e.g. the jet stream band).
     model_altitude_m: float | None = None
-    # Model variables {t2, dth, u10, u100, u500, shl, shj, tke}, null for older forecasts.
+    # Model variables {t2, rh, dth, u10, u100, u500, shl, shj, tke, ...}, null for older forecasts (rh: since 05/11/2026).
     variables: dict[str, float | None] | None = None
 
 

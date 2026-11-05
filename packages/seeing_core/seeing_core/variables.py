@@ -36,7 +36,7 @@ def _at(p: Profile, key: str, z: float) -> float:
 
 
 def model_variables(hag: Profile, full: Profile, wind10: tuple[float, float] | None = None) -> dict[str, float]:
-    """t2 [deg C] (10 m), dth [K/100 m] (10-100 m), u10/u100/u500 [km/h], shl [m/s/km] (10-500 m),
+    """t2 [deg C] (10 m), rh [%] (relative humidity, 10 m), dth [K/100 m] (10-100 m), u10/u100/u500 [km/h], shl [m/s/km] (10-500 m),
     shj [m/s/km] (max shear between consecutive levels in JET_BAND_M), tke [m2/s2] (10 m);
     wind roses: d10/d100/d500 [deg, from where] and u700h/u500h/u250h [km/h] with d700h/d500h/d250h at the
     pressure levels WIND_HPA."""
@@ -48,6 +48,7 @@ def model_variables(hag: Profile, full: Profile, wind10: tuple[float, float] | N
             hag["U"][i[0]], hag["V"][i[0]] = wind10
     t10 = _at(hag, "T", 10.0)
     out["t2"] = t10 - 273.15
+    out["rh"] = _at(hag, "RH", 10.0) if "RH" in hag else np.nan
     th10 = potential_temperature(t10, _at(hag, "P", 10.0))
     th100 = potential_temperature(_at(hag, "T", 100.0), _at(hag, "P", 100.0))
     out["dth"] = (th100 - th10) / 90.0 * 100.0

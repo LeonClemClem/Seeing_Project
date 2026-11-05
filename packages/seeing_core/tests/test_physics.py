@@ -102,6 +102,7 @@ def _synthetic_run(hours=(0, 1, 2)):
             "u": {z: 2.0 + 0.004 * z for z in HEIGHTS},
             "v": {z: 1.0 for z in HEIGHTS},
             "pres": {z: 100.0 * 900.0 * np.exp(-z / 8000.0) for z in HEIGHTS},  # Pa -> converted
+            "r": {z: 80.0 - 0.01 * z for z in HEIGHTS},  # relative humidity [%]
         }
         hp2[h] = {"tke": {z: 0.3 for z in HEIGHTS}}
         levels = [850.0, 700.0, 600.0, 500.0, 400.0, 300.0, 250.0, 200.0]
@@ -194,6 +195,7 @@ def test_model_variables_of_the_synthetic_profile():
     v = h.variables
     # synthetic HP1: T = 288 - 0.004 z, U = 2 + 0.004 z, V = 1, TKE = 0.3
     assert v["t2"] == pytest.approx(288 - 0.04 - 273.15)
+    assert v["rh"] == pytest.approx(80.0 - 0.1)  # relative humidity at 10 m
     assert v["u10"] == pytest.approx(np.hypot(2.04, 1) * 3.6)
     assert v["u500"] == pytest.approx(np.hypot(4.0, 1) * 3.6)
     assert v["shl"] == pytest.approx((4.0 - 2.04) / 0.49)

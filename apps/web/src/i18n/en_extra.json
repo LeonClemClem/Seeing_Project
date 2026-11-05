@@ -349,5 +349,6 @@
 "membre": "member",
 "équipe": "team",
 "administrateur": "administrator",
-"Lieu privé d'un membre (visible par l'administrateur seulement, position exacte)": "A member's private place (seen by the administrator only, exact position)"
+"Lieu privé d'un membre (visible par l'administrateur seulement, position exacte)": "A member's private place (seen by the administrator only, exact position)",
+"Humidité (10 m)": "Humidity (10 m)"
 }
