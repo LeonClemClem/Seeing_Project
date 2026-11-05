@@ -527,10 +527,14 @@ export const PVDEF: [id: string, label: string, unit: string, color: string, rea
   ["shj", "Cisaillement jetstream", " m/s/km", "#e8743b", true],
   ["tke", "TKE", " m²/s²", "#c79bff", true],
   ["t2", "Température", " °C", "#ff6b6b", true],
+  ["rh", "Humidité (10 m)", " %", "#5fd3c6", true],
 ];
+/** Sub-panels of the model variables, at most two units each (one scale on the left, one on the right). */
 export const PVGRP = [
-  ["see", "dth", "hc", "tke", "t2"],
+  ["see", "hc"],
+  ["dth", "tke"],
   ["u10", "u100", "u500", "shl", "shj"],
+  ["t2", "rh"],
 ];
 
 /** Value of variable `id` at time t from the forecast; null where it has none (forecasts computed before
@@ -541,6 +545,22 @@ function pvValue(t: number, id: string, byT: Map<number, Forecast["points"][numb
   if (id === "hc") return p?.h_coulim_m ?? null;
   return p?.variables?.[id] ?? null;
 }
+
+/** Round axis of a variable: [bottom, top, step] covering lo..hi with 2 to 4 round intervals. */
+function niceAxis(lo: number, hi: number): [number, number, number] {
+  if (!(hi - lo > 1e-9)) {
+    const d = Math.abs(lo) > 1e-9 ? Math.abs(lo) * 0.1 : 1;
+    lo -= d;
+    hi += d;
+  }
+  const raw = (hi - lo) / 3,
+    mag = Math.pow(10, Math.floor(Math.log10(raw))),
+    step = ([1, 2, 2.5, 5, 10].map((m) => m * mag).find((x) => x >= raw) ?? 10 * mag),
+    a = Math.floor(lo / step + 1e-9) * step,
+    b = Math.ceil(hi / step - 1e-9) * step;
+  return [a, b, step];
+}
+const axisDigits = (step: number) => (step >= 1 ? 0 : step >= 0.1 ? 1 : step >= 0.01 ? 2 : 3);
 
 export interface PvPanel {
   svg: string;
@@ -575,13 +595,17 @@ export function pvPanel(fc: Forecast, _name: string, sel: Set<string>, zoom = 1)
   });
   const NP = Math.max(1, pos);
   const chosen = PVDEF.filter((q) => sel.has(q[0])),
+    // one scale per unit (curves of the same unit share it), in the colour of its curve when it is the only one;
+    // the first half of the scales on the left, the others on the right
     units = [...new Set(chosen.map((q) => q[2]))],
-    common = units.length === 1,
+    AX = 46,
+    nLeft = Math.ceil(units.length / 2),
+    nRight = units.length - nLeft,
     W = Math.round(640 * zoom),
-    H = 200,
-    L = common ? 44 : 12,
-    R = 8,
-    T = 10,
+    H = 165,
+    L = 8 + AX * Math.max(1, nLeft),
+    R = 8 + AX * nRight,
+    T = 22,
     B = 22,
     pw = W - L - R,
     ph = H - T - B,
@@ -597,29 +621,43 @@ export function pvPanel(fc: Forecast, _name: string, sel: Set<string>, zoom = 1)
       g += `<text x="${X(j) + 2}" y="${T + ph + 15}" font-size="10" fill="${C_TXT}">${ddmm(b0)}→${ddmm(e)}</text>`;
     }
   });
-  let lo = 0,
-    hi = 1;
-  if (common && chosen.length) {
-    lo = Math.min(0, ...chosen.map((q) => D[q[0]]!.lo));
-    hi = Math.max(...chosen.map((q) => D[q[0]]!.hi)) * 1.08 || 1;
-  }
-  const Yc = (v: number) => T + ph - ((v - lo) / (hi - lo)) * ph;
-  if (common && chosen.length) {
-    const st = (hi - lo) / 4,
-      dg = hi - lo >= 20 ? 0 : hi - lo >= 2 ? 1 : 2;
-    for (let k2 = 0; k2 <= 4; k2++) {
-      const v = lo + st * k2;
-      g += `<line x1="${L}" x2="${W - R}" y1="${Yc(v)}" y2="${Yc(v)}" stroke="${C_LINE}" stroke-width="0.6"/><text x="${L - 4}" y="${Yc(v) + 3.5}" text-anchor="end" font-size="10" fill="${C_TXT}">${v.toFixed(dg)}<tspan font-weight="700">${k2 === 4 ? units[0]!.trim() : ""}</tspan></text>`;
-    }
-  } else {
-    for (let k2 = 0; k2 <= 4; k2++)
-      g += `<line x1="${L}" x2="${W - R}" y1="${T + (ph * k2) / 4}" y2="${T + (ph * k2) / 4}" stroke="${C_LINE}" stroke-width="0.6"/>`;
-    if (chosen.length)
-      g += `<text x="${L + 4}" y="${T + 11}" font-size="10" fill="${C_TXT}">${tr("échelle propre à chaque courbe (valeurs à droite)")}</text>`;
-  }
+  // scales: one round axis per unit, covering all its curves
+  const axisOf: Record<string, [number, number, number]> = {},
+    axes: Record<string, [number, number, number]> = {};
+  units.forEach((u) => {
+    const of = chosen.filter((q) => q[2] === u);
+    axisOf[u] = niceAxis(Math.min(...of.map((q) => D[q[0]]!.lo)), Math.max(...of.map((q) => D[q[0]]!.hi)));
+    of.forEach((q) => (axes[q[0]] = axisOf[u]!));
+  });
+  const Yof = (id: string) => {
+    const [a, b] = axes[id]!;
+    return (v: number) => T + ph - ((v - a) / (b - a)) * ph;
+  };
+  // horizontal grid on the ticks of the first scale (quarters when nothing is ticked)
+  const g0 = units.length ? axisOf[units[0]!]! : null,
+    gridY: number[] = [];
+  if (g0) for (let v = g0[0]; v <= g0[1] + g0[2] * 1e-6; v += g0[2]) gridY.push(T + ph - ((v - g0[0]) / (g0[1] - g0[0])) * ph);
+  else for (let k2 = 0; k2 <= 4; k2++) gridY.push(T + (ph * k2) / 4);
+  gridY.forEach((y) => (g += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="${C_LINE}" stroke-width="0.6"/>`));
+  units.forEach((u, k) => {
+    const of = chosen.filter((q) => q[2] === u),
+      col = of.length === 1 ? of[0]![3] : C_TXT,
+      left = k < nLeft,
+      x = left ? L - AX * (nLeft - 1 - k) : W - R + AX * (k - nLeft),
+      [a, b, st] = axisOf[u]!,
+      Y = (v: number) => T + ph - ((v - a) / (b - a)) * ph,
+      dg = axisDigits(st),
+      anchor = left ? "end" : "start",
+      tx = left ? x - 5 : x + 5,
+      name = u.trim() === '"' ? "″" : u.trim() || "–";
+    g += `<line x1="${x}" x2="${x}" y1="${T}" y2="${T + ph}" stroke="${col}" stroke-width="1.1"/>`;
+    for (let v = a; v <= b + st * 1e-6; v += st)
+      g += `<line x1="${left ? x - 3 : x}" x2="${left ? x : x + 3}" y1="${Y(v)}" y2="${Y(v)}" stroke="${col}"/><text x="${tx}" y="${Y(v) + 3.5}" text-anchor="${anchor}" font-size="10" fill="${col}">${(+v.toFixed(dg)).toLocaleString("fr-FR")}</text>`;
+    g += `<text x="${x}" y="${T - 8}" text-anchor="middle" font-size="${name === "″" ? 14 : 10}" font-weight="700" fill="${col}">${name}</text>`;
+  });
   chosen.forEach(([id, , , col]) => {
     const S2 = D[id]!,
-      Y = common ? Yc : (v: number) => T + ph - ((v - S2.lo) / (S2.hi - S2.lo || 1)) * ph * 0.92 - ph * 0.04;
+      Y = Yof(id);
     let seg: number[][] = [],
       pv: number | null = null,
       past = false;

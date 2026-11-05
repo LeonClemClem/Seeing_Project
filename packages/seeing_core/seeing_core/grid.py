@@ -36,7 +36,7 @@ from seeing_core.constants import (
     SSHF_SIGN,
     V2BD_TRANSITION_M,
 )
-from seeing_core.grib import PACKAGES, REQUIRED_PACKAGES, _get, _message_step, parse_grib_filename
+from seeing_core.grib import PACKAGES, POINT_ONLY_VARIABLES, REQUIRED_PACKAGES, _get, _message_step, parse_grib_filename
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +177,8 @@ class GridExtractor:
                                 self._clouds.setdefault(step, {})[short_name] = np.clip(cover, 0.0, 1.0)
                             continue
                         if short_name not in spec.variables or type_of_level not in spec.level_types:
+                            continue
+                        if short_name in POINT_ONLY_VARIABLES:
                             continue
                         step = _message_step(gid)
                         if step not in wanted:

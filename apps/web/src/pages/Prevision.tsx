@@ -284,9 +284,9 @@ function ModelVars({ place }: { place: Place }) {
   const [view, setView] = useState<View>("run");
   const [zoom, setZoom] = useState(1);
   const { forecast } = useRealForecast(place, view);
-  const [sel, setSel] = useState<Set<string>[]>(() => [0, 1].map((k) => new Set(PVGRP[k])));
+  const [sel, setSel] = useState<Set<string>[]>(() => PVGRP.map((g) => new Set(g)));
   const panels = useLangMemo(
-    () => (forecast.data ? [0, 1].map((k) => pvPanel(forecast.data!, place.nom, sel[k]!, zoom)) : null),
+    () => (forecast.data ? PVGRP.map((_, k) => pvPanel(forecast.data!, place.nom, sel[k]!, zoom)) : null),
     [forecast.data, place.nom, sel, zoom],
   );
   const vld = useLoading(forecast.isLoading);
@@ -352,8 +352,8 @@ function ModelVars({ place }: { place: Place }) {
                 )}
                 {sel[k]!.has(id) && (
                   <span className="rg">
-                    {dg(p.ranges[id]![0])}–{dg(p.ranges[id]![1])}
-                    {u.trim()}
+                    {dg(p.ranges[id]![0])} – {dg(p.ranges[id]![1])}
+                    {u.trim() === '"' ? "″" : ` ${u.trim()}`}
                   </span>
                 )}
               </label>
