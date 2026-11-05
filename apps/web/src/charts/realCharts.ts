@@ -527,9 +527,10 @@ export const PVDEF: [id: string, label: string, unit: string, color: string, rea
   ["shj", "Cisaillement jetstream", " m/s/km", "#e8743b", true],
   ["tke", "TKE", " m²/s²", "#c79bff", true],
   ["t2", "Température", " °C", "#ff6b6b", true],
+  ["rh", "Humidité (10 m)", " %", "#5fd3c6", true],
 ];
 export const PVGRP = [
-  ["see", "dth", "hc", "tke", "t2"],
+  ["see", "dth", "hc", "tke", "t2", "rh"],
   ["u10", "u100", "u500", "shl", "shj"],
 ];
 
