@@ -175,7 +175,9 @@ function draw(dr0: number, fade: number, targets: Iterable<HTMLCanvasElement>) {
       cb = Math.min(1, 1.5 * Math.pow(v, 0.75)),
       mc = Math.max(cr, cg, cb),
       t = Math.min(1, Math.max(0, (v - 0.1) / 0.3)), // the dark blue halo fades out too: only the light stays
-      al = mc * t * t * (3 - 2 * t);
+      // soft round mask towards the edge (no visible disc of speckle halo at the start of the cycle)
+      e = Math.min(1, Math.max(0, (r - 0.45) / 0.55)),
+      al = mc * t * t * (3 - 2 * t) * (1 - e * e * (3 - 2 * e));
     d[4 * i] = mc > 0 ? (255 * cr) / mc : 0;
     d[4 * i + 1] = mc > 0 ? (255 * cg) / mc : 0;
     d[4 * i + 2] = mc > 0 ? (255 * cb) / mc : 0;
