@@ -1,24 +1,126 @@
 /** Static pages of the mockup: Tutoriel, À propos, Besoin d'un seeing monitor ? */
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { tr } from "../i18n";
 
 const linkPill = { padding: "6px 12px", border: "1px solid var(--line)", borderRadius: 999, color: "#9cc7ff", textDecoration: "none" };
 
+/** Scientific references of the method (links checked on 05/11/2026), shown in "Méthode et sources". */
+const SOURCES: [string, string | null][] = [
+  ["Cuevas, Marín, Blázquez & Meyer (2024), Combining Cn² models to forecast the optical turbulence at Paranal, MNRAS 529, 2208 — méthode GmMC", "https://doi.org/10.1093/mnras/stae630"],
+  ["Masciadri & Jabouille (2001), Improvements in the optical turbulence parameterization for 3D simulations in a region around a telescope, A&A 376, 727 — Cn² de la couche limite (TKE)", "https://doi.org/10.1051/0004-6361:20010999"],
+  ["Masciadri, Lascaux & Turchi (2017), Optical turbulence forecast: ready for an operational application, MNRAS 466, 520 — modèle de Gladstone modifié (cisaillement)", "https://doi.org/10.1093/mnras/stw3111"],
+  ["Dewan, Good, Beland & Brown (1993), A model for Cn² (optical turbulence) profiles using radiosonde data, PL-TR-93-2043 — modèle comparé", "https://apps.dtic.mil/sti/pdfs/ADA279399.pdf"],
+  ["Wyngaard, Izumi & Collins (1971), Behavior of the refractive-index-structure parameter near the ground, JOSA 61, 1646 — convection libre", "https://doi.org/10.1364/JOSA.61.001646"],
+  ["Wyngaard & LeMone (1980), Behavior of the refractive index structure parameter in the entraining convective boundary layer, J. Atmos. Sci. 37, 1573", "https://doi.org/10.1175/1520-0469(1980)037<1573:BOTRIS>2.0.CO;2"],
+  ["Trinquet & Vernin (2006), A model to forecast seeing and estimate Cn² profiles from meteorological data, PASP 118, 756", "https://doi.org/10.1086/503165"],
+  ["Osborn & Sarazin (2018), Atmospheric turbulence forecasting with a general circulation model for Cerro Paranal, MNRAS 480, 1278", "https://doi.org/10.1093/mnras/sty1898"],
+  ["Fried (1966), Optical resolution through a randomly inhomogeneous medium for very long and very short exposures, JOSA 56, 1372 — paramètre r₀", "https://doi.org/10.1364/JOSA.56.001372"],
+  ["Roddier (1981), The effects of atmospheric turbulence in optical astronomy, Progress in Optics 19, 281 — du Cn² au seeing", "https://doi.org/10.1016/S0079-6638(08)70204-X"],
+  ["Sarazin & Roddier (1990), The ESO differential image motion monitor, A&A 227, 294 — principe des seeing monitors (DIMM)", "https://ui.adsabs.harvard.edu/abs/1990A&A...227..294S/abstract"],
+  ["Tatarskii (1961), Wave propagation in a turbulent medium, McGraw-Hill (livre) — relation entre turbulence et Cn²", null],
+  ["Seity et al. (2011), The AROME-France convective-scale operational model, Monthly Weather Review 139, 976", "https://doi.org/10.1175/2010MWR3425.1"],
+];
+
+/** Tutorial: the method in a few unrolling panels (opened one by one; the first one open). */
+const TUTO: [string, ReactNode][] = [
+  [
+    "D'où vient la prévision ?",
+    <p key="a">
+      {tr(
+        "AROME, le modèle de prévision à maille fine de Météo-France, calcule toutes les heures le vent, la température, l'humidité et la turbulence de l'air, sur une grille d'environ 2 km et sur des dizaines de niveaux, du sol jusqu'à plus de 15 km. Quatre fois par jour (runs de 00, 06, 12 et 18 h TU), le site récupère ces champs et en tire le seeing de chaque heure, pour chaque lieu et pour toute la carte.",
+      )}
+    </p>,
+  ],
+  [
+    "Du modèle au seeing",
+    <>
+      <p key="b1">
+        {tr(
+          "Le seeing vient de la turbulence optique, le Cn² : de petites fluctuations de température qui dévient la lumière. On la reconstruit couche par couche, avec deux origines :",
+        )}
+      </p>
+      <ul key="b2">
+        <li>{tr("près du sol, dans la couche limite : la turbulence calculée par AROME, et la convection quand le sol chauffe ;")}</li>
+        <li>{tr("au-dessus : le cisaillement du vent entre les couches, jusqu'au jet stream.")}</li>
+      </ul>
+      <p key="b3">
+        {tr("En additionnant toutes les couches, on obtient le seeing. C'est la méthode GmMC de Cuevas et al. (2024).")}
+      </p>
+    </>,
+  ],
+  [
+    "Pourquoi calibrer ?",
+    <>
+      <p key="c1">{tr("Le seeing brut du modèle suit bien les variations d'une nuit à l'autre, mais son niveau peut être décalé :")}</p>
+      <ul key="c2">
+        <li>{tr("une maille d'AROME fait environ 2 km : elle ne voit pas les effets locaux du terrain ;")}</li>
+        <li>{tr("le relief y est moyenné : un sommet, un col ou un fond de vallée prennent l'altitude « lissée » de la maille ;")}</li>
+        <li>{tr("le modèle ignore l'environnement immédiat de l'instrument : bâtiments, arbres, coupole, chaleur du sol ;")}</li>
+        <li>{tr("les formules qui passent de la turbulence du modèle au Cn² ont des coefficients réglés en moyenne, pas pour ton site.")}</li>
+      </ul>
+      <p key="c3">
+        {tr(
+          "Le choix du modèle de turbulence compte finalement peu : Cuevas et al. (2024) ont comparé plusieurs modèles de Cn² et, une fois calibrés, ils donnent presque les mêmes résultats. C'est la calibration sur des mesures qui fait la différence.",
+        )}
+      </p>
+    </>,
+  ],
+  [
+    "Comment calibrer ?",
+    <>
+      <p key="d1">
+        {tr(
+          "On compare les prévisions passées aux mesures d'un seeing monitor, heure par heure, nuit après nuit. Deux coefficients sont ajustés pour que la prévision colle aux mesures :",
+        )}
+      </p>
+      <ul key="d2">
+        <li>{tr("K1, pour la turbulence de la couche limite (près du sol) ;")}</li>
+        <li>{tr("K2, pour la turbulence au-dessus (cisaillement, jet stream).")}</li>
+      </ul>
+      <p key="d3">
+        {tr(
+          "Les nuits aberrantes (instrument en défaut, nuages) peuvent être retirées. Plus il y a de nuits mesurées, et des nuits variées, plus le calage est fiable. La carte utilise une calibration commune ; chaque lieu calibré a la sienne.",
+        )}
+      </p>
+    </>,
+  ],
+  [
+    "Calibrer son lieu, pas à pas",
+    <ol key="e">
+      <li>{tr("Crée ton lieu depuis la carte (zoome, puis clique à l'endroit voulu) ou avec « Ajouter un lieu » dans Lieux.")}</li>
+      <li>{tr("Importe les mesures de ton seeing monitor dans Calibrer.")}</li>
+      <li>{tr("Lance le calage : K1 et K2 sont calculés avec tes nuits.")}</li>
+      <li>{tr("Regarde la corrélation prévu / mesuré et l'erreur selon l'âge du run ; retire les nuits douteuses si besoin.")}</li>
+      <li>{tr("Enregistre : tes K servent à partir du run AROME suivant.")}</li>
+    </ol>,
+  ],
+  [
+    "Lire les panneaux",
+    <ul key="f">
+      <li>{tr("Carte : le seeing prévu partout, heure par heure ou en moyenne de nuit ; on peut n'afficher qu'une partie de la turbulence (couche limite, tranches d'altitude, jet stream).")}</li>
+      <li>{tr("Fisheye : le seeing dans chaque direction du ciel depuis ton lieu, avec les nuages et le relief à l'horizon.")}</li>
+      <li>{tr("Cn² : la turbulence en altitude au fil des heures ; le passage de la couche limite à l'atmosphère libre y est visible.")}</li>
+      <li>{tr("Corrélation : chaque point compare une heure (ou une nuit) prévue et mesurée ; plus les points sont près de la diagonale, meilleure est la prévision.")}</li>
+      <li>{tr("Erreur selon l'âge du run : la prévision est-elle meilleure à quelques heures qu'à deux jours ?")}</li>
+    </ul>,
+  ],
+];
+
 export function Tutoriel() {
   return (
     <section>
       <h1>{tr("Tutoriel")}</h1>
-      <div className="panel" style={{ textAlign: "center", padding: "48px 20px" }}>
-        <div style={{ fontSize: 64, lineHeight: 1 }} aria-hidden="true">
-          🔭✨
-        </div>
-        <h2 style={{ fontSize: 28, margin: "18px 0 8px" }}>{tr("Pour bientôt !")}</h2>
-        <p className="muted" style={{ maxWidth: 460, margin: "0 auto" }}>
-          {tr(
-            "On prépare un petit guide pas à pas : lire la carte, comprendre le Cn², caler ses K avec ses mesures… En attendant, bon ciel et beau seeing ! 🌙",
-          )}
-        </p>
+      <p className="lead">{tr("La méthode en quelques panneaux : clique sur un titre pour le dérouler.")}</p>
+      <div className="tuto">
+        {TUTO.map(([title, body], k) => (
+          <details key={title} className="panel" open={k === 0}>
+            <summary>
+              <h2>{tr(title)}</h2>
+            </summary>
+            <div className="tuto-body">{body}</div>
+          </details>
+        ))}
       </div>
     </section>
   );
@@ -75,11 +177,24 @@ export function APropos() {
           </div>
           <div className="panel">
             <h2>{tr("Méthode et sources")}</h2>
-            <p style={{ margin: 0 }}>
+            <p style={{ margin: "0 0 8px" }}>
               {tr(
-                "Seeing calculé à partir des prévisions AROME (Météo-France), par intégration du profil de Cn² selon la méthode GmMC (Cuevas 2024), puis calé sur les mesures des seeing monitors. Le détail viendra dans le tutoriel.",
+                "Seeing calculé à partir des prévisions AROME (Météo-France), par intégration du profil de Cn² selon la méthode GmMC (Cuevas et al. 2024), puis calé sur les mesures des seeing monitors. La méthode est expliquée dans le tutoriel.",
               )}
             </p>
+            <ul className="small" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.55 }}>
+              {SOURCES.map(([t, url]) => (
+                <li key={t}>
+                  {url ? (
+                    <a href={url} target="_blank" rel="noopener noreferrer">
+                      {t}
+                    </a>
+                  ) : (
+                    t
+                  )}
+                </li>
+              ))}
+            </ul>
           </div>
           <div className="panel">
             <h2>{tr("Travaux futurs")}</h2>
