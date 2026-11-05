@@ -284,9 +284,9 @@ function ModelVars({ place }: { place: Place }) {
   const [view, setView] = useState<View>("run");
   const [zoom, setZoom] = useState(1);
   const { forecast } = useRealForecast(place, view);
-  const [sel, setSel] = useState<Set<string>[]>(() => [0, 1].map((k) => new Set(PVGRP[k])));
+  const [sel, setSel] = useState<Set<string>[]>(() => PVGRP.map((g) => new Set(g)));
   const panels = useLangMemo(
-    () => (forecast.data ? [0, 1].map((k) => pvPanel(forecast.data!, place.nom, sel[k]!, zoom)) : null),
+    () => (forecast.data ? PVGRP.map((_, k) => pvPanel(forecast.data!, place.nom, sel[k]!, zoom)) : null),
     [forecast.data, place.nom, sel, zoom],
   );
   if (forecast.data && !forecast.data.points.length) return <PendingForecast pad={16} />;

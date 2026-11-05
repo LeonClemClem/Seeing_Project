@@ -529,9 +529,12 @@ export const PVDEF: [id: string, label: string, unit: string, color: string, rea
   ["t2", "Température", " °C", "#ff6b6b", true],
   ["rh", "Humidité (10 m)", " %", "#5fd3c6", true],
 ];
+/** Sub-panels of the model variables, at most two units each (one scale on the left, one on the right). */
 export const PVGRP = [
-  ["see", "dth", "hc", "tke", "t2", "rh"],
+  ["see", "hc"],
+  ["dth", "tke"],
   ["u10", "u100", "u500", "shl", "shj"],
+  ["t2", "rh"],
 ];
 
 /** Value of variable `id` at time t from the forecast; null where it has none (forecasts computed before
@@ -599,7 +602,7 @@ export function pvPanel(fc: Forecast, _name: string, sel: Set<string>, zoom = 1)
     nLeft = Math.ceil(units.length / 2),
     nRight = units.length - nLeft,
     W = Math.round(640 * zoom),
-    H = 200,
+    H = 165,
     L = 8 + AX * Math.max(1, nLeft),
     R = 8 + AX * nRight,
     T = 22,
