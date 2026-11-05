@@ -80,21 +80,20 @@ export default function Prevision() {
           {place.real ? <Cn2RealPanel place={place} defaultView="run" /> : <MockCn2 place={place} />}
           <KRead place={place} />
         </div>
+        {/* the model variables over the whole width, then correlation and error side by side, the history last */}
+        <div className="panel">
+          <h2>{tr("Variables du modèle (passées et prévues)")}</h2>
+          {place.real ? <ModelVars place={place} /> : <p className="muted small">{tr("Pas de variables enregistrées pour ce lieu.")}</p>}
+        </div>
+        <div className="grid2 eq">
+          <div className="panel">
+            <h2>{tr("Corrélation prévu / mesuré (nuit)")}</h2>
+            {place.real ? <RealCorr place={place} /> : <MockCorr place={place} />}
+          </div>
+          {place.real && <RunAgeSkill place={place} flush />}
+        </div>
         <div className="panel">
           {place.real ? <RealHistory place={place} OB={OB} head={histHead} /> : <MockHistory place={place} OB={OB} head={histHead} />}
-        </div>
-        <div className="grid2" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1.5fr)", alignItems: "start" }}>
-          <div>
-            <div className="panel">
-              <h2>{tr("Corrélation prévu / mesuré (nuit)")}</h2>
-              {place.real ? <RealCorr place={place} /> : <MockCorr place={place} />}
-            </div>
-            {place.real && <RunAgeSkill place={place} />}
-          </div>
-          <div className="panel">
-            <h2>{tr("Variables du modèle (passées et prévues)")}</h2>
-            {place.real ? <ModelVars place={place} /> : <p className="muted small">{tr("Pas de variables enregistrées pour ce lieu.")}</p>}
-          </div>
         </div>
       </div>
     </section>
@@ -338,53 +337,56 @@ function ModelVars({ place }: { place: Place }) {
         <button onClick={() => setZoom((z) => Math.min(16, z * 2))}>+</button>
         <button onClick={() => setZoom(1)}>{tr("tout voir")}</button>
       </div>
-      {panels.map((p, k) => (
-        <div className="pvrow" key={k}>
-          <div style={{ flex: "1 1 auto", minWidth: 0, overflowX: zoom > 1 ? "auto" : "visible" }}>
-            <div style={{ width: `${zoom * 100}%` }}>
-              <SvgChart html={p.svg} viewBox={`0 0 ${p.W} ${p.H}`} label={`Variables du modèle ${k + 1}`} />
+      {/* 4 sub-panels on 2 columns (the panel takes the whole width): ticks on a line above each chart */}
+      <div className="pvgrid">
+        {panels.map((p, k) => (
+          <div className="pvrow" key={k}>
+            <div style={{ flex: "1 1 auto", minWidth: 0, overflowX: zoom > 1 ? "auto" : "visible" }}>
+              <div style={{ width: `${zoom * 100}%` }}>
+                <SvgChart html={p.svg} viewBox={`0 0 ${p.W} ${p.H}`} label={`Variables du modèle ${k + 1}`} />
+              </div>
+            </div>
+            <div className="pvlist">
+              {/* compact rows: the winds and the shears, one checkbox per height / layer on a single line */}
+              {PVCOMPACT.filter((r) => r.ids.every((id) => PVGRP[k]!.includes(id))).map((r) => (
+                <div key={r.label} className="pvcompact">
+                  <span>{tr(r.label)}</span>
+                  {r.ids.map((id, j) => {
+                    const col = PVDEF.find((q) => q[0] === id)![3];
+                    const rg = p.ranges[id]!,
+                      u = PVDEF.find((q) => q[0] === id)![2].trim();
+                    return (
+                      <label key={id} title={sel[k]!.has(id) ? `${dg(rg[0])} – ${dg(rg[1])} ${u}` : undefined}>
+                        <input type="checkbox" checked={sel[k]!.has(id)} onChange={() => toggle(k, id)} />
+                        <span className="sw" style={{ background: col }} />
+                        {tr(r.opts[j]!)}
+                      </label>
+                    );
+                  })}
+                </div>
+              ))}
+              {PVDEF.filter((q) => PVGRP[k]!.includes(q[0]) && !PVCOMPACT.some((r) => r.ids.includes(q[0]))).map(([id, lab, u, col, real]) => (
+                <label key={id}>
+                  <input type="checkbox" checked={sel[k]!.has(id)} onChange={() => toggle(k, id)} />
+                  <span className="sw" style={{ background: col }} />
+                  {tr(lab)}
+                  {!real && (
+                    <span className="muted" title={tr("fictif dans la maquette")}>
+                      *
+                    </span>
+                  )}
+                  {sel[k]!.has(id) && (
+                    <span className="rg">
+                      {dg(p.ranges[id]![0])} – {dg(p.ranges[id]![1])}
+                      {u.trim() === '"' ? "″" : ` ${u.trim()}`}
+                    </span>
+                  )}
+                </label>
+              ))}
             </div>
           </div>
-          <div className="pvlist">
-            {/* compact rows: the winds and the shears, one checkbox per height / layer on a single line */}
-            {PVCOMPACT.filter((r) => r.ids.every((id) => PVGRP[k]!.includes(id))).map((r) => (
-              <div key={r.label} className="pvcompact">
-                <span>{tr(r.label)}</span>
-                {r.ids.map((id, j) => {
-                  const col = PVDEF.find((q) => q[0] === id)![3];
-                  const rg = p.ranges[id]!,
-                    u = PVDEF.find((q) => q[0] === id)![2].trim();
-                  return (
-                    <label key={id} title={sel[k]!.has(id) ? `${dg(rg[0])} – ${dg(rg[1])} ${u}` : undefined}>
-                      <input type="checkbox" checked={sel[k]!.has(id)} onChange={() => toggle(k, id)} />
-                      <span className="sw" style={{ background: col }} />
-                      {tr(r.opts[j]!)}
-                    </label>
-                  );
-                })}
-              </div>
-            ))}
-            {PVDEF.filter((q) => PVGRP[k]!.includes(q[0]) && !PVCOMPACT.some((r) => r.ids.includes(q[0]))).map(([id, lab, u, col, real]) => (
-              <label key={id}>
-                <input type="checkbox" checked={sel[k]!.has(id)} onChange={() => toggle(k, id)} />
-                <span className="sw" style={{ background: col }} />
-                {tr(lab)}
-                {!real && (
-                  <span className="muted" title={tr("fictif dans la maquette")}>
-                    *
-                  </span>
-                )}
-                {sel[k]!.has(id) && (
-                  <span className="rg">
-                    {dg(p.ranges[id]![0])} – {dg(p.ranges[id]![1])}
-                    {u.trim() === '"' ? "″" : ` ${u.trim()}`}
-                  </span>
-                )}
-              </label>
-            ))}
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
       <p className="small muted" style={{ margin: 0 }}>
         {tr("Variables du modèle AROME au point du lieu : vent et température au-dessus du sol (10 m, 100 m, 500 m), stabilité 10–100 m, cisaillement du jet-stream (6–14 km).")}
       </p>
